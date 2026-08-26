@@ -49,7 +49,16 @@ export default function CatalogPage({
           <h2>2. Add Catalog Item</h2>
           <form onSubmit={(e) => { 
             e.preventDefault(); 
-            handleApiCall('/items', itemForm, () => setItemForm({ category_id: '', name: '', unit_of_measure: '', reorder_level: '', is_serialized: false })); 
+            handleApiCall('/items', itemForm, () => setItemForm({ 
+              category_id: '', 
+              name: '', 
+              brand: '', 
+              specifications: '', 
+              type: '', 
+              unit_of_measure: '', 
+              reorder_level: '', 
+              is_serialized: false 
+            })); 
           }}>
             <div style={{ marginBottom: '10px' }}>
               <label>Category</label><br />
@@ -63,27 +72,65 @@ export default function CatalogPage({
                 {(categories || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
+
             <div style={{ marginBottom: '10px' }}>
               <label>Item Name</label><br />
               <input 
                 type="text" 
                 required 
+                placeholder="e.g., Bond Paper, Laptop, Ballpoint Pen"
                 value={itemForm.name || ''} 
                 onChange={e => setItemForm({...itemForm, name: e.target.value})} 
                 style={{ width: '100%', padding: '8px', marginTop: '5px' }}
               />
             </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+              <div style={{ flex: 1 }}>
+                <label>Brand (Optional)</label><br />
+                <input 
+                  type="text" 
+                  placeholder="e.g., Advance, Dell, HP" 
+                  value={itemForm.brand || ''} 
+                  onChange={e => setItemForm({...itemForm, brand: e.target.value})} 
+                  style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label>Specifications (Optional)</label><br />
+                <input 
+                  type="text" 
+                  placeholder="e.g., A4, 70gsm, Core i5" 
+                  value={itemForm.specifications || ''} 
+                  onChange={e => setItemForm({...itemForm, specifications: e.target.value})} 
+                  style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '10px' }}>
+              <label>Item Type (Optional)</label><br />
+              <input 
+                type="text" 
+                placeholder="e.g., Ink, Paper, Hardware" 
+                value={itemForm.type || ''} 
+                onChange={e => setItemForm({...itemForm, type: e.target.value})} 
+                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+              />
+            </div>
+
             <div style={{ marginBottom: '10px' }}>
               <label>Unit of Measure</label><br />
               <input 
                 type="text" 
                 required 
-                placeholder="pcs / box / unit" 
+                placeholder="pcs / box / ream / unit" 
                 value={itemForm.unit_of_measure || ''} 
                 onChange={e => setItemForm({...itemForm, unit_of_measure: e.target.value})} 
                 style={{ width: '100%', padding: '8px', marginTop: '5px' }}
               />
             </div>
+
             <div style={{ marginBottom: '10px' }}>
               <label>Reorder Level</label><br />
               <input 
@@ -101,6 +148,7 @@ export default function CatalogPage({
                 }}
               />
             </div>
+
             <div style={{ marginBottom: '10px' }}>
               <label>
                 <input 
@@ -118,6 +166,7 @@ export default function CatalogPage({
                 Is Serialized Asset? (Equipment)
               </label>
             </div>
+            
             <button type="submit" style={{ padding: '8px 15px', cursor: 'pointer' }}>Save Item</button>
           </form>
         </div>
@@ -133,22 +182,28 @@ export default function CatalogPage({
               <th style={{ border: '1px solid #ddd', padding: '8px' }}>Item Code</th>
               <th style={{ border: '1px solid #ddd', padding: '8px' }}>Item Name</th>
               <th style={{ border: '1px solid #ddd', padding: '8px' }}>Category</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Unit</th>
+              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Brand</th>
+              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Specifications</th>
               <th style={{ border: '1px solid #ddd', padding: '8px' }}>Type</th>
+              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Unit</th>
+              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Tracking Type</th>
               <th style={{ border: '1px solid #ddd', padding: '8px' }}>Reorder Level</th>
             </tr>
           </thead>
           <tbody>
             {(!items || items.length === 0) ? (
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '15px', color: '#777' }}>No items created yet.</td>
+                <td colSpan="9" style={{ textAlign: 'center', padding: '15px', color: '#777' }}>No items created yet.</td>
               </tr>
             ) : (
               items.map(item => (
                 <tr key={item.id}>
                   <td style={{ border: '1px solid #ddd', padding: '8px', fontFamily: 'monospace', fontWeight: 'bold' }}>{item.item_code}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.name}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold' }}>{item.name}</td>
                   <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.category?.name || 'N/A'}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.brand || '—'}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.specifications || '—'}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.type || '—'}</td>
                   <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.unit_of_measure}</td>
                   <td style={{ border: '1px solid #ddd', padding: '8px' }}>
                     {item.is_serialized ? 'Serialized Asset' : 'Consumable / Bulk'}

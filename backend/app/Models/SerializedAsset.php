@@ -10,7 +10,7 @@ class SerializedAsset extends Model
 {
     protected $fillable = [
         'item_id', 'serial_number', 'property_number', 
-        'brand', 'model', 'unit_cost', 'status'
+         'model', 'unit_cost', 'status'
     ];
 
     public function item(): BelongsTo

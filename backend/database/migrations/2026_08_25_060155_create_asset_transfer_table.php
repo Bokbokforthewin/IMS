@@ -21,8 +21,8 @@ return new class extends Migration
             // $table->foreignId('employee_id')->constrained('employees')->onDelete('cascade'); transfered from
             // $table->foreignId('transfered_to')->constrained('employees')->onDelete('cascade');// transfered to
             // Transfer details
-            $table->string('from_office')->nullable();
-            $table->string('to_office')->nullable();
+            $table->string('from_office')->nullable(); //change to employees in the future
+            $table->string('to_office')->nullable(); //change to real employees later on use foreignKey from users table
             $table->string('reason'); // e.g., "Resigned/Retired", "Department Reassignment", "Defect/Maintenance"
             $table->date('transfer_date');
             $table->text('remarks')->nullable();

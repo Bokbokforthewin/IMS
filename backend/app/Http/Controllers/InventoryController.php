@@ -19,8 +19,6 @@ class InventoryController extends Controller
     {
         $validatedData = $request->validate([
             'item_id' => 'required|exists:items,id',
-            'brand' => 'nullable|string|max:255',
-            'specifications' => 'nullable|string|max:255',
             'unit_cost' => 'required|numeric|min:0',
             'arrival_date' => 'nullable|date',
             'is_serialized' => 'required|boolean',
@@ -36,8 +34,7 @@ class InventoryController extends Controller
                 if ($validatedData['is_serialized']) {
                     $serializedData = $request->validate([
                         'serial_number' => 'required|string|max:255|unique:serialized_assets,serial_number',
-                        'brand' => 'required|string|max:255',
-                        'model' => 'required|string|max:255',
+                        'model' => 'nullable|string|max:255',
                     ]);
 
                     // Monthly auto-increment for Property Number with lock
@@ -59,8 +56,7 @@ class InventoryController extends Controller
                         'item_id' => $validatedData['item_id'],
                         'serial_number' => $serializedData['serial_number'],
                         'property_number' => $propertyNumber,
-                        'brand' => $serializedData['brand'],
-                        'model' => $serializedData['model'],
+                        'model' => $serializedData['model'] ?? null,
                         'unit_cost' => $validatedData['unit_cost'],
                         'status' => 'Available',
                     ]);
@@ -92,12 +88,10 @@ class InventoryController extends Controller
 
                     $iarNumber = sprintf("IAR-%s-%s-%s-%03d", $year, $month, $day, $nextSeq);
 
-                    // FIXED: Now saving brand, specifications, and arrival_date to the stock batch!
+                    // Saved cleanly without trying to write to non-existent batch brand/specs columns
                     $batch = StockBatch::create([
                         'item_id' => $validatedData['item_id'],
                         'iar_number' => $iarNumber,
-                        'brand' => $validatedData['brand'] ?? null,
-                        'specifications' => $validatedData['specifications'] ?? null,
                         'quantity_on_hand' => $batchData['quantity'],
                         'unit_cost' => $validatedData['unit_cost'],
                         'received_date' => $arrivalDate,
@@ -138,7 +132,6 @@ class InventoryController extends Controller
     /**
      * Deduct consumables from a specific stock batch safely.
      */
-
     public function issueConsumables(Request $request)
     {
         $validatedData = $request->validate([

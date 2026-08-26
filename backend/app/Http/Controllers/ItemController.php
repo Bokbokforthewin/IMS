@@ -32,6 +32,9 @@ class ItemController extends Controller
         $validatedData = $request->validate([
             'category_id' => 'required|exists:categories,id',
             'name' => 'required|string|max:255',
+            'brand' => 'nullable|string|max:255',
+            'specifications' => 'nullable|string|max:255',
+            'type' => 'nullable|string|max:255',
             'unit_of_measure' => 'required|string|max:50',
             'reorder_level' => 'required|integer|min:0',
             'is_serialized' => 'required|boolean',
@@ -51,7 +54,7 @@ class ItemController extends Controller
                     $catPrefix = str_pad($catPrefix, 3, 'X', STR_PAD_RIGHT);
                 }
 
-                // Base prefix pattern for this category and month (e.g., NEW-2026-08-)
+                // Base prefix pattern for this category and month (e.g., OFF-2026-08-)
                 $prefixPattern = sprintf("%s-%s-%s-", $catPrefix, $year, $month);
 
                 // Find the latest item matching this specific prefix pattern with a row lock
@@ -70,11 +73,14 @@ class ItemController extends Controller
 
                 $itemCode = sprintf("%s%03d", $prefixPattern, $nextSeq);
 
-                // Create the item record
+                // Create the item record including brand, specifications, and type
                 $item = Item::create([
                     'category_id' => $validatedData['category_id'],
                     'item_code' => $itemCode,
                     'name' => $validatedData['name'],
+                    'brand' => $validatedData['brand'] ?? null,
+                    'specifications' => $validatedData['specifications'] ?? null,
+                    'type' => $validatedData['type'] ?? null,
                     'unit_of_measure' => $validatedData['unit_of_measure'],
                     'reorder_level' => $validatedData['reorder_level'],
                     'is_serialized' => $validatedData['is_serialized'],

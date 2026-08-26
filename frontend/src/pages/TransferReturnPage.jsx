@@ -1,33 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-export default function TransferReturnPage({ serializedAssets, handleApiCall, refreshData }) {
+// Recommended: Use an environment variable for your API base URL
+// e.g., VITE_API_URL=http://localhost:8000/api/v1 in your .env file
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+export default function TransferReturnPage({ serializedAssets = [], handleApiCall, refreshData }) {
   const [transfers, setTransfers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
+
   const [form, setForm] = useState({
     serialized_asset_id: '',
     transfer_type: 'RETURN',
     from_office: '',
     to_office: '',
     reason: '',
-    transfer_date: '',
+    transfer_date: new Date().toISOString().split('T')[0],
     remarks: ''
   });
 
   const fetchTransfers = async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
     try {
-      const response = await axios.get('/api/v1/asset-transfers');
-      // Safely unpack data regardless of whether Laravel wraps it in a resource collection or plain array
+      const response = await axios.get(`${API_BASE_URL}/asset-transfers`);
       const rawData = response.data;
       const items = Array.isArray(rawData) ? rawData : (rawData?.data || rawData?.transfers || []);
       setTransfers(items);
     } catch (err) {
       console.error('Failed to load transfer/return records:', err);
+      setErrorMessage('Could not load transfer history logs. Please check your connection.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     fetchTransfers();
   }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await handleApiCall('/asset-transfers', form, () => {
+      setForm({
+        serialized_asset_id: '',
+        transfer_type: 'RETURN',
+        from_office: '',
+        to_office: '',
+        reason: '',
+        transfer_date: new Date().toISOString().split('T')[0],
+        remarks: ''
+      });
+      fetchTransfers();
+      if (typeof refreshData === 'function') refreshData();
+    });
+  };
 
   return (
     <div style={{ border: '1px solid #ccc', padding: '20px', borderRadius: '5px', maxWidth: '800px', margin: '0 auto', background: '#fff' }}>
@@ -36,23 +64,7 @@ export default function TransferReturnPage({ serializedAssets, handleApiCall, re
         Process employee returns or inter-office property transfers.
       </p>
 
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        handleApiCall('/asset-transfers', form, () => {
-          setForm({
-            serialized_asset_id: '',
-            transfer_type: 'RETURN',
-            from_office: '',
-            to_office: '',
-            reason: '',
-            transfer_date: '',
-            remarks: ''
-          });
-          fetchTransfers();
-          if (refreshData) refreshData();
-        });
-      }}>
-        
+      <form onSubmit={handleSubmit}>
         {/* Action Type Radio Buttons */}
         <div style={{ marginBottom: '15px' }}>
           <label style={{ fontWeight: 'bold' }}>Action Type</label><br />
@@ -104,11 +116,7 @@ export default function TransferReturnPage({ serializedAssets, handleApiCall, re
               const brandModel = (a.brand || a.model) ? `(${a.brand || ''} ${a.model || ''})`.trim() : '';
 
               return (
-                <option 
-                  key={a.id} 
-                  value={a.id} 
-                  disabled={disableOption}
-                >
+                <option key={a.id} value={a.id} disabled={disableOption}>
                   {categoryName} {itemName} {brandModel} — SN: {a.serial_number} [{a.status}]
                 </option>
               );
@@ -187,6 +195,13 @@ export default function TransferReturnPage({ serializedAssets, handleApiCall, re
       {/* History Table */}
       <div style={{ marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
         <h3>Return & Transfer History Logs</h3>
+
+        {errorMessage && (
+          <div style={{ padding: '10px', background: '#f8d7da', color: '#721c24', borderRadius: '4px', marginBottom: '10px', fontSize: '13px' }}>
+            {errorMessage}
+          </div>
+        )}
+
         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px', fontSize: '14px' }}>
           <thead>
             <tr style={{ background: '#f4f4f4', textAlign: 'left' }}>
@@ -199,7 +214,11 @@ export default function TransferReturnPage({ serializedAssets, handleApiCall, re
             </tr>
           </thead>
           <tbody>
-            {transfers.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan="6" style={{ textAlign: 'center', padding: '15px', color: '#777' }}>Loading records...</td>
+              </tr>
+            ) : transfers.length === 0 ? (
               <tr>
                 <td colSpan="6" style={{ textAlign: 'center', padding: '15px', color: '#777' }}>No return or transfer records found.</td>
               </tr>

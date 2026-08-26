@@ -48,8 +48,8 @@ export default function AccountabilityPage({ serializedAssets, accountabilityFor
           >
             <option value="">Select asset...</option>
             {(serializedAssets || []).map(a => {
-              const isReleased = a.is_released || a.status === 'released' || a.status === 'Assigned' || !!a.date_issued;
-              if (isReleased) return null; // Only show unreleased assets in dropdown
+              const isAssigned = a.is_assigned || a.status === 'assigned' || a.status === 'Assigned' || !!a.date_issued;
+              if (isAssigned) return null; // Only show unassigned assets in dropdown
               
               const cost = Number(a.unit_cost ?? a.item?.unit_cost ?? a.item?.cost ?? a.item?.price ?? 0);
               const type = cost >= 50000 ? 'PAR' : 'ICS';
@@ -74,11 +74,11 @@ export default function AccountabilityPage({ serializedAssets, accountabilityFor
         </div>
 
         <div style={{ marginBottom: '15px' }}>
-          <label>Remarks / End-User Info</label><br />
+          <label>Purpose / Remarks (Optional)</label><br />
           <input 
             type="text" 
-            placeholder="Issued to [Name / Office]" 
-            value={accountabilityForm.remarks || ''} 
+            placeholder="e.g., Monthly office supplies printing" 
+            value={accountabilityForm.remarks} 
             onChange={e => setAccountabilityForm({...accountabilityForm, remarks: e.target.value})} 
             style={{ width: '100%', padding: '8px', marginTop: '5px' }}
           />
@@ -100,7 +100,6 @@ export default function AccountabilityPage({ serializedAssets, accountabilityFor
               <th style={{ border: '1px solid #ddd', padding: '8px' }}>Type</th>
               <th style={{ border: '1px solid #ddd', padding: '8px' }}>Cost</th>
               <th style={{ border: '1px solid #ddd', padding: '8px' }}>Status</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Remarks / Assigned To</th>
             </tr>
           </thead>
           <tbody>
@@ -112,7 +111,7 @@ export default function AccountabilityPage({ serializedAssets, accountabilityFor
               serializedAssets.map(a => {
                 const cost = Number(a.unit_cost ?? a.item?.unit_cost ?? a.item?.cost ?? a.item?.price ?? 0);
                 const type = cost >= 50000 ? 'PAR' : 'ICS';
-                const isReleased = a.is_released || a.status === 'released' || a.status === 'Assigned' || !!a.date_issued;
+                const isAssigned = a.is_assigned || a.status === 'assigned' || a.status === 'Assigned' || !!a.date_issued;
 
                 return (
                   <tr key={a.id}>
@@ -125,13 +124,12 @@ export default function AccountabilityPage({ serializedAssets, accountabilityFor
                         padding: '3px 8px', 
                         borderRadius: '4px', 
                         fontSize: '12px',
-                        background: isReleased ? '#d4edda' : '#fff3cd',
-                        color: isReleased ? '#155724' : '#856404'
+                        background: isAssigned ? '#d4edda' : '#fff3cd',
+                        color: isAssigned ? '#155724' : '#856404'
                       }}>
-                        {isReleased ? 'Released' : 'Available'}
+                        {isAssigned ? 'Assigned' : 'Available'}
                       </span>
                     </td>
-                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{a.remarks || a.end_user || '—'}</td>
                   </tr>
                 );
               })

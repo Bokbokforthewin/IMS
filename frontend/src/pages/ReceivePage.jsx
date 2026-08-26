@@ -12,9 +12,7 @@ export default function ReceivePage({ items, receiveForm, setReceiveForm, handle
           arrival_date: '',
           is_serialized: false,
           serial_number: '',
-          brand: '',
           model: '',
-          specifications: '',
           quantity: ''
         })); 
       }}>
@@ -35,12 +33,26 @@ export default function ReceivePage({ items, receiveForm, setReceiveForm, handle
             style={{ width: '100%', padding: '8px', marginTop: '5px' }}
           >
             <option value="">Select item...</option>
-            {(items || []).map(i => (
-              <option key={i.id} value={i.id}>
-                {i.name} ({i.is_serialized ? 'Serialized' : 'Consumable'})
-              </option>
-            ))}
+            {(items || []).map(i => {
+              const brandText = i.brand ? `[${i.brand}]` : '';
+              const specText = i.specifications ? `(${i.specifications})` : '';
+              const typeText = i.type ? `- ${i.type}` : '';
+              return (
+                <option key={i.id} value={i.id}>
+                  {i.name} {brandText} {specText} {typeText} — {i.is_serialized ? 'Serialized' : `Consumable (${i.unit_of_measure})`}
+                </option>
+              );
+            })}
           </select>
+          {receiveForm.item_id && (() => {
+            const selectedItem = (items || []).find(i => i.id == receiveForm.item_id);
+            if (!selectedItem) return null;
+            return (
+              <div style={{ marginTop: '6px', fontSize: '13px', color: '#555', background: '#f8f9fa', padding: '6px 10px', borderRadius: '4px', border: '1px solid #eee' }}>
+                <b>Item Code:</b> {selectedItem.item_code} | <b>Brand:</b> {selectedItem.brand || 'N/A'} | <b>Specs:</b> {selectedItem.specifications || 'N/A'} | <b>Unit:</b> {selectedItem.unit_of_measure}
+              </div>
+            );
+          })()}
         </div>
 
         <div style={{ marginBottom: '15px' }}>
@@ -82,24 +94,11 @@ export default function ReceivePage({ items, receiveForm, setReceiveForm, handle
               />
             </div>
 
-            <div style={{ marginBottom: '10px' }}>
-              <label>Brand</label><br />
-              <input 
-                type="text" 
-                placeholder="Brand" 
-                required 
-                value={receiveForm.brand || ''} 
-                onChange={e => setReceiveForm({...receiveForm, brand: e.target.value})} 
-                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-              />
-            </div>
-
             <div>
-              <label>Model</label><br />
+              <label>Model (Optional)</label><br />
               <input 
                 type="text" 
                 placeholder="Model" 
-                required 
                 value={receiveForm.model || ''} 
                 onChange={e => setReceiveForm({...receiveForm, model: e.target.value})} 
                 style={{ width: '100%', padding: '8px', marginTop: '5px' }}
@@ -110,40 +109,20 @@ export default function ReceivePage({ items, receiveForm, setReceiveForm, handle
           <div style={{ background: '#f9f9f9', padding: '15px', borderRadius: '5px', marginBottom: '15px', border: '1px solid #eee' }}>
             <h3 style={{ marginTop: '0', fontSize: '16px' }}>Consumable / Bulk Quantity Details</h3>
             
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-              <div style={{ flex: 1 }}>
-                <label>Brand (Optional)</label><br />
-                <input 
-                  type="text" 
-                  placeholder="e.g., Advance, HP, Pioneer" 
-                  value={receiveForm.brand || ''} 
-                  onChange={e => setReceiveForm({...receiveForm, brand: e.target.value})} 
-                  style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                />
-              </div>
-
-              <div style={{ flex: 1 }}>
-                <label>Specifications / Size (Optional)</label><br />
-                <input 
-                  type="text" 
-                  placeholder="e.g., A4, Short, 70gsm" 
-                  value={receiveForm.specifications || ''} 
-                  onChange={e => setReceiveForm({...receiveForm, specifications: e.target.value})} 
-                  style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                />
-              </div>
-            </div>
-
             <div>
-              <label>Quantity</label><br />
+              <label>Quantity to Receive</label><br />
               <input 
                 type="number" 
                 placeholder="Quantity" 
                 required 
+                min="1"
                 value={receiveForm.quantity || ''} 
                 onChange={e => setReceiveForm({...receiveForm, quantity: e.target.value})} 
                 style={{ width: '100%', padding: '8px', marginTop: '5px' }}
               />
+              <small style={{ color: '#666', display: 'block', marginTop: '4px' }}>
+                * Brand and specifications are already tracked globally via the selected catalog item.
+              </small>
             </div>
           </div>
         )}

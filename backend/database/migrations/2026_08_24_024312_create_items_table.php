@@ -16,6 +16,9 @@ return new class extends Migration
             $table->foreignId('category_id')->constrained('categories')->onDelete('cascade');
             $table->string('item_code')->unique(); // e.g., SUP-PAPER-A4-2026-08
             $table->string('name');
+            $table->string('brand')->nullable();
+            $table->string('specifications')->nullable(); // e.g., "Short", "A4", "70gsm"
+            $table->string('type')->nullable(); //if applicable only
             $table->string('unit_of_measure'); // pcs, ream, box, set, roll, liter, gallon
             $table->integer('reorder_level')->default(5);
             $table->boolean('is_serialized')->default(false);
