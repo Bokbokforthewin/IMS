@@ -84,10 +84,12 @@ export default function ReceivePage({ items, receiveForm, setReceiveForm, handle
             
             <div style={{ marginBottom: '10px' }}>
               <label>Serial Number</label><br />
+              <small style={{ color: '#666', display: 'block', marginBottom: '4px' }}>
+                Required for PAR assets, optional for ICS items.
+              </small>
               <input 
                 type="text" 
-                placeholder="Serial Number" 
-                required 
+                placeholder="Serial Number (if applicable)" 
                 value={receiveForm.serial_number || ''} 
                 onChange={e => setReceiveForm({...receiveForm, serial_number: e.target.value})} 
                 style={{ width: '100%', padding: '8px', marginTop: '5px' }}

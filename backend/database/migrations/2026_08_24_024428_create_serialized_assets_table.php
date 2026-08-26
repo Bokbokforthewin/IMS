@@ -14,10 +14,10 @@ return new class extends Migration
         Schema::create('serialized_assets', function (Blueprint $table) {
             $table->id();
             $table->foreignId('item_id')->constrained('items')->onDelete('cascade');
-            $table->string('serial_number')->unique();
+            $table->string('serial_number')->unique()->nullable();
             $table->string('property_number')->unique(); // e.g., DOH NIR-2026-04-00106
-            $table->string('brand');
-            $table->string('model');
+            $table->string('brand')->nullable();
+            $table->string('model')->nullable();
             $table->decimal('unit_cost', 12, 2);
             $table->enum('status', ['Available', 'Assigned', 'Under Repair', 'Condemned'])->default('Available');
             $table->timestamps();

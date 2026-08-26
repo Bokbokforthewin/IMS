@@ -78,7 +78,7 @@ class ItemController extends Controller
                     'category_id' => $validatedData['category_id'],
                     'item_code' => $itemCode,
                     'name' => $validatedData['name'],
-                    'brand' => $validatedData['brand'] ?? null,
+                    'brand' => $validatedData['brand'] ?? 'N/A',
                     'specifications' => $validatedData['specifications'] ?? null,
                     'type' => $validatedData['type'] ?? null,
                     'unit_of_measure' => $validatedData['unit_of_measure'],

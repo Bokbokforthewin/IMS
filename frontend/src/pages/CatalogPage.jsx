@@ -78,7 +78,7 @@ export default function CatalogPage({
               <input 
                 type="text" 
                 required 
-                placeholder="e.g., Bond Paper, Laptop, Ballpoint Pen"
+                placeholder="e.g., Lenovo Thinkpad, Epson l5290"
                 value={itemForm.name || ''} 
                 onChange={e => setItemForm({...itemForm, name: e.target.value})} 
                 style={{ width: '100%', padding: '8px', marginTop: '5px' }}

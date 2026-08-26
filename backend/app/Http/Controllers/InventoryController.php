@@ -32,7 +32,7 @@ class InventoryController extends Controller
             return DB::transaction(function () use ($request, $validatedData, $year, $month, $day, $arrivalDate) {
                 if ($validatedData['is_serialized']) {
                     $serializedData = $request->validate([
-                        'serial_number' => 'required|string|max:255|unique:serialized_assets,serial_number',
+                        'serial_number' => 'nullable|string|max:255|unique:serialized_assets,serial_number',
                         'model' => 'nullable|string|max:255',
                     ]);
 
@@ -47,7 +47,7 @@ class InventoryController extends Controller
                         $parts = explode('-', $lastProperty->property_number);
                         $nextSeq = intval(end($parts)) + 1;
                     }
-                    
+
                     $propertyNumber = sprintf("DOH NIR-%s-%s-%05d", $year, $month, $nextSeq);
 
                     $asset = SerializedAsset::create([
@@ -64,7 +64,6 @@ class InventoryController extends Controller
                         'property_number' => $propertyNumber,
                         'asset' => $asset
                     ], 201);
-
                 } else {
                     $batchData = $request->validate([
                         'quantity' => 'required|integer|min:1',
@@ -100,7 +99,6 @@ class InventoryController extends Controller
                     ], 201);
                 }
             });
-
         } catch (\Exception $e) {
             Log::error('Failed to save inbound stock: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to save stock: ' . $e->getMessage()], 500);
@@ -117,7 +115,7 @@ class InventoryController extends Controller
                 ->with('item')
                 ->orderBy('created_at', 'desc')
                 ->get();
-                
+
             return response()->json($batches, 200);
         } catch (\Exception $e) {
             Log::error('Failed to fetch stock batches: ' . $e->getMessage());
