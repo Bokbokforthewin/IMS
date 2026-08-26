@@ -7,6 +7,7 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\AccountabilityController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\AssetTransferController;
+use App\Http\Controllers\ConsumablesController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -27,9 +28,12 @@ Route::prefix('v1')->group(function () {
 
     // Inventory & Stock Management
     Route::post('/stocks/receive', [InventoryController::class, 'storeStock']);
-    Route::post('/consumables/issue', [InventoryController::class, 'issueConsumables']);
     Route::get('/stock-batches', [InventoryController::class, 'indexStockBatches']);
-    Route::get('/stock-issuances', [InventoryController::class, 'indexIssuances']);
+
+    // Consumables issuance & stock levels
+    Route::post('/consumables/issue', [ConsumablesController::class, 'issueConsumables']);
+    Route::get('/consumables/stock-status', [ConsumablesController::class, 'getStockStatus']);
+    Route::get('/consumables/issuances', [ConsumablesController::class, 'indexIssuances']);
 
     // Property Accountability & Issuances (PAR / ICS)
     Route::post('/accountability/issue-asset', [AccountabilityController::class, 'issueAsset']);
