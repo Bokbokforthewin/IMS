@@ -1,0 +1,17 @@
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 6px;
+
+  flex-shrink: 0;
+}
+
+.logo__image {
+  display: block;
+
+  object-fit: contain;
+
+  flex-shrink: 0;
+}

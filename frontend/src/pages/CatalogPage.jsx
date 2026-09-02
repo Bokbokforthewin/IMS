@@ -1,4 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
+
+import CategoryForm from '../components/catalog/CategoryForm.jsx';
+import ItemForm from '../components/catalog/ItemForm.jsx';
+
+import CategoryTable from '../components/catalog/CategoryTable.jsx';
+import ItemTable from '../components/catalog/ItemTable.jsx';
+
+import Modal from '../components/Modal.jsx';
+import EditCategoryModal from '../components/catalog/EditCategoryModal.jsx';
+import DeleteCategoryModal from '../components/catalog/DeleteCategoryModal.jsx';
+
+import EditItemModal from '../components/catalog/EditItemModal.jsx';
+import DeleteItemModal from '../components/catalog/DeleteItemModal.jsx';
+
+import '../components/catalog/CatalogPage.css';
+import '../components/catalog/CatalogForms.css';
+import '../components/catalog/CatalogTables.css';
+import '../components/catalog/CatalogModals.css';
 
 export default function CatalogPage({ 
   categories, 
@@ -9,212 +27,194 @@ export default function CatalogPage({
   setItemForm, 
   handleApiCall 
 }) {
+  // Add Form Modal States
+  const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
+  const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
+
+  // Category Delete State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
+
+  // Item Delete State
+  const [isDeleteItemModalOpen, setIsDeleteItemModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+
+  // Category Edit State
+  const [isEditCategoryModalOpen, setIsEditCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState({ id: '', name: '', description: '' });
+
+  // Item Edit State
+  const [isEditItemModalOpen, setIsEditItemModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState({
+    id: '',
+    category_id: '',
+    name: '',
+    brand: '',
+    specifications: '',
+    type: '',
+    unit_of_measure: '',
+    reorder_level: '',
+    is_serialized: false
+  });
+
+  // Item Delete Handlers
+  const handleOpenDeleteItemModal = (item) => {
+    setItemToDelete(item);
+    setIsDeleteItemModalOpen(true);
+  };
+
+  const handleDeleteItem = () => {
+    if (!itemToDelete) return;
+    handleApiCall(`/items/${itemToDelete.id}`, null, () => {
+      setIsDeleteItemModalOpen(false);
+      setItemToDelete(null);
+    }, 'DELETE');
+  };
+
+  // Category Delete Handlers
+  const handleOpenDeleteModal = (cat) => {
+    setCategoryToDelete(cat);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDeleteCategory = () => {
+    if (!categoryToDelete) return;
+    handleApiCall(`/categories/${categoryToDelete.id}`, null, () => {
+      setIsDeleteModalOpen(false);
+      setCategoryToDelete(null);
+    }, 'DELETE');
+  };
+
+  // Category Edit Handlers
+  const handleOpenEditCategoryModal = (cat) => {
+    setEditingCategory({ id: cat.id, name: cat.name, description: cat.description || '' });
+    setIsEditCategoryModalOpen(true);
+  };
+
+  const handleUpdateCategory = (e) => {
+    e.preventDefault();
+    handleApiCall(`/categories/${editingCategory.id}`, editingCategory, () => {
+      setIsEditCategoryModalOpen(false);
+    }, 'PUT');
+  };
+
+  // Item Edit Handlers
+  const handleOpenEditItemModal = (item) => {
+    setEditingItem({
+      id: item.id,
+      category_id: item.category_id,
+      name: item.name,
+      brand: item.brand || '',
+      specifications: item.specifications || '',
+      type: item.type || '',
+      unit_of_measure: item.unit_of_measure,
+      reorder_level: item.reorder_level,
+      is_serialized: !!item.is_serialized
+    });
+    setIsEditItemModalOpen(true);
+  };
+
+  const handleUpdateItem = (e) => {
+    e.preventDefault();
+    handleApiCall(`/items/${editingItem.id}`, editingItem, () => {
+      setIsEditItemModalOpen(false);
+    }, 'PUT');
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '30px', padding: '20px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-        
-        {/* 1. Add Category Form */}
-        <div style={{ border: '1px solid #ccc', padding: '15px', borderRadius: '5px', background: '#fff' }}>
-          <h2>1. Add Category</h2>
-          <form onSubmit={(e) => { 
-            e.preventDefault(); 
-            handleApiCall('/categories', categoryForm, () => setCategoryForm({ name: '', description: '' })); 
-          }}>
-            <div style={{ marginBottom: '10px' }}>
-              <label>Category Name</label><br />
-              <input 
-                type="text" 
-                required 
-                value={categoryForm.name || ''} 
-                onChange={e => setCategoryForm({ ...categoryForm, name: e.target.value })} 
-                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-              />
-            </div>
-            <div style={{ marginBottom: '10px' }}>
-              <label>Description</label><br />
-              <textarea 
-                rows="3"
-                placeholder="Brief category description..."
-                value={categoryForm.description || ''} 
-                onChange={e => setCategoryForm({ ...categoryForm, description: e.target.value })} 
-                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-              />
-            </div>
-            <button type="submit" style={{ padding: '8px 15px', cursor: 'pointer' }}>Save Category</button>
-          </form>
-        </div>
-
-        {/* 2. Add Catalog Item Form */}
-        <div style={{ border: '1px solid #ccc', padding: '15px', borderRadius: '5px', background: '#fff' }}>
-          <h2>2. Add Catalog Item</h2>
-          <form onSubmit={(e) => { 
-            e.preventDefault(); 
-            handleApiCall('/items', itemForm, () => setItemForm({ 
-              category_id: '', 
-              name: '', 
-              brand: '', 
-              specifications: '', 
-              type: '', 
-              unit_of_measure: '', 
-              reorder_level: '', 
-              is_serialized: false 
-            })); 
-          }}>
-            <div style={{ marginBottom: '10px' }}>
-              <label>Category</label><br />
-              <select 
-                required 
-                value={itemForm.category_id || ''} 
-                onChange={e => setItemForm({...itemForm, category_id: e.target.value})}
-                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-              >
-                <option value="">Select Category...</option>
-                {(categories || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '10px' }}>
-              <label>Item Name</label><br />
-              <input 
-                type="text" 
-                required 
-                placeholder="e.g., Lenovo Thinkpad, Epson l5290"
-                value={itemForm.name || ''} 
-                onChange={e => setItemForm({...itemForm, name: e.target.value})} 
-                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-              <div style={{ flex: 1 }}>
-                <label>Brand (Optional)</label><br />
-                <input 
-                  type="text" 
-                  placeholder="e.g., Advance, Dell, HP" 
-                  value={itemForm.brand || ''} 
-                  onChange={e => setItemForm({...itemForm, brand: e.target.value})} 
-                  style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <label>Specifications (Optional)</label><br />
-                <input 
-                  type="text" 
-                  placeholder="e.g., A4, 70gsm, Core i5" 
-                  value={itemForm.specifications || ''} 
-                  onChange={e => setItemForm({...itemForm, specifications: e.target.value})} 
-                  style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '10px' }}>
-              <label>Item Type (Optional)</label><br />
-              <input 
-                type="text" 
-                placeholder="e.g., Ink, Paper, Hardware" 
-                value={itemForm.type || ''} 
-                onChange={e => setItemForm({...itemForm, type: e.target.value})} 
-                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '10px' }}>
-              <label>Unit of Measure</label><br />
-              <input 
-                type="text" 
-                required 
-                placeholder="pcs / box / ream / unit" 
-                value={itemForm.unit_of_measure || ''} 
-                onChange={e => setItemForm({...itemForm, unit_of_measure: e.target.value})} 
-                style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '10px' }}>
-              <label>Reorder Level</label><br />
-              <input 
-                type="number" 
-                required={!itemForm.is_serialized}
-                disabled={itemForm.is_serialized}
-                value={itemForm.is_serialized ? '1' : (itemForm.reorder_level || '')} 
-                onChange={e => setItemForm({...itemForm, reorder_level: e.target.value})} 
-                style={{ 
-                  width: '100%', 
-                  padding: '8px', 
-                  marginTop: '5px',
-                  backgroundColor: itemForm.is_serialized ? '#f0f0f0' : '#fff',
-                  cursor: itemForm.is_serialized ? 'not-allowed' : 'text'
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '10px' }}>
-              <label>
-                <input 
-                  type="checkbox" 
-                  checked={!!itemForm.is_serialized} 
-                  onChange={e => {
-                    const isChecked = e.target.checked;
-                    setItemForm({
-                      ...itemForm, 
-                      is_serialized: isChecked,
-                      reorder_level: isChecked ? '1' : ''
-                    });
-                  }} 
-                />{' '}
-                Is Serialized Asset? (Equipment)
-              </label>
-            </div>
-            
-            <button type="submit" style={{ padding: '8px 15px', cursor: 'pointer' }}>Save Item</button>
-          </form>
-        </div>
-
+    <div className="catalog-page-container">
+      {/* Action Buttons Header */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+        <button 
+          onClick={() => setIsAddCategoryModalOpen(true)} 
+          className="btn-modal btn-primary"
+        >
+          + Add Category
+        </button>
+        <button 
+          onClick={() => setIsAddItemModalOpen(true)} 
+          className="btn-modal btn-primary"
+        >
+          + Add Catalog Item
+        </button>
       </div>
 
-      {/* Catalog Items Table */}
-      <div style={{ border: '1px solid #ccc', padding: '15px', borderRadius: '5px', background: '#fff' }}>
-        <h3>Existing Catalog Items & Generated Codes</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
-          <thead>
-            <tr style={{ background: '#f4f4f4', textAlign: 'left' }}>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Item Code</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Item Name</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Category</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Brand</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Specifications</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Type</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Unit</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Tracking Type</th>
-              <th style={{ border: '1px solid #ddd', padding: '8px' }}>Reorder Level</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(!items || items.length === 0) ? (
-              <tr>
-                <td colSpan="9" style={{ textAlign: 'center', padding: '15px', color: '#777' }}>No items created yet.</td>
-              </tr>
-            ) : (
-              items.map(item => (
-                <tr key={item.id}>
-                  <td style={{ border: '1px solid #ddd', padding: '8px', fontFamily: 'monospace', fontWeight: 'bold' }}>{item.item_code}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold' }}>{item.name}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.category?.name || 'N/A'}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.brand || '—'}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.specifications || '—'}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.type || '—'}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.unit_of_measure}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                    {item.is_serialized ? 'Serialized Asset' : 'Consumable / Bulk'}
-                  </td>
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{item.reorder_level}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* Tables Section */}
+      <CategoryTable 
+        categories={categories} 
+        handleOpenEditCategoryModal={handleOpenEditCategoryModal} 
+        handleOpenDeleteModal={handleOpenDeleteModal} 
+      />
+
+      <ItemTable 
+        items={items} 
+        handleOpenEditItemModal={handleOpenEditItemModal} 
+        handleOpenDeleteItemModal={handleOpenDeleteItemModal} 
+      />
+
+      {/* Add Category Modal */}
+      <Modal isOpen={isAddCategoryModalOpen} title="Add Category" onClose={() => setIsAddCategoryModalOpen(false)}>
+        <CategoryForm 
+          categoryForm={categoryForm} 
+          setCategoryForm={setCategoryForm} 
+          handleApiCall={(url, data, onSuccess) => {
+            handleApiCall(url, data, () => {
+              if (onSuccess) onSuccess();
+              setIsAddCategoryModalOpen(false);
+            });
+          }} 
+        />
+      </Modal>
+
+      {/* Add Item Modal */}
+      <Modal isOpen={isAddItemModalOpen} title="Add Catalog Item" onClose={() => setIsAddItemModalOpen(false)}>
+        <ItemForm 
+          itemForm={itemForm} 
+          setItemForm={setItemForm} 
+          categories={categories} 
+          handleApiCall={(url, data, onSuccess) => {
+            handleApiCall(url, data, () => {
+              if (onSuccess) onSuccess();
+              setIsAddItemModalOpen(false);
+            });
+          }} 
+        />
+      </Modal>
+
+      {/* Edit Category Modal */}
+      <EditCategoryModal 
+        isOpen={isEditCategoryModalOpen}
+        onClose={() => setIsEditCategoryModalOpen(false)}
+        editingCategory={editingCategory}
+        setEditingCategory={setEditingCategory}
+        handleUpdateCategory={handleUpdateCategory}
+      />
+
+      {/* Delete Category Modal */}
+      <DeleteCategoryModal 
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        categoryToDelete={categoryToDelete}
+        handleDeleteCategory={handleDeleteCategory}
+      />
+
+      {/* Edit Item Modal */}
+      <EditItemModal 
+        isOpen={isEditItemModalOpen}
+        onClose={() => setIsEditItemModalOpen(false)}
+        editingItem={editingItem}
+        setEditingItem={setEditingItem}
+        categories={categories}
+        handleUpdateItem={handleUpdateItem}
+      />
+
+      {/* Delete Item Modal */}
+      <DeleteItemModal 
+        isOpen={isDeleteItemModalOpen}
+        onClose={() => setIsDeleteItemModalOpen(false)}
+        itemToDelete={itemToDelete}
+        handleDeleteItem={handleDeleteItem}
+      />
     </div>
   );
 }

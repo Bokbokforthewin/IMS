@@ -16,7 +16,7 @@ class AccountabilityController extends Controller
             $assets = SerializedAsset::with('item')
                 ->orderBy('created_at', 'desc')
                 ->get();
-                
+
             return response()->json($assets, 200);
         } catch (\Exception $e) {
             Log::error('Failed to fetch serialized assets: ' . $e->getMessage());
@@ -63,7 +63,6 @@ class AccountabilityController extends Controller
                 }
 
                 $item = $asset->item;
-                // Fallback check across common column names for unit price on both asset and item
                 $unitCost = $asset->unit_cost ?? $asset->cost ?? $asset->price ?? 0;
                 if (!$unitCost && $asset->item) {
                     $item = $asset->item;
@@ -107,7 +106,6 @@ class AccountabilityController extends Controller
                     'receipt' => $receipt
                 ], 201);
             });
-
         } catch (\Exception $e) {
             Log::error('Failed to issue asset: ' . $e->getMessage());
             return response()->json([

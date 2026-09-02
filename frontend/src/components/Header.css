@@ -1,0 +1,310 @@
+/* ============================================================
+   Header
+   ============================================================ */
+
+.site-header {
+  background-color: var(--color-navy);
+  color: var(--color-white);
+
+  flex-shrink: 0;
+
+  position: relative;
+  z-index: 50;
+}
+
+.site-header__inner {
+  display: flex;
+  align-items: center;
+
+  min-height: 8vh;
+
+  width: 100%;
+}
+
+
+/* ============================================================
+   Brand
+   ============================================================ */
+
+.site-header__brand {
+  display: flex;
+  align-items: center;
+
+  /*
+   * Responsive left spacing:
+   * 20px minimum
+   * scales with viewport width
+   * 150px maximum
+   */
+  margin-inline-start: clamp(20px, 8vw, 20px);
+
+  gap: clamp(8px, 1.2vw, 12px);
+
+  min-width: 0;
+}
+
+
+/* ============================================================
+   Logo
+   ============================================================ */
+
+.site-header__logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex-shrink: 0;
+
+  filter:
+    drop-shadow(
+      0 0 4px rgba(226, 224, 224, 0.5)
+    );
+}
+
+
+/* ============================================================
+   Divider
+   ============================================================ */
+
+.site-header__divider {
+  width: 2px;
+  height: 35px;
+
+  flex-shrink: 0;
+
+  background-color: #d1d5db;
+}
+
+
+/* ============================================================
+   Organization Text
+   ============================================================ */
+
+.site-header__text {
+  display: flex;
+  flex-direction: column;
+
+  min-width: 0;
+
+  line-height: 1.15;
+}
+
+
+/* Department of Health */
+
+.site-header__sub {
+  color: #ffffff;
+
+  font-size: clamp(9px, 0.75vw, 11px);
+  font-weight: 700;
+
+  white-space: nowrap;
+
+  text-align: left;
+}
+
+
+/* NEGROS ISLAND REGION */
+
+.site-header__name {
+  color: #ffffff;
+
+  font-size: clamp(12px, 1.7vw, 18px);
+  font-weight: 700;
+
+  letter-spacing: 0.01em;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  text-align: left;
+}
+
+
+/* Republic of the Philippines */
+
+.site-header__sub-secondary {
+  color: rgba(255, 255, 255, 0.62);
+
+  font-size: clamp(8px, 0.65vw, 9px);
+  font-weight: 400;
+  font-style: italic;
+
+  white-space: nowrap;
+
+  text-align: left;
+}
+
+
+/* ============================================================
+   Tablet
+   ============================================================ */
+
+@media (max-width: 900px) {
+
+  .site-header__brand {
+    margin-inline-start: 40px;
+    gap: 9px;
+  }
+
+  .site-header__divider {
+    height: 32px;
+  }
+
+  .site-header__name {
+    font-size: 18px;
+  }
+}
+
+
+/* ============================================================
+   Mobile
+   ============================================================ */
+
+@media (max-width: 600px) {
+
+  .site-header__brand {
+    margin-inline-start: 15px;
+    gap: 8px;
+  }
+
+  .site-header__name {
+    font-size: 16px;
+  }
+
+  .site-header__sub {
+    font-size: 9px;
+  }
+
+  .site-header__sub-secondary {
+    font-size: 8px;
+  }
+
+  .site-header__divider {
+    height: 30px;
+  }
+}
+
+
+/* ============================================================
+   Small Mobile
+   ============================================================ */
+
+@media (max-width: 480px) {
+
+  .site-header__brand {
+    margin-inline-start: 10px;
+    gap: 7px;
+  }
+
+  .site-header__name {
+    font-size: 14px;
+  }
+
+  .site-header__sub {
+    font-size: 8px;
+  }
+
+  .site-header__sub-secondary {
+    display: none;
+  }
+
+  .site-header__divider {
+    height: 27px;
+  }
+}
+
+
+/* ============================================================
+   Very Small Mobile
+   ============================================================ */
+
+@media (max-width: 360px) {
+
+  .site-header__brand {
+    margin-inline-start: 6px;
+    gap: 6px;
+  }
+
+  .site-header__name {
+    font-size: 13px;
+  }
+
+  .site-header__sub {
+    font-size: 7.5px;
+  }
+
+  .site-header__divider {
+    display: none;
+  }
+}
+
+
+/* ============================================================
+   Tablet
+   ============================================================ */
+
+@media (max-width: 900px) {
+
+  .site-header__brand {
+    gap: 9px;
+  }
+
+  .site-header__divider {
+    height: 44px;
+  }
+}
+
+
+/* ============================================================
+   Mobile
+   ============================================================ */
+
+@media (max-width: 480px) {
+
+  .site-header__inner {
+    min-height: 60px;
+  }
+
+  .site-header__brand {
+    gap: 8px;
+  }
+
+  .site-header__divider {
+    width: 2px;
+    height: 38px;
+  }
+
+  .site-header__name {
+    font-size: 16px;
+  }
+
+  .site-header__sub {
+    font-size: 10px;
+  }
+
+  .site-header__sub-secondary {
+    display: none;
+  }
+}
+
+
+/* ============================================================
+   Very Small Phones
+   ============================================================ */
+
+@media (max-width: 360px) {
+
+  .site-header__name {
+    font-size: 14px;
+  }
+
+  .site-header__sub {
+    font-size: 9px;
+  }
+
+  .site-header__divider {
+    display: none;
+  }
+}

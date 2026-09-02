@@ -69,10 +69,10 @@ export default function App() {
     fetchData();
   }, []);
 
-  const handleApiCall = async (endpoint, payload, onSuccess) => {
+  const handleApiCall = async (endpoint, payload, onSuccess, method = 'POST') => { // <-- Add method parameter here
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'POST',
+        method: method, // <-- Use the dynamic method here instead of hardcoding 'POST'
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(payload)
       });

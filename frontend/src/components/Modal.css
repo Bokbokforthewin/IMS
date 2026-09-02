@@ -1,0 +1,563 @@
+/* ============================================================
+   ENTERPRISE MODAL
+   ============================================================ */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 16px;
+
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(3px);
+
+  overflow-y: auto;
+
+  animation: modal-fade-in 0.18s ease;
+}
+
+
+/* ============================================================
+   MODAL
+   ============================================================ */
+
+.modal {
+  position: relative;
+
+  width: 100%;
+  max-width: 500px;
+  max-height: calc(100vh - 32px);
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  background: #ffffff;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+
+  box-shadow:
+    0 20px 45px rgba(15, 23, 42, 0.18),
+    0 4px 12px rgba(15, 23, 42, 0.08);
+
+  animation: modal-slide-in 0.2s ease;
+}
+
+
+/* ============================================================
+   TOP BRAND ACCENT
+   ============================================================ */
+
+.modal::before {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  left: 0;
+  right: 0;
+
+  height: 3px;
+
+  background: #1f2a45;
+}
+
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+.modal__header {
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  min-height: 52px;
+
+  padding: 10px 16px;
+
+  border-bottom: 1px solid #edf0f3;
+
+  background: #ffffff;
+}
+
+
+.modal__title {
+  margin: 0;
+
+  color: #1f2a45;
+
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+
+/* ============================================================
+   CLOSE BUTTON
+   ============================================================ */
+
+.modal__close {
+  width: 30px;
+  height: 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid transparent;
+  border-radius: 7px;
+
+  background: transparent;
+
+  color: #64748b;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+
+.modal__close:hover {
+  background: #f5f7fa;
+  border-color: #e2e8f0;
+  color: #1f2a45;
+}
+
+
+.modal__close:focus-visible {
+  outline: 2px solid #1f2a45;
+  outline-offset: 2px;
+}
+
+
+/* ============================================================
+   CONTENT
+   ============================================================ */
+
+.modal__content {
+  flex: 1;
+
+  min-height: 0;
+
+  padding: 14px 16px 16px;
+
+  overflow-y: auto;
+}
+
+
+/* ============================================================
+   NORMALIZE CONTENT SPACING
+   ============================================================ */
+
+/*
+   This is the important part.
+
+   It prevents forms/components inside the modal from
+   creating excessive vertical spacing.
+*/
+
+.modal__content > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+
+.modal__content form {
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+
+  margin: 0;
+}
+
+
+/* ============================================================
+   FORM FIELDS
+   ============================================================ */
+
+.modal__content .form-field {
+  display: flex;
+  flex-direction: column;
+
+  gap: 4px;
+
+  margin: 0;
+}
+
+
+.modal__content .form-field + .form-field {
+  margin-top: 0;
+}
+
+
+/* ============================================================
+   LABELS
+   ============================================================ */
+
+.modal__content label {
+  margin: 0;
+
+  color: #334155;
+
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+
+/* Optional text beside labels */
+
+.modal__content label span {
+  margin-left: 5px;
+
+  color: #94a3b8;
+
+  font-size: 10px;
+  font-weight: 500;
+}
+
+
+/* ============================================================
+   INPUTS
+   ============================================================ */
+
+.modal__content input,
+.modal__content select,
+.modal__content textarea {
+  width: 100%;
+  box-sizing: border-box;
+
+  min-height: 36px;
+
+  padding: 8px 10px;
+
+  border: 1px solid #d8dee7;
+  border-radius: 7px;
+
+  background: #ffffff;
+
+  color: #1e293b;
+
+  font-family: inherit;
+  font-size: 12.5px;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+
+.modal__content input::placeholder,
+.modal__content textarea::placeholder {
+  color: #a0a9b5;
+}
+
+
+.modal__content input:hover,
+.modal__content select:hover,
+.modal__content textarea:hover {
+  border-color: #b9c3cf;
+}
+
+
+.modal__content input:focus,
+.modal__content select:focus,
+.modal__content textarea:focus {
+  outline: none;
+
+  border-color: #1f2a45;
+
+  box-shadow:
+    0 0 0 3px rgba(31, 42, 69, 0.07);
+}
+
+
+/* ============================================================
+   TEXTAREA
+   ============================================================ */
+
+.modal__content textarea {
+  min-height: 72px;
+
+  resize: vertical;
+}
+
+
+/* ============================================================
+   HELP TEXT
+   ============================================================ */
+
+.modal__content small,
+.modal__content .form-help {
+  margin: 0;
+
+  color: #64748b;
+
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+
+/* ============================================================
+   TWO-COLUMN FORM GRID
+   ============================================================ */
+
+.modal__content .form-grid {
+  display: grid;
+
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  gap: 10px;
+
+  margin: 0;
+}
+
+
+/* ============================================================
+   SERIALIZED TOGGLE / SPECIAL SECTIONS
+   ============================================================ */
+
+.modal__content .serialized-toggle {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 9px;
+
+  margin: 2px 0 0;
+}
+
+
+.modal__content .serialized-toggle__content {
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+
+/* ============================================================
+   BUTTON
+   ============================================================ */
+
+.modal__content button[type="submit"],
+.modal__content .catalog-button {
+  width: 100%;
+
+  min-height: 38px;
+
+  margin-top: 2px;
+
+  padding: 8px 14px;
+
+  border: none;
+  border-radius: 7px;
+
+  background: #1f2a45;
+  color: #ffffff;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 3px 8px rgba(31, 42, 69, 0.14);
+
+  transition:
+    background-color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+
+.modal__content button[type="submit"]:hover,
+.modal__content .catalog-button:hover {
+  background: #263653;
+
+  box-shadow:
+    0 5px 12px rgba(31, 42, 69, 0.18);
+}
+
+
+.modal__content button[type="submit"]:active,
+.modal__content .catalog-button:active {
+  transform: translateY(1px);
+}
+
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+
+.modal__content::-webkit-scrollbar {
+  width: 6px;
+}
+
+
+.modal__content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+
+.modal__content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+
+  border-radius: 10px;
+}
+
+
+.modal__content::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+
+/* ============================================================
+   ANIMATION
+   ============================================================ */
+
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+
+@keyframes modal-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+
+/* ============================================================
+   TABLET
+   ============================================================ */
+
+@media (max-width: 700px) {
+
+  .modal-overlay {
+    padding: 12px;
+  }
+
+  .modal {
+    max-width: 100%;
+    max-height: calc(100vh - 24px);
+  }
+
+  .modal__content {
+    padding: 13px 14px 15px;
+  }
+}
+
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 520px) {
+
+  .modal-overlay {
+    align-items: flex-start;
+
+    padding: 10px;
+  }
+
+  .modal {
+    max-height: calc(100vh - 20px);
+
+    border-radius: 10px;
+  }
+
+  .modal__header {
+    min-height: 48px;
+
+    padding: 9px 13px;
+  }
+
+  .modal__title {
+    font-size: 15px;
+  }
+
+  .modal__content {
+    padding: 12px;
+  }
+
+  .modal__content form {
+    gap: 9px;
+  }
+
+  .modal__content .form-grid {
+    grid-template-columns: 1fr;
+
+    gap: 9px;
+  }
+
+  .modal__content input,
+  .modal__content select,
+  .modal__content textarea {
+    min-height: 35px;
+
+    padding: 7px 9px;
+
+    font-size: 12px;
+  }
+}
+
+
+/* ============================================================
+   VERY SMALL SCREENS
+   ============================================================ */
+
+@media (max-width: 360px) {
+
+  .modal-overlay {
+    padding: 6px;
+  }
+
+  .modal {
+    max-height: calc(100vh - 12px);
+  }
+
+  .modal__header {
+    padding-inline: 11px;
+  }
+
+  .modal__content {
+    padding: 10px;
+  }
+
+  .modal__content form {
+    gap: 8px;
+  }
+}

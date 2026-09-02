@@ -26,16 +26,20 @@ Route::prefix('v1')
     // Categories (Restricted to Admin / Supply Officer)
     Route::get('/categories', [CategoryController::class, 'index']);
     Route::post('/categories', [CategoryController::class, 'store']);
+    Route::put('/categories/{category}', [CategoryController::class, 'update']);
+    Route::delete('/categories/{category}', [CategoryController::class, 'destroy']);
         // ->middleware('permission:manage items');
 
     // Items
     Route::get('/items', [ItemController::class, 'index']);
     Route::post('/items', [ItemController::class, 'store']);
+    Route::put('/items/{item}', [ItemController::class, 'update']);
+    Route::delete('/items/{item}', [ItemController::class, 'destroy']);
         // ->middleware('permission:manage items');
 
     // Serialized Assets
     Route::get('/serialized-assets', [AccountabilityController::class, 'index']);
-    Route::get('/serialized_assets', [AccountabilityController::class, 'index']);
+    // Route::get('/serialized_assets', [AccountabilityController::class, 'index']);
 
     // Inventory & Stock Management
     Route::post('/stocks/receive', [InventoryController::class, 'storeStock']);

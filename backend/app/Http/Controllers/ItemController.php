@@ -10,9 +10,7 @@ use Illuminate\Support\Facades\Log;
 
 class ItemController extends Controller
 {
-    /**
-     * Display a listing of all catalog items.
-     */
+
     public function index()
     {
         try {
@@ -24,9 +22,6 @@ class ItemController extends Controller
         }
     }
 
-    /**
-     * Store a newly created catalog item with a sequential, zero-duplicate item code.
-     */
     public function store(Request $request)
     {
         $validatedData = $request->validate([
@@ -49,7 +44,7 @@ class ItemController extends Controller
                 // Generate a clean 3-letter prefix from category name (e.g., Office Supplies -> OFF)
                 $cleanedName = preg_replace('/[^a-zA-Z]/', '', $category->name);
                 $catPrefix = strtoupper(substr($cleanedName, 0, 3));
-                
+
                 if (strlen($catPrefix) < 3) {
                     $catPrefix = str_pad($catPrefix, 3, 'X', STR_PAD_RIGHT);
                 }
@@ -91,11 +86,64 @@ class ItemController extends Controller
                     'item' => $item
                 ], 201);
             });
-            
         } catch (\Exception $e) {
             Log::error('Failed to create catalog item: ' . $e->getMessage());
             return response()->json([
                 'error' => 'An error occurred while generating the item code. Please try again.'
+            ], 500);
+        }
+    }
+   
+    public function update(Request $request, Item $item)
+    {
+        $validatedData = $request->validate([
+            'category_id' => 'required|exists:categories,id',
+            'name' => 'required|string|max:255',
+            'brand' => 'nullable|string|max:255',
+            'specifications' => 'nullable|string|max:255',
+            'type' => 'nullable|string|max:255',
+            'unit_of_measure' => 'required|string|max:50',
+            'reorder_level' => 'required|integer|min:0',
+            'is_serialized' => 'required|boolean',
+        ]);
+
+        try {
+            $item->update([
+                'category_id' => $validatedData['category_id'],
+                'name' => $validatedData['name'],
+                'brand' => $validatedData['brand'] ?? 'N/A',
+                'specifications' => $validatedData['specifications'] ?? null,
+                'type' => $validatedData['type'] ?? null,
+                'unit_of_measure' => $validatedData['unit_of_measure'],
+                'reorder_level' => $validatedData['reorder_level'],
+                'is_serialized' => $validatedData['is_serialized'],
+            ]);
+
+            return response()->json([
+                'message' => 'Catalog item successfully updated!',
+                'item' => $item->load('category')
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to update catalog item: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'An error occurred while updating the item.'
+            ], 500);
+        }
+    }
+    public function destroy(Item $item)
+    {
+        try {
+            $item->delete();
+
+            return response()->json([
+                'message' => 'Catalog item successfully deleted!',
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to delete catalog item: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'An error occurred while deleting the item.'
             ], 500);
         }
     }

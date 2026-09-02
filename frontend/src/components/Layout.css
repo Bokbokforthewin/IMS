@@ -1,0 +1,96 @@
+/* =========================================================
+   Application Layout
+   ========================================================= */
+
+.layout {
+  display: flex;
+  flex-direction: column;
+
+  width: 100%;
+  height: 100vh;
+  min-height: 0;
+
+  overflow: hidden;
+
+  background: #f7faf9;
+}
+
+
+/* =========================================================
+   Header + Body
+   ========================================================= */
+
+.layout__body {
+  display: flex;
+
+  flex: 1;
+  min-height: 0;
+
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   Main Content
+   ========================================================= */
+
+.layout__content {
+  flex: 1;
+
+  min-width: 0;
+  min-height: 0;
+
+  padding: 28px;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  background: #f7faf9;
+
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+
+  /*
+   * Keeps the scrollbar inside the content area.
+   * Header and sidebar remain stationary.
+   */
+  overscroll-behavior: contain;
+}
+
+
+/* =========================================================
+   Scrollbar
+   ========================================================= */
+
+.layout__content {
+  scrollbar-width: thin;
+  scrollbar-color: #cfdad5 transparent;
+}
+
+.layout__content::-webkit-scrollbar {
+  width: 7px;
+}
+
+.layout__content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.layout__content::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #cfdad5;
+}
+
+.layout__content::-webkit-scrollbar-thumb:hover {
+  background: #b7c5bf;
+}
+
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+
+@media (max-width: 700px) {
+  .layout__content {
+    padding: 20px;
+  }
+}

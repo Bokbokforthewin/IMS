@@ -1,53 +1,156 @@
-import React from 'react';
+import React, { useState } from 'react';
+import {
+  Boxes,
+  PackageCheck,
+  PackageOpen,
+  ClipboardCheck,
+  ArrowLeftRight,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
+
+import './Sidebar.css';
 
 export default function Sidebar({ activeTab, setActiveTab }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const menuItems = [
+    {
+      id: 'catalog',
+      label: 'Catalog',
+      description: 'Categories & Items',
+      icon: Boxes,
+    },
+    {
+      id: 'receive',
+      label: 'Receive Stock',
+      description: 'Inbound Deliveries',
+      icon: PackageCheck,
+    },
+    {
+      id: 'consumables',
+      label: 'Issue Consumables',
+      description: 'FIFO Inventory',
+      icon: PackageOpen,
+    },
+    {
+      id: 'accountability',
+      label: 'Assign Asset',
+      description: 'PAR / ICS',
+      icon: ClipboardCheck,
+    },
+    {
+      id: 'transfer-return',
+      label: 'Transfers & Returns',
+      description: 'Asset Movement',
+      icon: ArrowLeftRight,
+    },
+  ];
+
+  const toggleSidebar = () => {
+    setIsCollapsed((prev) => !prev);
+  };
+
   return (
-    <aside style={{ width: '250px', borderRight: '1px solid #ccc', padding: '20px', background: '#f9f9f9', height: '100vh' }}>
-      <h2>DOH Inventory</h2>
-      <nav>
-        <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-          <li>
-            <button 
-              onClick={() => setActiveTab('catalog')} 
-              style={{ width: '100%', textAlign: 'left', padding: '10px', background: activeTab === 'catalog' ? '#e2e8f0' : 'transparent', border: 'none', cursor: 'pointer', fontWeight: activeTab === 'catalog' ? 'bold' : 'normal', borderRadius: '4px' }}
-            >
-              1 & 2. Categories & Items
-            </button>
-          </li>
-          <li>
-            <button 
-              onClick={() => setActiveTab('receive')}
-              style={{ width: '100%', textAlign: 'left', padding: '10px', background: activeTab === 'receive' ? '#e2e8f0' : 'transparent', border: 'none', cursor: 'pointer', fontWeight: activeTab === 'receive' ? 'bold' : 'normal', borderRadius: '4px' }}
-            >
-              3. Receive Stock
-            </button>
-          </li>
-          <li>
-            <button 
-              onClick={() => setActiveTab('consumables')}
-              style={{ width: '100%', textAlign: 'left', padding: '10px', background: activeTab === 'consumables' ? '#e2e8f0' : 'transparent', border: 'none', cursor: 'pointer', fontWeight: activeTab === 'consumables' ? 'bold' : 'normal', borderRadius: '4px' }}
-            >
-              4. Issue Consumables (FIFO)
-            </button>
-          </li>
-          <li>
-            <button 
-              onClick={() => setActiveTab('accountability')}
-              style={{ width: '100%', textAlign: 'left', padding: '10px', background: activeTab === 'accountability' ? '#e2e8f0' : 'transparent', border: 'none', cursor: 'pointer', fontWeight: activeTab === 'accountability' ? 'bold' : 'normal', borderRadius: '4px' }}
-            >
-              5. Assign Asset (PAR/ICS)
-            </button>
-          </li>
-          <li>
-            <button 
-              onClick={() => setActiveTab('transfer-return')}
-              style={{ width: '100%', textAlign: 'left', padding: '10px', background: activeTab === 'transfer-return' ? '#e2e8f0' : 'transparent', border: 'none', cursor: 'pointer', fontWeight: activeTab === 'transfer-return' ? 'bold' : 'normal', borderRadius: '4px' }}
-            >
-              6. Asset Transfers & Returns
-            </button>
-          </li>
+    <aside
+      className={`sidebar ${
+        isCollapsed ? 'sidebar--collapsed' : ''
+      }`}
+    >
+
+      {/* =====================================================
+          Sidebar Toggle
+          ===================================================== */}
+      <button
+        type="button"
+        className="sidebar__toggle-btn"
+        onClick={toggleSidebar}
+        title={isCollapsed ? 'Expand Sidebar' : 'Minimize Sidebar'}
+        aria-label={isCollapsed ? 'Expand Sidebar' : 'Minimize Sidebar'}
+        aria-expanded={!isCollapsed}
+      >
+        {isCollapsed ? (
+          <ChevronRight size={18} strokeWidth={2} />
+        ) : (
+          <ChevronLeft size={18} strokeWidth={2} />
+        )}
+      </button>
+
+
+      {/* =====================================================
+          Navigation
+          ===================================================== */}
+      <nav className="sidebar__nav">
+        <ul className="sidebar__menu">
+
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+
+            return (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className={`sidebar__item ${
+                    isActive ? 'sidebar__item--active' : ''
+                  }`}
+                  onClick={() => setActiveTab(item.id)}
+                  title={isCollapsed ? item.label : undefined}
+                >
+
+                  {/* Icon */}
+                  <span className="sidebar__item-icon">
+                    <Icon
+                      size={19}
+                      strokeWidth={isActive ? 2.2 : 1.8}
+                    />
+                  </span>
+
+
+                  {/* Text */}
+                  <span className="sidebar__item-content">
+                    <span className="sidebar__item-label">
+                      {item.label}
+                    </span>
+
+                    <span className="sidebar__item-description">
+                      {item.description}
+                    </span>
+                  </span>
+
+
+                  {/* Active Indicator */}
+                  {isActive && (
+                    <span
+                      className="sidebar__active-indicator"
+                      aria-hidden="true"
+                    />
+                  )}
+
+                </button>
+              </li>
+            );
+          })}
+
         </ul>
       </nav>
+
+
+      {/* =====================================================
+          Footer
+          ===================================================== */}
+      <div className="sidebar__footer">
+
+        <div className="sidebar__footer-divider" />
+
+        <span className="sidebar__version">
+          {isCollapsed
+            ? 'DOH'
+            : 'DOH NIR CHD - ICT Unit Systems'}
+        </span>
+
+      </div>
+
     </aside>
   );
 }
