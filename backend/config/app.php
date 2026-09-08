@@ -15,6 +15,21 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    'organization' => env(
+        'APP_ORGANIZATION',
+        'Department of Health'
+    ),
+
+    'region' => env(
+        'APP_REGION',
+        'Negros Island Region'
+    ),
+
+    'country' => env(
+        'APP_COUNTRY',
+        'Republic of the Philippines'
+    ),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

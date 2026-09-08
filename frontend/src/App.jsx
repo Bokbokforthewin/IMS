@@ -21,7 +21,7 @@ export default function App() {
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
   const [itemForm, setItemForm] = useState({ category_id: '', name: '', unit_of_measure: '', reorder_level: '', is_serialized: false });
   const [receiveForm, setReceiveForm] = useState({ item_id: '', unit_cost: '', arrival_date: '', is_serialized: false, quantity: '', serial_number: '', brand: '', model: '' });
-  const [accountabilityForm, setAccountabilityForm] = useState({ serialized_asset_id: '', date_issued: '', remarks: '' });
+  const [accountabilityForm, setAccountabilityForm] = useState({ serialized_asset_id: '',user_id: '',issued_by_id: '', date_issued: '', remarks: '' });
   
   // Transfer / Return Form State
   const [transferForm, setTransferForm] = useState({
@@ -133,8 +133,6 @@ export default function App() {
       {activeTab === 'transfer-return' && (
         <TransferReturnPage 
           serializedAssets={serializedAssets}
-          transferForm={transferForm}
-          setTransferForm={setTransferForm}
           handleApiCall={handleApiCall}
           refreshData={fetchData}
         />

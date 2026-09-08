@@ -135,7 +135,7 @@ export default function CatalogPage({
           onClick={() => setIsAddItemModalOpen(true)} 
           className="btn-modal btn-primary"
         >
-          + Add Catalog Item
+          + Add Item
         </button>
       </div>
 

@@ -13,10 +13,10 @@ class AssetTransferController extends Controller
     public function index()
     {
         try {
-            $transfers = AssetTransfer::with(['serializedAsset.item.category'])
+            $transfers = AssetTransfer::with(['serializedAsset.item.category', 'transferredFrom', 'transferredTo'])
                 ->orderBy('created_at', 'desc')
                 ->get();
-                
+
             return response()->json($transfers, 200);
         } catch (\Exception $e) {
             Log::error('Failed to fetch asset transfers: ' . $e->getMessage());
@@ -26,12 +26,12 @@ class AssetTransferController extends Controller
 
     public function store(Request $request)
     {
-        // Allow to_office to be dynamically filled from frontend for both Return and Transfer
         $validatedData = $request->validate([
             'serialized_asset_id' => 'required|exists:serialized_assets,id',
             'transfer_type' => 'required|in:RETURN,TRANSFER',
-            'from_office' => 'nullable|string|max:255',
-            'to_office' => 'required|string|max:255', // Now required for both so user choice dictates destination
+            'user_id' => 'required|exists:users,id', // transferring FROM (current holder)
+            'transfered_to' => 'required|exists:users,id', // transferring TO
+            'description' => 'required|string|max:255',
             'reason' => 'required|string|max:255',
             'transfer_date' => 'required|date',
             'remarks' => 'nullable|string|max:1000',
@@ -48,7 +48,6 @@ class AssetTransferController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                // Generate sequential document number
                 $lastRecord = AssetTransfer::where('transfer_type', $validatedData['transfer_type'])
                     ->whereYear('transfer_date', $year)
                     ->whereMonth('transfer_date', $month)
@@ -64,31 +63,26 @@ class AssetTransferController extends Controller
 
                 $documentNumber = sprintf("%s-%s-%s-%03d", $prefix, $year, $month, $nextSeq);
 
-                // Use the exact user-submitted 'to_office' instead of hardcoding it
                 $transfer = AssetTransfer::create([
                     'document_number' => $documentNumber,
                     'transfer_type' => $validatedData['transfer_type'],
                     'serialized_asset_id' => $asset->id,
-                    'from_office' => $validatedData['from_office'] ?? 'Main Office',
-                    'to_office' => $validatedData['to_office'], 
+                    'user_id' => $validatedData['user_id'],
+                    'transfered_to' => $validatedData['transfered_to'],
+                    'description' => $validatedData['description'],
                     'reason' => $validatedData['reason'],
                     'transfer_date' => $validatedData['transfer_date'],
                     'remarks' => $validatedData['remarks'] ?? null,
                 ]);
 
-                // Update asset status based on action
                 if ($validatedData['transfer_type'] === 'RETURN') {
-                    $asset->update([
-                        'status' => 'Available', 
-                        'remarks' => 'Returned to ' . $validatedData['to_office'] . ': ' . $validatedData['reason']
-                    ]);
+                    $asset->update(['status' => 'Available']);
                 } else {
-                    $asset->update([
-                        'remarks' => 'Transferred to ' . $validatedData['to_office']
-                    ]);
+                    // TRANSFER keeps the asset assigned, just to a different person
+                    $asset->update(['status' => 'Assigned']);
                 }
 
-                $transfer->load('serializedAsset.item.category');
+                $transfer->load(['serializedAsset.item.category', 'transferredFrom', 'transferredTo']);
 
                 return response()->json([
                     'message' => "Asset successfully processed under {$documentNumber}",
@@ -96,7 +90,6 @@ class AssetTransferController extends Controller
                     'transfer' => $transfer
                 ], 201);
             });
-
         } catch (\Exception $e) {
             Log::error('Failed to process asset transfer/return: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to process transaction: ' . $e->getMessage()], 500);

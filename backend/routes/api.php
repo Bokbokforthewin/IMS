@@ -9,6 +9,10 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\AssetTransferController;
 use App\Http\Controllers\ConsumablesController;
 use App\Http\Controllers\PermissionMatrixController;
+use App\Http\Controllers\AppConfigController;
+use App\Http\Controllers\UserController;
+
+Route::get('/app-config', [AppConfigController::class, 'index']);
 
 Route::get('/user', function (Request $request) {
     return response()->json([
@@ -23,6 +27,8 @@ Route::get('/user', function (Request $request) {
 Route::prefix('v1')
 // ->middleware(['auth:sanctum'])
 ->group(function () {
+
+    Route::get('/users', [UserController::class, 'index']);
     // Categories (Restricted to Admin / Supply Officer)
     Route::get('/categories', [CategoryController::class, 'index']);
     Route::post('/categories', [CategoryController::class, 'store']);
@@ -45,6 +51,11 @@ Route::prefix('v1')
     Route::post('/stocks/receive', [InventoryController::class, 'storeStock']);
         // ->middleware('permission:receive stock');
     Route::get('/stock-batches', [InventoryController::class, 'indexStockBatches']);
+    Route::get('/inventory/received-history', [InventoryController::class, 'receivedHistory']);
+    Route::put('/inventory/stock-batches/{stockBatch}', [InventoryController::class, 'updateStockBatch']);
+    Route::delete('/inventory/stock-batches/{stockBatch}', [InventoryController::class, 'deleteStockBatch']);
+    Route::put('/inventory/serialized-assets/{serializedAsset}', [InventoryController::class, 'updateSerializedAsset']);
+    Route::delete('/inventory/serialized-assets/{serializedAsset}', [InventoryController::class, 'deleteSerializedAsset']);
 
     // Consumables issuance & stock levels
     Route::post('/consumables/issue', [ConsumablesController::class, 'issueConsumables']);

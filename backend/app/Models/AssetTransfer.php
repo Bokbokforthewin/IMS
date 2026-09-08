@@ -7,16 +7,28 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AssetTransfer extends Model
 {
+    protected $table = 'asset_transfer';
 
-    protected $table = 'asset_transfer'; // <--- Add this line
-    
     protected $fillable = [
         'document_number', 'transfer_type', 'serialized_asset_id',
-        'from_office', 'to_office', 'reason', 'transfer_date', 'remarks'
+        'user_id', 'transfered_to', 'description', 'reason',
+        'transfer_date', 'remarks'
     ];
 
     public function serializedAsset(): BelongsTo
     {
         return $this->belongsTo(SerializedAsset::class, 'serialized_asset_id');
+    }
+
+    // The employee the asset is currently held by / being transferred FROM
+    public function transferredFrom(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    // The employee the asset is being transferred/returned TO
+    public function transferredTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'transfered_to');
     }
 }

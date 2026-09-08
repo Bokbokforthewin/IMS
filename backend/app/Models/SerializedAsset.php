@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class SerializedAsset extends Model
 {
     protected $fillable = [
-        'item_id', 'serial_number', 'property_number', 
-         'model', 'unit_cost', 'status'
+        'item_id', 'serial_number', 'property_number',
+        'model', 'unit_cost', 'status', 'current_holder_id'
     ];
 
     public function item(): BelongsTo
@@ -18,8 +18,13 @@ class SerializedAsset extends Model
         return $this->belongsTo(Item::class);
     }
 
-    public function accountabilityReceipts(): HasMany
+    public function currentHolder(): BelongsTo
     {
-        return $this->hasMany(AccountabilityReceipt::class);
+        return $this->belongsTo(User::class, 'current_holder_id');
+    }
+
+    public function receiptLines(): HasMany
+    {
+        return $this->hasMany(AccountabilityReceiptLine::class);
     }
 }

@@ -14,17 +14,10 @@ return new class extends Migration
         Schema::create('accountability_receipts', function (Blueprint $table) {
             $table->id();
             $table->enum('receipt_type', ['ICS', 'PAR']);
-            $table->string('document_number'); // Not unique, allows multi-item bundling (e.g., PAR-2026-08-001)
-            
-            // Employee relationships
-            // $table->foreignId('employee_id')->constrained('employees')->onDelete('cascade'); // Recipient
-            // $table->foreignId('issued_by_id')->constrained('employees')->onDelete('cascade'); // Issuer Plantilla Personnel
-            
-            // Asset relationships
-            $table->foreignId('item_id')->constrained('items')->onDelete('cascade');
-            $table->foreignId('serialized_asset_id')->nullable()->constrained('serialized_assets')->onDelete('set null');
-            
-            $table->integer('quantity'); // Validated by dev controller: if serialized_asset_id != null, quantity = 1
+            $table->string('document_number')->unique(); // one row per document now, so this can be unique
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade'); // recipient
+            $table->foreignId('issued_by_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('received_mr_by_id')->nullable()->constrained('users')->nullOnDelete();
             $table->date('date_issued');
             $table->text('remarks')->nullable();
             $table->timestamps();

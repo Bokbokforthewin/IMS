@@ -1,0 +1,274 @@
+/* === Layout === */
+.receive-page-container {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* === Shared panel look === */
+.receive-panel {
+  background: #ffffff;
+  border: 1px solid #e3e8e6;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.receive-panel__title {
+  margin: 0 0 20px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2a45;
+}
+
+/* === Form === */
+.receive-form {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.receive-field {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.receive-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.receive-field input,
+.receive-field select {
+  padding: 9px 10px;
+  border: 1px solid #d1d7db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2a45;
+  background: #fff;
+}
+
+.receive-field input:focus,
+.receive-field select:focus {
+  outline: 2px solid #2d6a4f;
+  outline-offset: 1px;
+  border-color: #2d6a4f;
+}
+
+.receive-field small {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.receive-item-preview {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #4b5563;
+  background: #f8fcfa;
+  border: 1px solid #e3eee9;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.receive-item-preview b {
+  color: #1f2a45;
+}
+
+/* === Serialized / Consumable sub-panel === */
+.receive-subpanel {
+  background: #f8fafa;
+  border: 1px solid #e3e8e6;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.receive-subpanel__title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2a45;
+}
+
+/* === Submit button === */
+.receive-submit-btn {
+  width: 100%;
+  padding: 11px 16px;
+  background: #2d6a4f;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.receive-submit-btn:hover {
+  background: #24573f;
+}
+
+.receive-submit-btn:active {
+  background: #1c452f;
+}
+
+/* === Received stock table === */
+.receive-table-wrapper {
+  overflow-x: auto;
+}
+
+.receive-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.receive-table thead tr {
+  background: #f8fcfa;
+  border-bottom: 2px solid #e3eee9;
+  color: #1f2a45;
+}
+
+.receive-table th,
+.receive-table td {
+  padding: 12px 14px;
+}
+
+.receive-table tbody tr {
+  border-bottom: 1px solid #edf0ef;
+}
+
+.receive-table__date {
+  color: #4b5563;
+}
+
+.receive-table__item-name {
+  font-weight: 600;
+  color: #1f2a45;
+}
+
+.receive-table__item-code {
+  color: #6b7280;
+}
+
+.receive-table__reference {
+  font-family: monospace;
+  color: #374151;
+}
+
+.receive-table__qty {
+  font-weight: 600;
+}
+
+.receive-table__unit {
+  color: #6b7280;
+}
+
+.receive-table__total {
+  font-weight: 600;
+  color: #1f2a45;
+}
+
+.receive-table__empty {
+  text-align: center;
+  padding: 24px;
+  color: #8a929d;
+}
+
+.receive-table__loading {
+  padding: 16px 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* === Type badge === */
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.badge--asset {
+  background: #eef2f6;
+  color: #1f2a45;
+}
+
+.badge--consumable {
+  background: #e6f6d8;
+  color: #2d6a4f;
+}
+
+.receive-table__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.receive-action-btn {
+  padding: 5px 10px;
+  border: 1px solid #d1d7db;
+  border-radius: 4px;
+  background: #fff;
+  color: #1f2a45;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.receive-action-btn:hover {
+  background: #f8fafa;
+}
+
+.receive-action-btn--danger {
+  border-color: #f1b0b7;
+  color: #c0392b;
+}
+
+.receive-action-btn--danger:hover {
+  background: #fdecea;
+}
+
+.receive-modal-error {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.receive-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.receive-cancel-btn {
+  padding: 8px 14px;
+  border: 1px solid #d1d7db;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.receive-delete-btn {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #c0392b;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.receive-delete-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}

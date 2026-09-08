@@ -8,7 +8,7 @@ export default function ItemTable({
 }) {
   return (
     <div className="catalog-table-card">
-      <h3>Existing Catalog Items & Generated Codes</h3>
+      <h3>Items</h3>
 
       <div className="catalog-table-wrapper">
         <table className="catalog-table">

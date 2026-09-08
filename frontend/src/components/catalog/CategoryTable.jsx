@@ -8,7 +8,7 @@ export default function CategoryTable({
 }) {
   return (
     <div className="catalog-table-card">
-      <h3>Existing Categories</h3>
+      <h3>Categories</h3>
 
       <div className="catalog-table-wrapper">
         <table className="catalog-table">

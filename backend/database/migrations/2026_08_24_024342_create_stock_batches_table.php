@@ -14,10 +14,13 @@ return new class extends Migration
         Schema::create('stock_batches', function (Blueprint $table) {
             $table->id();
             $table->foreignId('item_id')->constrained('items')->onDelete('cascade');
-            $table->string('iar_number'); // e.g., IAR-2026-01-17 (Not unique, can have multiple lines per IAR)
+            $table->string('iar_number');
+            $table->date('received_date');
             $table->integer('quantity_on_hand')->default(0);
             $table->decimal('unit_cost', 12, 2);
             $table->timestamps();
+
+            $table->index(['item_id', 'received_date']);
         });
     }
 

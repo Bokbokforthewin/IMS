@@ -1,0 +1,181 @@
+.transfer-page-container {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.transfer-panel {
+  background: #fff;
+  border: 1px solid #e3e8e6;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.transfer-panel__title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2a45;
+}
+
+.transfer-panel__subtitle {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* === Radio group === */
+.transfer-radio-group {
+  margin-bottom: 16px;
+}
+
+.transfer-radio-group > label {
+  font-weight: 700;
+  font-size: 13px;
+  color: #374151;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.transfer-radio-options {
+  display: flex;
+  gap: 20px;
+}
+
+.transfer-radio-options label {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+  color: #1f2a45;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* === Fields === */
+.transfer-field {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.transfer-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.transfer-field input,
+.transfer-field select {
+  padding: 9px 10px;
+  border: 1px solid #d1d7db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2a45;
+  background: #fff;
+}
+
+.transfer-field input:focus,
+.transfer-field select:focus {
+  outline: 2px solid #28a745;
+  outline-offset: 1px;
+  border-color: #28a745;
+}
+
+.transfer-field small {
+  color: #888;
+  font-size: 12px;
+}
+
+/* === Submit === */
+.transfer-submit-btn {
+  padding: 10px 15px;
+  background: #28a745;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.transfer-submit-btn:hover {
+  background: #21883a;
+}
+
+/* === Alerts === */
+.transfer-alert {
+  padding: 10px 12px;
+  margin-bottom: 15px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.transfer-alert--error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* === Table === */
+.transfer-table-wrapper {
+  overflow-x: auto;
+}
+
+.transfer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.transfer-table th,
+.transfer-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.transfer-table thead tr {
+  background: #f4f4f4;
+}
+
+.transfer-table__empty {
+  text-align: center;
+  padding: 15px;
+  color: #777;
+}
+
+.transfer-table__doc {
+  font-family: monospace;
+  font-weight: 700;
+}
+
+.transfer-table__sn {
+  font-family: monospace;
+  font-size: 12px;
+  color: #555;
+}
+
+.transfer-table__route {
+  font-size: 13px;
+}
+
+/* === Type badge === */
+.transfer-badge {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.transfer-badge--return {
+  background: #d4edda;
+  color: #155724;
+}
+
+.transfer-badge--transfer {
+  background: #fff3cd;
+  color: #856404;
+}

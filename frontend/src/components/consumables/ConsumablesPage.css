@@ -1,0 +1,331 @@
+/* === Layout === */
+.consumables-page-container {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.consumables-panel {
+  background: #ffffff;
+  border: 1px solid #e3e8e6;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.consumables-panel__title {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2a45;
+}
+
+/* === Alerts === */
+.consumables-alert {
+  padding: 10px 12px;
+  margin-bottom: 15px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.consumables-alert--error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.consumables-alert--success {
+  background: #d4edda;
+  color: #155724;
+  font-weight: 700;
+}
+
+/* === Form === */
+.consumables-field {
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.consumables-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.consumables-field input,
+.consumables-field select {
+  padding: 9px 10px;
+  border: 1px solid #d1d7db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2a45;
+  background: #fff;
+}
+
+.consumables-field input:focus,
+.consumables-field select:focus {
+  outline: 2px solid #2d6a4f;
+  outline-offset: 1px;
+  border-color: #2d6a4f;
+}
+
+.consumables-submit-btn {
+  padding: 10px 15px;
+  background: #28a745;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.consumables-submit-btn:hover:not(:disabled) {
+  background: #21883a;
+}
+
+.consumables-submit-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* === Tables (shared) === */
+.consumables-table-wrapper {
+  overflow-x: auto;
+}
+
+.consumables-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.consumables-table th,
+.consumables-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.consumables-table thead tr {
+  background: #f4f4f4;
+}
+
+.consumables-table__empty {
+  text-align: center;
+  padding: 15px;
+  color: #777;
+}
+
+.consumables-table__item-code {
+  font-family: monospace;
+}
+
+.consumables-table__item-meta {
+  font-size: 12px;
+  color: #555;
+  margin-top: 2px;
+}
+
+.consumables-table__qty,
+.consumables-table__ris {
+  font-weight: 700;
+}
+
+.consumables-table__ris {
+  font-family: monospace;
+}
+
+/* === Status badges === */
+.status-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-badge--ok {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge--low {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-badge--empty {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* === Expand/collapse button === */
+.consumables-expand-btn {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #d1d7db;
+  border-radius: 4px;
+  background: #fff;
+  color: #1f2a45;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.consumables-expand-btn:hover {
+  background: #f8fafa;
+}
+
+/* === Multi-batch badge === */
+.badge--multi {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  background: #fff3cd;
+  color: #856404;
+}
+
+/* === Nested batch breakdown row === */
+.consumables-subrow td {
+  background: #f8fafa;
+  padding: 0 8px 12px !important;
+  border-bottom: 1px solid #ddd;
+}
+
+.consumables-subtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.consumables-subtable th,
+.consumables-subtable td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #e3e8e6;
+  text-align: left;
+}
+
+.consumables-subtable thead tr {
+  background: transparent;
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: none;
+}
+
+.consumables-table__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.consumables-action-btn {
+  padding: 5px 10px;
+  border: 1px solid #d1d7db;
+  border-radius: 4px;
+  background: #fff;
+  color: #1f2a45;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.consumables-action-btn:hover {
+  background: #f8fafa;
+}
+
+.consumables-action-btn--danger {
+  border-color: #f1b0b7;
+  color: #c0392b;
+}
+
+.consumables-action-btn--danger:hover {
+  background: #fdecea;
+}
+
+.consumables-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.consumables-cancel-btn {
+  padding: 8px 14px;
+  border: 1px solid #c0392b;
+  border-radius: 6px;
+  background: #c0392b;
+  cursor: pointer;
+  font-size: 13px;
+  color: #fff;
+}
+
+.consumables-delete-btn {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #d1d7db;
+  color: #000000;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.consumables-delete-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.consumables-issue-target {
+  background: #f8fafa;
+  border: 1px solid #e3e8e6;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.consumables-issue-target__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #6b7280;
+  letter-spacing: 0.03em;
+}
+
+.consumables-issue-target__name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2a45;
+  margin-top: 2px;
+}
+
+.consumables-issue-target__meta {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.consumables-action-btn--primary {
+  border-color: #28a745;
+  color: #1f7a34;
+}
+
+.consumables-action-btn--primary:hover:not(:disabled) {
+  background: #eaf7ee;
+}
+
+.consumables-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.consumables-line-grouped td {
+  border-top: none;
+}

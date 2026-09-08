@@ -17,7 +17,8 @@ class Item extends Model
         'type', 
         'unit_of_measure', 
         'reorder_level', 
-        'is_serialized'
+        'is_serialized',
+        'estimated_useful_life',
     ];
 
     public function category(): BelongsTo

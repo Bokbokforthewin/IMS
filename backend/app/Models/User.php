@@ -20,9 +20,25 @@ class User extends Authenticatable
 
     protected $fillable = [
         'name',
+        'unit',
+        'division',
+        'designation',
+        'is_head',
         'email',
         'password',
     ];
+    /**
+     * Find the head of this user's unit — the other user in the same
+     * unit flagged is_head = true. Returns null if none exists (including
+     * when this user IS the head, or when no head has been designated yet).
+     */
+    public function findUnitHead(): ?User
+    {
+        return User::where('unit', $this->unit)
+            ->where('id', '!=', $this->id)
+            ->where('is_head', true)
+            ->first();
+    }
 
     /**
      * Get the attributes that should be cast.

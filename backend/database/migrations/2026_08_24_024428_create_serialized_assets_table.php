@@ -15,7 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('item_id')->constrained('items')->onDelete('cascade');
             $table->string('serial_number')->unique()->nullable();
-            $table->string('property_number')->unique(); // e.g., DOH NIR-2026-04-00106
+            $table->string('property_number')->unique(); // e.g., DOH NIR-2026-0106
+            $table->foreignId('current_holder_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('brand')->nullable();
             $table->string('model')->nullable();
             $table->decimal('unit_cost', 12, 2);
