@@ -17,10 +17,12 @@ return new class extends Migration
             $table->string('serial_number')->unique()->nullable();
             $table->string('property_number')->unique(); // e.g., DOH NIR-2026-0106
             $table->foreignId('current_holder_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('brand')->nullable();
             $table->string('model')->nullable();
+            $table->string('manufacturer_name')->nullable();
+            $table->string('country_of_origin')->nullable();
             $table->decimal('unit_cost', 12, 2);
             $table->enum('status', ['Available', 'Assigned', 'Under Repair', 'Condemned'])->default('Available');
+            $table->text('condition_remarks')->nullable();
             $table->timestamps();
         });
     }

@@ -187,7 +187,7 @@ export default function AccountabilityForm({ serializedAssets, initialAssetId, h
       </div>
 
       <button type="submit" className="submit-btn" disabled={submitting || lines.length === 0}>
-        {submitting ? 'Processing...' : `Issue ${lines.length} Asset${lines.length !== 1 ? 's' : ''} & Generate Document`}
+        {submitting ? 'Processing...' : `Issue ${lines.length} Asset${lines.length !== 1 ? 's' : ''}`}
       </button>
     </form>
   );

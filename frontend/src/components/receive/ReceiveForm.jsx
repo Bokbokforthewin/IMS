@@ -11,6 +11,9 @@ export default function ReceiveForm({ items, receiveForm, setReceiveForm, handle
         is_serialized: false,
         serial_number: '',
         model: '',
+        manufacturer_name: '',
+        country_of_origin: '',
+        estimated_useful_life: '',
         quantity: ''
       });
       if (onSuccess) onSuccess();
@@ -103,25 +106,39 @@ export default function ReceiveForm({ items, receiveForm, setReceiveForm, handle
                 onChange={e => setReceiveForm({ ...receiveForm, model: e.target.value })}
               />
             </div>
-          </div>
-        ) : (
-          <div className="receive-subpanel">
-            <h3 className="receive-subpanel__title">Consumable / Bulk Quantity Details</h3>
 
             <div className="receive-field">
-              <label>Quantity to Receive</label>
+              <label>Name of Manufacturer (Optional)</label>
               <input
-                type="number"
-                placeholder="Quantity"
-                required
-                min="1"
-                value={receiveForm.quantity || ''}
-                onChange={e => setReceiveForm({ ...receiveForm, quantity: e.target.value })}
+                type="text"
+                placeholder="e.g. Epson"
+                value={receiveForm.manufacturer_name || ''}
+                onChange={e => setReceiveForm({ ...receiveForm, manufacturer_name: e.target.value })}
               />
-              <small>* Brand and specifications are already tracked globally via the selected catalog item.</small>
+            </div>
+
+            <div className="receive-field">
+              <label>Country of Origin (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. Japan"
+                value={receiveForm.country_of_origin || ''}
+                onChange={e => setReceiveForm({ ...receiveForm, country_of_origin: e.target.value })}
+              />
+            </div>
+
+            <div className="receive-field">
+              <label>Estimated Useful Life (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. 5 Years"
+                value={receiveForm.estimated_useful_life || ''}
+                onChange={e => setReceiveForm({ ...receiveForm, estimated_useful_life: e.target.value })}
+              />
+              <small>This updates the item's useful life catalog-wide, not just this unit.</small>
             </div>
           </div>
-        )}
+        ) : null}
 
         <button type="submit" className="receive-submit-btn">
           Process Inbound Stock

@@ -1,6 +1,6 @@
 import React from 'react';
 import Modal from '../Modal.jsx';
-import './CatalogModals.css';
+import './CatalogPage.css';
 
 export default function EditItemModal({ isOpen, onClose, editingItem, setEditingItem, categories, handleUpdateItem }) {
   return (

@@ -171,9 +171,9 @@ class AccountabilityController extends Controller
     public function downloadExcel(int $id, AccountabilityExcelService $excelService)
     {
         $receipt = AccountabilityReceipt::with([
-            'recipient', 
-            'issuedBy', 
-            'receivedMrBy', 
+            'user',
+            'issuedBy',
+            'receivedMrBy',
             'lines.serializedAsset.item'
         ])->findOrFail($id);
 

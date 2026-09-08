@@ -1,6 +1,6 @@
 import React from 'react';
 import Modal from '../Modal.jsx';
-import './CatalogModals.css';
+import './CatalogPage.css';
 
 export default function EditCategoryModal({ isOpen, onClose, editingCategory, setEditingCategory, handleUpdateCategory }) {
   return (

@@ -20,7 +20,11 @@ export default function App() {
   // Form states
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
   const [itemForm, setItemForm] = useState({ category_id: '', name: '', unit_of_measure: '', reorder_level: '', is_serialized: false });
-  const [receiveForm, setReceiveForm] = useState({ item_id: '', unit_cost: '', arrival_date: '', is_serialized: false, quantity: '', serial_number: '', brand: '', model: '' });
+  const [receiveForm, setReceiveForm] = useState({
+    item_id: '', unit_cost: '', arrival_date: '', is_serialized: false,
+    quantity: '', serial_number: '', model: '',
+    manufacturer_name: '', country_of_origin: '', estimated_useful_life: ''
+  });
   const [accountabilityForm, setAccountabilityForm] = useState({ serialized_asset_id: '',user_id: '',issued_by_id: '', date_issued: '', remarks: '' });
   
   // Transfer / Return Form State

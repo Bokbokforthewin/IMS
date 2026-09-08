@@ -1,6 +1,6 @@
 import React from 'react';
 import Modal from '../Modal.jsx';
-import './CatalogModals.css';
+import './CatalogPage.css';
 
 export default function DeleteItemModal({ isOpen, onClose, itemToDelete, handleDeleteItem }) {
   return (
@@ -22,14 +22,14 @@ export default function DeleteItemModal({ isOpen, onClose, itemToDelete, handleD
           <button 
             type="button" 
             onClick={onClose} 
-            className="btn-modal btn-cancel"
+            className="btn-modal btn-danger"
           >
             Cancel
           </button>
           <button 
             type="button" 
             onClick={handleDeleteItem} 
-            className="btn-modal btn-danger"
+            className="btn-modal btn-cancel"
           >
             Yes, Delete
           </button>

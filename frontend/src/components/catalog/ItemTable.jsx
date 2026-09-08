@@ -1,5 +1,5 @@
 import React from 'react';
-import './CatalogTables.css';
+import './CatalogPage.css';
 
 export default function ItemTable({
   items,

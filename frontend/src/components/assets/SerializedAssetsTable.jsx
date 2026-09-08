@@ -1,23 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import IssueAssetModal from './IssueAssetModal.jsx';
+import EditAssetStatusModal from './EditAssetStatusModal.jsx';
+
+function statusBadgeClass(status) {
+  if (status === 'Available') return 'badge-available';
+  if (status === 'Assigned') return 'badge-assigned';
+  if (status === 'Under Repair') return 'badge-repair';
+  if (status === 'Condemned') return 'badge-condemned';
+  return '';
+}
 
 export default function SerializedAssetsTable({ serializedAssets, handleApiCall, refreshData }) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
   const [initialAssetId, setInitialAssetId] = useState(null);
 
-  const handleOpenModal = (asset) => {
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingAsset, setEditingAsset] = useState(null);
+
+  // 1. Maintain a local copy of assets for immediate UI updates
+  const [localAssets, setLocalAssets] = useState(serializedAssets || []);
+
+  // 2. Keep local state synchronized if props change from outside
+  useEffect(() => {
+    setLocalAssets(serializedAssets || []);
+  }, [serializedAssets]);
+
+  const handleOpenIssueModal = (asset) => {
     setInitialAssetId(asset.id);
-    setIsModalOpen(true);
+    setIsIssueModalOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const handleCloseIssueModal = () => {
+    setIsIssueModalOpen(false);
     setInitialAssetId(null);
   };
 
-  const handleSuccess = () => {
-    setIsModalOpen(false);
+  const handleIssueSuccess = () => {
+    setIsIssueModalOpen(false);
     setInitialAssetId(null);
+    if (typeof refreshData === 'function') refreshData();
+  };
+
+  const handleOpenEditModal = (asset) => {
+    setEditingAsset(asset);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditingAsset(null);
+  };
+
+  // 3. Receive the updated asset back and patch it locally right away
+  const handleEditSaved = (updatedAsset) => {
+    if (updatedAsset && updatedAsset.id) {
+      setLocalAssets(prev =>
+        prev.map(a => (a.id === updatedAsset.id ? updatedAsset : a))
+      );
+    }
+    // Also trigger parent refresh in the background to keep everything aligned
     if (typeof refreshData === 'function') refreshData();
   };
 
@@ -36,15 +77,14 @@ export default function SerializedAssetsTable({ serializedAssets, handleApiCall,
           </tr>
         </thead>
         <tbody>
-          {(!serializedAssets || serializedAssets.length === 0) ? (
+          {(!localAssets || localAssets.length === 0) ? (
             <tr>
               <td colSpan="6" className="empty-row">No serialized assets found.</td>
             </tr>
           ) : (
-            serializedAssets.map(a => {
+            localAssets.map(a => {
               const cost = Number(a.unit_cost ?? a.item?.unit_cost ?? a.item?.cost ?? a.item?.price ?? 0);
               const type = cost >= 50000 ? 'PAR' : 'ICS';
-              const isAssigned = a.status === 'Assigned';
 
               return (
                 <tr key={a.id}>
@@ -53,22 +93,30 @@ export default function SerializedAssetsTable({ serializedAssets, handleApiCall,
                   <td className="bold-text">{type}</td>
                   <td>₱{cost.toLocaleString()}</td>
                   <td>
-                    <span className={isAssigned ? 'badge-assigned' : 'badge-available'}>
-                      {a.status}
-                    </span>
+                    <span className={statusBadgeClass(a.status)}>{a.status}</span>
+                    {a.condition_remarks && (a.status === 'Under Repair' || a.status === 'Condemned') && (
+                      <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>
+                        {a.condition_remarks}
+                      </div>
+                    )}
                   </td>
-                  <td>
-                    {a.status === 'Available' ? (
+                  <td style={{ display: 'flex', gap: '6px' }}>
+                    {a.status === 'Available' && (
                       <button
-                        onClick={() => handleOpenModal(a)}
+                        onClick={() => handleOpenIssueModal(a)}
                         className="btn-issue"
                         style={{ padding: '6px 12px', cursor: 'pointer' }}
                       >
                         Issue
                       </button>
-                    ) : (
-                      <span style={{ color: '#888', fontStyle: 'italic' }}>{a.status}</span>
                     )}
+                    <button
+                      onClick={() => handleOpenEditModal(a)}
+                      className="btn-edit"
+                      style={{ padding: '6px 12px', cursor: 'pointer' }}
+                    >
+                      Edit
+                    </button>
                   </td>
                 </tr>
               );
@@ -78,12 +126,19 @@ export default function SerializedAssetsTable({ serializedAssets, handleApiCall,
       </table>
 
       <IssueAssetModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        serializedAssets={serializedAssets}
+        isOpen={isIssueModalOpen}
+        onClose={handleCloseIssueModal}
+        serializedAssets={localAssets}
         initialAssetId={initialAssetId}
         handleApiCall={handleApiCall}
-        onSuccess={handleSuccess}
+        onSuccess={handleIssueSuccess}
+      />
+
+      <EditAssetStatusModal
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        asset={editingAsset}
+        onSaved={handleEditSaved}
       />
     </div>
   );

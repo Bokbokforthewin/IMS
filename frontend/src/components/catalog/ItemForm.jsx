@@ -1,5 +1,5 @@
 import React from 'react';
-import './CatalogForms.css';
+import './CatalogPage.css';
 
 export default function ItemForm({ itemForm, setItemForm, categories, handleApiCall }) {
   const handleSubmit = (e) => {

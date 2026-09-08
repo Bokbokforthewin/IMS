@@ -11,6 +11,7 @@ use App\Http\Controllers\ConsumablesController;
 use App\Http\Controllers\PermissionMatrixController;
 use App\Http\Controllers\AppConfigController;
 use App\Http\Controllers\UserController;
+use App\Services\AccountabilityExcelService;
 
 Route::get('/app-config', [AppConfigController::class, 'index']);
 
@@ -56,6 +57,7 @@ Route::prefix('v1')
     Route::delete('/inventory/stock-batches/{stockBatch}', [InventoryController::class, 'deleteStockBatch']);
     Route::put('/inventory/serialized-assets/{serializedAsset}', [InventoryController::class, 'updateSerializedAsset']);
     Route::delete('/inventory/serialized-assets/{serializedAsset}', [InventoryController::class, 'deleteSerializedAsset']);
+    Route::put('/inventory/serialized-assets/{serializedAsset}/status', [InventoryController::class, 'updateAssetStatus']);
 
     // Consumables issuance & stock levels
     Route::post('/consumables/issue', [ConsumablesController::class, 'issueConsumables']);
@@ -67,7 +69,8 @@ Route::prefix('v1')
     Route::post('/accountability/issue-asset', [AccountabilityController::class, 'issueAsset']);
         // ->middleware('permission:issue consumables');
     Route::get('/accountability/receipts', [AccountabilityController::class, 'getReceipts']);
-
+    Route::get('/accountability/receipts/{receipt}/download-excel', [AccountabilityController::class, 'downloadExcel']);
+    
     // Return & Transfer Assets
     Route::get('/asset-transfers', [AssetTransferController::class, 'index']);
     Route::post('/asset-transfers', [AssetTransferController::class, 'store']);

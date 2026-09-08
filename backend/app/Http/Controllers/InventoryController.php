@@ -30,40 +30,52 @@ class InventoryController extends Controller
 
         try {
             return DB::transaction(function () use ($request, $validatedData, $year, $month, $day, $arrivalDate) {
-                if ($validatedData['is_serialized']) {
-                    $serializedData = $request->validate([
-                        'serial_number' => 'nullable|string|max:255|unique:serialized_assets,serial_number',
-                        'model' => 'nullable|string|max:255',
-                    ]);
+               if ($validatedData['is_serialized']) {
+                $serializedData = $request->validate([
+                    'serial_number' => 'nullable|string|max:255|unique:serialized_assets,serial_number',
+                    'model' => 'nullable|string|max:255',
+                    'manufacturer_name' => 'nullable|string|max:255',
+                    'country_of_origin' => 'nullable|string|max:255',
+                    'estimated_useful_life' => 'nullable|string|max:255',
+                ]);
 
-                    $lastProperty = SerializedAsset::whereYear('created_at', $year)
-                        ->whereMonth('created_at', $month)
-                        ->orderBy('id', 'desc')
-                        ->lockForUpdate()
-                        ->first();
+                $lastProperty = SerializedAsset::whereYear('created_at', $year)
+                    ->orderBy('id', 'desc')
+                    ->lockForUpdate()
+                    ->first();
 
-                    $nextSeq = 1;
-                    if ($lastProperty && $lastProperty->property_number) {
-                        $parts = explode('-', $lastProperty->property_number);
-                        $nextSeq = intval(end($parts)) + 1;
-                    }
+                $nextSeq = 1;
+                if ($lastProperty && $lastProperty->property_number) {
+                    $parts = explode('-', $lastProperty->property_number);
+                    $nextSeq = intval(end($parts)) + 1;
+                }
 
-                    $propertyNumber = sprintf("DOH NIR-%s-%s-%05d", $year, $month, $nextSeq);
+                $propertyNumber = sprintf("DOH NIR-%s-%04d", $year, $nextSeq);
 
-                    $asset = SerializedAsset::create([
-                        'item_id' => $validatedData['item_id'],
-                        'serial_number' => $serializedData['serial_number'],
-                        'property_number' => $propertyNumber,
-                        'model' => $serializedData['model'] ?? null,
-                        'unit_cost' => $validatedData['unit_cost'],
-                        'status' => 'Available',
-                    ]);
+                $asset = SerializedAsset::create([
+                    'item_id' => $validatedData['item_id'],
+                    'serial_number' => $serializedData['serial_number'],
+                    'property_number' => $propertyNumber,
+                    'model' => $serializedData['model'] ?? null,
+                    'manufacturer_name' => $serializedData['manufacturer_name'] ?? null,
+                    'country_of_origin' => $serializedData['country_of_origin'] ?? null,
+                    'unit_cost' => $validatedData['unit_cost'],
+                    'status' => 'Available',
+                ]);
 
-                    return response()->json([
-                        'message' => 'Serialized asset successfully recorded',
-                        'property_number' => $propertyNumber,
-                        'asset' => $asset
-                    ], 201);
+                // Estimated useful life lives on the catalog Item (shared across every unit
+                // of this item type), so update it there rather than per-asset.
+                if (!empty($serializedData['estimated_useful_life'])) {
+                    Item::where('id', $validatedData['item_id'])
+                        ->update(['estimated_useful_life' => $serializedData['estimated_useful_life']]);
+                }
+
+                return response()->json([
+                    'message' => 'Serialized asset successfully recorded',
+                    'property_number' => $propertyNumber,
+                    'asset' => $asset
+                ], 201);
+
                 } else {
                     $batchData = $request->validate([
                         'quantity' => 'required|integer|min:1',
@@ -316,6 +328,40 @@ class InventoryController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to delete serialized asset: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to delete serialized asset.'], 500);
+        }
+    }
+    public function updateAssetStatus(Request $request, SerializedAsset $serializedAsset)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:Available,Under Repair,Condemned',
+            'condition_remarks' => 'required_if:status,Under Repair,Condemned|nullable|string|max:1000',
+        ]);
+
+        $currentStatus = $serializedAsset->status;
+        $newStatus = $validated['status'];
+
+        // Block manually reversing an active issuance — that must go through
+        // the Transfer/Return workflow, which properly logs a RET document
+        // and clears current_holder_id.
+        if ($currentStatus === 'Assigned' && $newStatus === 'Available') {
+            return response()->json([
+                'error' => 'This asset is currently assigned to someone. Use the Return/Transfer page to properly return it — that keeps the audit trail correct.'
+            ], 422);
+        }
+
+        try {
+            $serializedAsset->update([
+                'status' => $newStatus,
+                'condition_remarks' => $validated['condition_remarks'] ?? null,
+            ]);
+
+            return response()->json([
+                'message' => "Asset status updated to '{$newStatus}'.",
+                'asset' => $serializedAsset->fresh(['item', 'currentHolder']),
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Failed to update asset status: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to update asset status.'], 500);
         }
     }
 }

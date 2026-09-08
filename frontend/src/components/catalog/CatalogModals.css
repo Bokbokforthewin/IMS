@@ -1,15 +1,8 @@
-/* =========================================
-   Modal Form
-   ========================================= */
-
-.modal-form {
+/* .modal-form {
   width: 100%;
 }
 
 
-/* =========================================
-   Modal Form Groups
-   ========================================= */
 
 .modal-form-group {
   display: flex;
@@ -23,9 +16,6 @@
 }
 
 
-/* =========================================
-   Modal Labels
-   ========================================= */
 
 .modal-form-group label {
   display: flex;
@@ -40,9 +30,6 @@
 }
 
 
-/* =========================================
-   Inputs
-   ========================================= */
 
 .modal-form-group input[type="text"],
 .modal-form-group input[type="number"],
@@ -72,7 +59,6 @@
 }
 
 
-/* Input + Select */
 
 .modal-form-group input[type="text"],
 .modal-form-group input[type="number"],
@@ -83,7 +69,6 @@
 }
 
 
-/* Textarea */
 
 .modal-form-group textarea {
   min-height: 95px;
@@ -96,9 +81,6 @@
 }
 
 
-/* =========================================
-   Placeholder
-   ========================================= */
 
 .modal-form-group input::placeholder,
 .modal-form-group textarea::placeholder {
@@ -106,9 +88,6 @@
 }
 
 
-/* =========================================
-   Hover
-   ========================================= */
 
 .modal-form-group input:hover,
 .modal-form-group textarea:hover,
@@ -119,9 +98,6 @@
 }
 
 
-/* =========================================
-   Focus
-   ========================================= */
 
 .modal-form-group input:focus,
 .modal-form-group textarea:focus,
@@ -135,9 +111,6 @@
 }
 
 
-/* =========================================
-   Two Column Fields
-   ========================================= */
 
 .modal-form-row {
   display: grid;
@@ -158,9 +131,6 @@
 }
 
 
-/* =========================================
-   Serialized Asset Toggle
-   ========================================= */
 
 .modal-serialized-toggle {
   position: relative;
@@ -194,7 +164,6 @@
 }
 
 
-/* Hide native checkbox */
 
 .modal-serialized-toggle input {
   position: absolute;
@@ -208,7 +177,6 @@
 }
 
 
-/* Custom checkbox */
 
 .modal-serialized-toggle__box {
   position: relative;
@@ -237,7 +205,6 @@
 }
 
 
-/* Check mark */
 
 .modal-serialized-toggle__box::after {
   width: 5px;
@@ -256,7 +223,6 @@
 }
 
 
-/* Checked */
 
 .modal-serialized-toggle input:checked
   + .modal-serialized-toggle__box {
@@ -275,7 +241,6 @@
 }
 
 
-/* Focus */
 
 .modal-serialized-toggle input:focus-visible
   + .modal-serialized-toggle__box {
@@ -284,7 +249,6 @@
 }
 
 
-/* Hover */
 
 .modal-serialized-toggle:hover {
   border-color: #b9c9bc;
@@ -293,7 +257,6 @@
 }
 
 
-/* Toggle Content */
 
 .modal-serialized-toggle__content {
   display: flex;
@@ -325,9 +288,6 @@
 }
 
 
-/* =========================================
-   Disabled Input
-   ========================================= */
 
 .modal-form-group input:disabled {
   border-color: #e5e8eb;
@@ -340,18 +300,11 @@
 }
 
 
-/* =========================================
-   Utility
-   ========================================= */
-
 .mb-large {
   margin-bottom: 22px;
 }
 
 
-/* =========================================
-   Modal Text
-   ========================================= */
 
 .modal-text {
   margin: 0 0 18px;
@@ -364,9 +317,6 @@
 }
 
 
-/* =========================================
-   Information Box
-   ========================================= */
 
 .modal-info-box {
   position: relative;
@@ -402,9 +352,6 @@
 }
 
 
-/* =========================================
-   Information Subtext
-   ========================================= */
 
 .info-subtext {
   display: block;
@@ -419,9 +366,6 @@
 }
 
 
-/* =========================================
-   Modal Actions
-   ========================================= */
 
 .modal-actions {
   display: flex;
@@ -441,9 +385,6 @@
 }
 
 
-/* =========================================
-   Modal Buttons
-   ========================================= */
 
 .btn-modal {
   display: inline-flex;
@@ -487,9 +428,6 @@
 }
 
 
-/* =========================================
-   Cancel
-   ========================================= */
 
 .btn-cancel {
   border-color: #dce2e8;
@@ -508,9 +446,6 @@
 }
 
 
-/* =========================================
-   Primary
-   ========================================= */
 
 .btn-primary {
   background: #1f2a45;
@@ -529,9 +464,6 @@
 }
 
 
-/* =========================================
-   Danger
-   ========================================= */
 
 .btn-danger {
   background: #ad0f0a;
@@ -550,9 +482,6 @@
 }
 
 
-/* =========================================
-   Neutral
-   ========================================= */
 
 .btn-neutral {
   border-color: #dce2e8;
@@ -569,23 +498,11 @@
 }
 
 
-/* =========================================
-   Wide Item Modal
-   ========================================= */
-
-/*
-   Add this class to your Edit Item modal
-   if your Modal component supports className.
-*/
 
 .modal--item {
   width: min(760px, calc(100vw - 32px));
 }
 
-
-/* =========================================
-   Tablet
-   ========================================= */
 
 @media (max-width: 700px) {
 
@@ -610,9 +527,6 @@
 }
 
 
-/* =========================================
-   Mobile
-   ========================================= */
 
 @media (max-width: 480px) {
 
@@ -681,9 +595,6 @@
 }
 
 
-/* =========================================
-   Extra Small Devices
-   ========================================= */
 
 @media (max-width: 360px) {
 
@@ -703,4 +614,4 @@
     padding: 11px;
   }
 
-}
+} */

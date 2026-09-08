@@ -1,7 +1,4 @@
-/* =========================================
-   Catalog Table Card
-   ========================================= */
-
+/* 
 .catalog-table-card {
   width: 100%;
   max-width: 100%;
@@ -19,10 +16,6 @@
 }
 
 
-/* =========================================
-   Heading
-   ========================================= */
-
 .catalog-table-card h3 {
   margin: 0;
   padding: 22px 24px;
@@ -38,9 +31,6 @@
 }
 
 
-/* =========================================
-   Horizontal Scroll Container
-   ========================================= */
 
 .catalog-table-wrapper {
   width: 100%;
@@ -56,9 +46,6 @@
 }
 
 
-/* =========================================
-   Scrollbar
-   ========================================= */
 
 .catalog-table-wrapper::-webkit-scrollbar {
   height: 7px;
@@ -78,9 +65,6 @@
 }
 
 
-/* =========================================
-   Table
-   ========================================= */
 
 .catalog-table {
   width: max-content;
@@ -93,17 +77,10 @@
 
   font-size: 0.78rem;
 
-  /*
-   * Prevent the browser from trying to
-   * squeeze every column into the viewport.
-   */
   table-layout: auto;
 }
 
 
-/* =========================================
-   Header
-   ========================================= */
 
 .catalog-table th {
   padding: 13px 15px;
@@ -127,9 +104,6 @@
 }
 
 
-/* =========================================
-   Body
-   ========================================= */
 
 .catalog-table td {
   padding: 14px 15px;
@@ -144,17 +118,10 @@
   text-align: left;
   vertical-align: middle;
 
-  /*
-   * Keep values readable instead of
-   * wrapping awkwardly.
-   */
   white-space: nowrap;
 }
 
 
-/* =========================================
-   First / Last Cell
-   ========================================= */
 
 .catalog-table th:first-child,
 .catalog-table td:first-child {
@@ -167,9 +134,6 @@
 }
 
 
-/* =========================================
-   Row
-   ========================================= */
 
 .catalog-table tbody tr {
   background: #ffffff;
@@ -186,14 +150,6 @@
 }
 
 
-/* =========================================
-   Category Table
-   ========================================= */
-
-/*
- * The category table only has three columns,
- * so let it use the available width.
- */
 
 .catalog-table th:nth-child(1),
 .catalog-table td:nth-child(1) {
@@ -206,14 +162,6 @@
 }
 
 
-/* =========================================
-   Item Table Columns
-   ========================================= */
-
-/*
- * These widths apply naturally to the
- * 10-column Item table.
- */
 
 .catalog-table th:nth-child(1),
 .catalog-table td:nth-child(1) {
@@ -261,9 +209,6 @@
 }
 
 
-/* =========================================
-   Actions
-   ========================================= */
 
 .action-col {
   min-width: 145px;
@@ -293,9 +238,6 @@
 }
 
 
-/* =========================================
-   Action Buttons
-   ========================================= */
 
 .btn-action {
   display: inline-flex;
@@ -337,9 +279,6 @@
 }
 
 
-/* =========================================
-   Edit
-   ========================================= */
 
 .btn-edit {
   border: 1px solid #d8e0e7;
@@ -359,9 +298,6 @@
 }
 
 
-/* =========================================
-   Delete
-   ========================================= */
 
 .btn-delete {
   border: 1px solid #f0c9c7;
@@ -381,9 +317,6 @@
 }
 
 
-/* =========================================
-   Empty State
-   ========================================= */
 
 .empty-row {
   padding: 45px 20px !important;
@@ -396,9 +329,6 @@
 }
 
 
-/* =========================================
-   Utility
-   ========================================= */
 
 .font-bold {
   color: #1f2a45;
@@ -417,9 +347,6 @@
 }
 
 
-/* =========================================
-   Tablet
-   ========================================= */
 
 @media (max-width: 900px) {
 
@@ -443,9 +370,6 @@
 }
 
 
-/* =========================================
-   Mobile
-   ========================================= */
 
 @media (max-width: 600px) {
 
@@ -495,9 +419,6 @@
 }
 
 
-/* =========================================
-   Small Mobile
-   ========================================= */
 
 @media (max-width: 400px) {
 
@@ -545,4 +466,4 @@
     padding: 0 8px;
     font-size: 0.64rem;
   }
-}
+} */ 

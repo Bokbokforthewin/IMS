@@ -115,3 +115,1755 @@
   }
 
 }
+
+/* =========================================
+   Modal Form
+   ========================================= */
+
+.modal-form {
+  width: 100%;
+}
+
+
+/* =========================================
+   Modal Form Groups
+   ========================================= */
+
+.modal-form-group {
+  display: flex;
+  flex-direction: column;
+
+  gap: 7px;
+
+  width: 100%;
+
+  margin-bottom: 17px;
+}
+
+
+/* =========================================
+   Modal Labels
+   ========================================= */
+
+.modal-form-group label {
+  display: flex;
+  align-items: center;
+
+  color: #1f2a45;
+
+  font-size: 0.76rem;
+  font-weight: 700;
+
+  line-height: 1.4;
+}
+
+
+/* =========================================
+   Inputs
+   ========================================= */
+
+.modal-form-group input[type="text"],
+.modal-form-group input[type="number"],
+.modal-form-group textarea,
+.modal-form-group select {
+  width: 100%;
+  max-width: 100%;
+
+  box-sizing: border-box;
+
+  border: 1px solid #dce2e8;
+  border-radius: 9px;
+
+  background: #fafcfd;
+
+  color: #333333;
+
+  font-family: inherit;
+  font-size: 0.82rem;
+
+  outline: none;
+
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+
+/* Input + Select */
+
+.modal-form-group input[type="text"],
+.modal-form-group input[type="number"],
+.modal-form-group select {
+  height: 43px;
+
+  padding: 0 12px;
+}
+
+
+/* Textarea */
+
+.modal-form-group textarea {
+  min-height: 95px;
+
+  padding: 11px 12px;
+
+  resize: vertical;
+
+  line-height: 1.5;
+}
+
+
+/* =========================================
+   Placeholder
+   ========================================= */
+
+.modal-form-group input::placeholder,
+.modal-form-group textarea::placeholder {
+  color: #a5adb7;
+}
+
+
+/* =========================================
+   Hover
+   ========================================= */
+
+.modal-form-group input:hover,
+.modal-form-group textarea:hover,
+.modal-form-group select:hover {
+  border-color: #c6d0da;
+
+  background: #ffffff;
+}
+
+
+/* =========================================
+   Focus
+   ========================================= */
+
+.modal-form-group input:focus,
+.modal-form-group textarea:focus,
+.modal-form-group select:focus {
+  border-color: #365175;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 0 0 3px rgba(54, 81, 117, 0.09);
+}
+
+
+/* =========================================
+   Two Column Fields
+   ========================================= */
+
+.modal-form-row {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, 1fr);
+
+  gap: 14px;
+
+  width: 100%;
+
+  margin-bottom: 0;
+}
+
+.modal-form-row .modal-form-group {
+  min-width: 0;
+}
+
+
+/* =========================================
+   Serialized Asset Toggle
+   ========================================= */
+
+.modal-serialized-toggle {
+  position: relative;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  width: 100%;
+
+  box-sizing: border-box;
+
+  margin: 3px 0 18px;
+
+  padding: 13px 14px;
+
+  border: 1px solid #dfe6e2;
+
+  border-radius: 10px;
+
+  background: #fafcfb;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+
+/* Hide native checkbox */
+
+.modal-serialized-toggle input {
+  position: absolute;
+
+  width: 1px;
+  height: 1px;
+
+  opacity: 0;
+
+  pointer-events: none;
+}
+
+
+/* Custom checkbox */
+
+.modal-serialized-toggle__box {
+  position: relative;
+
+  display: grid;
+
+  width: 20px;
+  height: 20px;
+
+  flex-shrink: 0;
+
+  place-items: center;
+
+  box-sizing: border-box;
+
+  border: 1.5px solid #c4cdd5;
+
+  border-radius: 5px;
+
+  background: #ffffff;
+
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+
+/* Check mark */
+
+.modal-serialized-toggle__box::after {
+  width: 5px;
+  height: 10px;
+
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+
+  opacity: 0;
+
+  transform: rotate(45deg) translate(-1px, -1px);
+
+  content: "";
+
+  transition: opacity 0.15s ease;
+}
+
+
+/* Checked */
+
+.modal-serialized-toggle input:checked
+  + .modal-serialized-toggle__box {
+  border-color: #1f2a45;
+
+  background: #1f2a45;
+
+  box-shadow:
+    0 0 0 3px rgba(31, 42, 69, 0.08);
+}
+
+
+.modal-serialized-toggle input:checked
+  + .modal-serialized-toggle__box::after {
+  opacity: 1;
+}
+
+
+/* Focus */
+
+.modal-serialized-toggle input:focus-visible
+  + .modal-serialized-toggle__box {
+  box-shadow:
+    0 0 0 3px rgba(54, 81, 117, 0.14);
+}
+
+
+/* Hover */
+
+.modal-serialized-toggle:hover {
+  border-color: #b9c9bc;
+
+  background: #f5faf7;
+}
+
+
+/* Toggle Content */
+
+.modal-serialized-toggle__content {
+  display: flex;
+
+  flex-direction: column;
+
+  min-width: 0;
+
+  gap: 2px;
+}
+
+
+.modal-serialized-toggle__content strong {
+  color: #1f2a45;
+
+  font-size: 0.76rem;
+  font-weight: 750;
+
+  line-height: 1.3;
+}
+
+
+.modal-serialized-toggle__content small {
+  color: #718096;
+
+  font-size: 0.65rem;
+
+  line-height: 1.4;
+}
+
+
+/* =========================================
+   Disabled Input
+   ========================================= */
+
+.modal-form-group input:disabled {
+  border-color: #e5e8eb;
+
+  background: #f0f2f4;
+
+  color: #8d969f;
+
+  cursor: not-allowed;
+}
+
+
+/* =========================================
+   Utility
+   ========================================= */
+
+.mb-large {
+  margin-bottom: 22px;
+}
+
+
+/* =========================================
+   Modal Text
+   ========================================= */
+
+.modal-text {
+  margin: 0 0 18px;
+
+  color: #56616e;
+
+  font-size: 0.82rem;
+
+  line-height: 1.6;
+}
+
+
+/* =========================================
+   Information Box
+   ========================================= */
+
+.modal-info-box {
+  position: relative;
+
+  box-sizing: border-box;
+
+  margin-bottom: 22px;
+
+  padding: 15px 16px 15px 18px;
+
+  border: 1px solid #e2e7ed;
+  border-radius: 10px;
+
+  background: #f8fafb;
+
+  color: #333333;
+}
+
+.modal-info-box::before {
+  position: absolute;
+
+  top: 0;
+  bottom: 0;
+  left: 0;
+
+  width: 3px;
+
+  border-radius: 10px 0 0 10px;
+
+  background: #365175;
+
+  content: "";
+}
+
+
+/* =========================================
+   Information Subtext
+   ========================================= */
+
+.info-subtext {
+  display: block;
+
+  margin-top: 5px;
+
+  color: #718096;
+
+  font-size: 0.7rem;
+
+  line-height: 1.5;
+}
+
+
+/* =========================================
+   Modal Actions
+   ========================================= */
+
+.modal-actions {
+  display: flex;
+
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 9px;
+
+  width: 100%;
+
+  margin-top: 24px;
+
+  padding-top: 18px;
+
+  border-top: 1px solid #edf0f2;
+}
+
+
+/* =========================================
+   Modal Buttons
+   ========================================= */
+
+.btn-modal {
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  min-height: 40px;
+
+  padding: 0 17px;
+
+  box-sizing: border-box;
+
+  border: 1px solid transparent;
+
+  border-radius: 8px;
+
+  font-family: inherit;
+
+  font-size: 0.75rem;
+  font-weight: 700;
+
+  white-space: nowrap;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.btn-modal:hover {
+  transform: translateY(-1px);
+}
+
+.btn-modal:active {
+  transform: translateY(0);
+}
+
+
+/* =========================================
+   Cancel
+   ========================================= */
+
+.btn-cancel {
+  border-color: #dce2e8;
+
+  background: #ffffff;
+
+  color: #56616e;
+}
+
+.btn-cancel:hover {
+  border-color: #c7d0da;
+
+  background: #f5f7f9;
+
+  color: #333333;
+}
+
+
+/* =========================================
+   Primary
+   ========================================= */
+
+.btn-primary {
+  background: #1f2a45;
+
+  color: #ffffff;
+
+  box-shadow:
+    0 4px 12px rgba(31, 42, 69, 0.14);
+}
+
+.btn-primary:hover {
+  background: #365175;
+
+  box-shadow:
+    0 6px 16px rgba(31, 42, 69, 0.18);
+}
+
+
+/* =========================================
+   Danger
+   ========================================= */
+
+.btn-danger {
+  background: #ad0f0a;
+
+  color: #ffffff;
+
+  box-shadow:
+    0 4px 12px rgba(173, 15, 10, 0.12);
+}
+
+.btn-danger:hover {
+  background: #8f0c08;
+
+  box-shadow:
+    0 6px 16px rgba(173, 15, 10, 0.18);
+}
+
+
+/* =========================================
+   Neutral
+   ========================================= */
+
+.btn-neutral {
+  border-color: #dce2e8;
+
+  background: #f3f5f7;
+
+  color: #475569;
+}
+
+.btn-neutral:hover {
+  border-color: #cbd5e1;
+
+  background: #e8ecf0;
+}
+
+
+/* =========================================
+   Wide Item Modal
+   ========================================= */
+
+/*
+   Add this class to your Edit Item modal
+   if your Modal component supports className.
+*/
+
+.modal--item {
+  width: min(760px, calc(100vw - 32px));
+}
+
+
+/* =========================================
+   Tablet
+   ========================================= */
+
+@media (max-width: 700px) {
+
+  .modal-form-row {
+    grid-template-columns: 1fr;
+
+    gap: 0;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+
+    align-items: stretch;
+
+    gap: 8px;
+  }
+
+  .btn-modal {
+    width: 100%;
+  }
+
+}
+
+
+/* =========================================
+   Mobile
+   ========================================= */
+
+@media (max-width: 480px) {
+
+  .modal--item {
+    width: calc(100vw - 24px);
+  }
+
+  .modal-form-group {
+    gap: 6px;
+
+    margin-bottom: 14px;
+  }
+
+  .modal-form-group label {
+    font-size: 0.74rem;
+  }
+
+  .modal-form-group input[type="text"],
+  .modal-form-group input[type="number"],
+  .modal-form-group select {
+    height: 42px;
+
+    padding: 0 11px;
+
+    font-size: 0.8rem;
+  }
+
+  .modal-form-group textarea {
+    min-height: 85px;
+
+    padding: 10px 11px;
+
+    font-size: 0.8rem;
+  }
+
+  .modal-serialized-toggle {
+    align-items: flex-start;
+
+    padding: 12px;
+  }
+
+  .modal-serialized-toggle__content small {
+    font-size: 0.63rem;
+  }
+
+  .modal-info-box {
+    padding: 13px 14px 13px 16px;
+  }
+
+  .modal-text {
+    font-size: 0.78rem;
+  }
+
+  .modal-actions {
+    margin-top: 20px;
+
+    padding-top: 15px;
+  }
+
+  .btn-modal {
+    min-height: 42px;
+
+    font-size: 0.74rem;
+  }
+
+}
+
+
+/* =========================================
+   Extra Small Devices
+   ========================================= */
+
+@media (max-width: 360px) {
+
+  .modal--item {
+    width: calc(100vw - 16px);
+  }
+
+  .modal-form-group input[type="text"],
+  .modal-form-group input[type="number"],
+  .modal-form-group select {
+    height: 40px;
+  }
+
+  .modal-serialized-toggle {
+    gap: 9px;
+
+    padding: 11px;
+  }
+
+}
+
+/* =========================================
+   Catalog Form Card
+   ========================================= */
+
+.catalog-form-card {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+
+  padding: 26px;
+
+  border: 1px solid #e2e7ed;
+  border-radius: 16px;
+
+  background: #ffffff;
+
+  color: #333333;
+
+  box-shadow:
+    0 4px 12px rgba(31, 42, 69, 0.04),
+    0 12px 32px rgba(31, 42, 69, 0.05);
+
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.catalog-form-card::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+
+  height: 4px;
+
+  background: #1f2a45;
+
+  content: "";
+}
+
+.catalog-form-card:hover {
+  box-shadow:
+    0 6px 16px rgba(31, 42, 69, 0.05),
+    0 16px 40px rgba(31, 42, 69, 0.07);
+}
+
+
+/* =========================================
+   Heading
+   ========================================= */
+
+.catalog-form-card h2 {
+  margin: 0 0 24px;
+
+  color: #1f2a45;
+
+  font-size: 1.2rem;
+  font-weight: 750;
+
+  letter-spacing: -0.02em;
+
+  line-height: 1.3;
+}
+
+.catalog-form-card h2::after {
+  display: block;
+
+  width: 32px;
+  height: 3px;
+
+  margin-top: 9px;
+
+  border-radius: 999px;
+
+  background: #e6f6d8;
+
+  content: "";
+}
+
+
+/* =========================================
+   Form Group
+   ========================================= */
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+
+  width: 100%;
+
+  gap: 7px;
+
+  margin-bottom: 17px;
+}
+
+.serialized-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  padding: 14px 16px;
+  border: 1px solid #d9e2e7;
+  border-radius: 12px;
+  background: #ffffff;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.serialized-toggle:hover {
+  border-color: #587ca5;
+  background: #f8fbfa;
+}
+
+.serialized-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.serialized-toggle__box {
+  position: relative;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  border: 2px solid #aebbc3;
+  border-radius: 6px;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.serialized-toggle__box::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 5px;
+  height: 10px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0);
+  transition: transform 0.15s ease;
+}
+
+.serialized-toggle input:checked + .serialized-toggle__box {
+  border-color: #1f2a45;
+  background: #1f2a45;
+}
+
+.serialized-toggle input:checked + .serialized-toggle__box::after {
+  transform: rotate(45deg) scale(1);
+}
+
+.serialized-toggle__content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.serialized-toggle__content strong {
+  color: #1f2a45;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.serialized-toggle__content small {
+  color: #6b7780;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+
+/* =========================================
+   Labels
+   ========================================= */
+
+.form-group label {
+  display: flex;
+  align-items: center;
+
+  color: #1f2a45;
+
+  font-size: 0.76rem;
+  font-weight: 700;
+
+  line-height: 1.4;
+}
+
+
+/* =========================================
+   Inputs
+   ========================================= */
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  max-width: 100%;
+
+  box-sizing: border-box;
+
+  border: 1px solid #dce2e8;
+  border-radius: 9px;
+
+  background: #fafcfd;
+
+  color: #333333;
+
+  font-family: inherit;
+  font-size: 0.82rem;
+
+  outline: none;
+
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+
+/* Input + Select */
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select {
+  height: 43px;
+
+  padding: 0 12px;
+}
+
+
+/* Textarea */
+
+.form-group textarea {
+  min-height: 100px;
+
+  padding: 11px 12px;
+
+  resize: vertical;
+
+  line-height: 1.5;
+}
+
+
+/* Placeholder */
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: #a5adb7;
+}
+
+
+/* Hover */
+
+.form-group input:hover,
+.form-group textarea:hover,
+.form-group select:hover {
+  border-color: #c6d0da;
+
+  background: #ffffff;
+}
+
+
+/* Focus */
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  border-color: #365175;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 0 0 3px rgba(54, 81, 117, 0.09);
+}
+
+
+/* =========================================
+   Two Column Row
+   ========================================= */
+
+.form-row {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, 1fr);
+
+  gap: 14px;
+
+  width: 100%;
+
+  margin-bottom: 0;
+}
+
+.flex-1 {
+  min-width: 0;
+}
+
+
+/* =========================================
+   Disabled Input
+   ========================================= */
+
+.input-disabled {
+  border-color: #e5e8eb !important;
+
+  background-color: #f1f3f5 !important;
+
+  color: #8d969f;
+
+  cursor: not-allowed;
+}
+
+
+/* =========================================
+   Enabled Input
+   ========================================= */
+
+.input-enabled {
+  background-color: #fafcfd;
+
+  cursor: text;
+}
+
+
+/* =========================================
+   Submit Button
+   ========================================= */
+
+.btn-submit {
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+
+  min-height: 43px;
+
+  margin-top: 5px;
+
+  padding: 0 18px;
+
+  box-sizing: border-box;
+
+  border: none;
+  border-radius: 9px;
+
+  background: #1f2a45;
+
+  color: #ffffff;
+
+  font-family: inherit;
+
+  font-size: 0.78rem;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 5px 14px rgba(31, 42, 69, 0.15);
+
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.btn-submit:hover {
+  background: #365175;
+
+  box-shadow:
+    0 7px 18px rgba(31, 42, 69, 0.2);
+
+  transform: translateY(-1px);
+}
+
+.btn-submit:active {
+  transform: translateY(0);
+}
+
+
+/* =========================================
+   TABLET
+   ========================================= */
+
+@media (max-width: 900px) {
+
+  .catalog-form-card {
+    padding: 22px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+}
+
+
+/* =========================================
+   MOBILE
+   ========================================= */
+
+@media (max-width: 600px) {
+
+  .catalog-form-card {
+    padding: 19px;
+
+    border-radius: 14px;
+  }
+
+  .catalog-form-card h2 {
+    margin-bottom: 20px;
+
+    font-size: 1.1rem;
+  }
+
+  .form-group {
+    gap: 6px;
+
+    margin-bottom: 14px;
+  }
+
+  .form-group label {
+    font-size: 0.74rem;
+  }
+
+  .form-group input[type="text"],
+  .form-group input[type="number"],
+  .form-group select {
+    height: 42px;
+
+    padding: 0 11px;
+
+    font-size: 0.8rem;
+  }
+
+  .form-group textarea {
+    min-height: 90px;
+
+    padding: 10px 11px;
+
+    font-size: 0.8rem;
+  }
+
+  .btn-submit {
+    min-height: 42px;
+
+    font-size: 0.77rem;
+  }
+
+}
+
+
+/* =========================================
+   SMALL MOBILE
+   ========================================= */
+
+@media (max-width: 400px) {
+
+  .catalog-form-card {
+    padding: 16px;
+
+    border-radius: 12px;
+  }
+
+  .catalog-form-card h2 {
+    font-size: 1rem;
+  }
+
+  .form-group {
+    margin-bottom: 13px;
+  }
+
+  .form-group input[type="text"],
+  .form-group input[type="number"],
+  .form-group select {
+    height: 41px;
+
+    font-size: 0.78rem;
+  }
+
+  .form-group textarea {
+    min-height: 85px;
+  }
+
+  .btn-submit {
+    min-height: 41px;
+  }
+
+}
+
+/* =========================================
+   Catalog Table Card
+   ========================================= */
+
+.catalog-table-card {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+
+  border: 1px solid #e2e7ed;
+  border-radius: 16px;
+
+  background: #ffffff;
+  color: #333333;
+
+  box-shadow:
+    0 4px 12px rgba(31, 42, 69, 0.04),
+    0 12px 32px rgba(31, 42, 69, 0.05);
+}
+
+
+/* =========================================
+   Heading
+   ========================================= */
+
+.catalog-table-card h3 {
+  margin: 0;
+  padding: 22px 24px;
+
+  border-bottom: 1px solid #e8ecf0;
+
+  color: #1f2a45;
+
+  font-size: 1.1rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+}
+
+
+/* =========================================
+   Horizontal Scroll Container
+   ========================================= */
+
+.catalog-table-wrapper {
+  width: 100%;
+  max-width: 100%;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+
+  -webkit-overflow-scrolling: touch;
+
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5df transparent;
+}
+
+
+/* =========================================
+   Scrollbar
+   ========================================= */
+
+.catalog-table-wrapper::-webkit-scrollbar {
+  height: 7px;
+}
+
+.catalog-table-wrapper::-webkit-scrollbar-track {
+  background: #f5f7f9;
+}
+
+.catalog-table-wrapper::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #cbd5df;
+}
+
+.catalog-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #aeb9c5;
+}
+
+
+/* =========================================
+   Table
+   ========================================= */
+
+.catalog-table {
+  width: max-content;
+  min-width: 100%;
+
+  margin: 0;
+
+  border-collapse: separate;
+  border-spacing: 0;
+
+  font-size: 0.78rem;
+
+  /*
+   * Prevent the browser from trying to
+   * squeeze every column into the viewport.
+   */
+  table-layout: auto;
+}
+
+
+/* =========================================
+   Header
+   ========================================= */
+
+.catalog-table th {
+  padding: 13px 15px;
+
+  border-bottom: 1px solid #dfe5ea;
+
+  background: #f7f9fb;
+
+  color: #667386;
+
+  font-size: 0.63rem;
+  font-weight: 800;
+
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+
+  text-align: left;
+  text-transform: uppercase;
+
+  white-space: nowrap;
+}
+
+
+/* =========================================
+   Body
+   ========================================= */
+
+.catalog-table td {
+  padding: 14px 15px;
+
+  border-bottom: 1px solid #edf0f2;
+
+  color: #56616e;
+
+  font-size: 0.76rem;
+  line-height: 1.45;
+
+  text-align: left;
+  vertical-align: middle;
+
+  /*
+   * Keep values readable instead of
+   * wrapping awkwardly.
+   */
+  white-space: nowrap;
+}
+
+
+/* =========================================
+   First / Last Cell
+   ========================================= */
+
+.catalog-table th:first-child,
+.catalog-table td:first-child {
+  padding-left: 20px;
+}
+
+.catalog-table th:last-child,
+.catalog-table td:last-child {
+  padding-right: 20px;
+}
+
+
+/* =========================================
+   Row
+   ========================================= */
+
+.catalog-table tbody tr {
+  background: #ffffff;
+
+  transition: background 0.15s ease;
+}
+
+.catalog-table tbody tr:hover {
+  background: #fafcfb;
+}
+
+.catalog-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+
+/* =========================================
+   Category Table
+   ========================================= */
+
+/*
+ * The category table only has three columns,
+ * so let it use the available width.
+ */
+
+.catalog-table th:nth-child(1),
+.catalog-table td:nth-child(1) {
+  min-width: 180px;
+}
+
+.catalog-table th:nth-child(2),
+.catalog-table td:nth-child(2) {
+  min-width: 300px;
+}
+
+
+/* =========================================
+   Item Table Columns
+   ========================================= */
+
+/*
+ * These widths apply naturally to the
+ * 10-column Item table.
+ */
+
+.catalog-table th:nth-child(1),
+.catalog-table td:nth-child(1) {
+  min-width: 120px;
+}
+
+.catalog-table th:nth-child(2),
+.catalog-table td:nth-child(2) {
+  min-width: 170px;
+}
+
+.catalog-table th:nth-child(3),
+.catalog-table td:nth-child(3) {
+  min-width: 140px;
+}
+
+.catalog-table th:nth-child(4),
+.catalog-table td:nth-child(4) {
+  min-width: 110px;
+}
+
+.catalog-table th:nth-child(5),
+.catalog-table td:nth-child(5) {
+  min-width: 180px;
+}
+
+.catalog-table th:nth-child(6),
+.catalog-table td:nth-child(6) {
+  min-width: 110px;
+}
+
+.catalog-table th:nth-child(7),
+.catalog-table td:nth-child(7) {
+  min-width: 90px;
+}
+
+.catalog-table th:nth-child(8),
+.catalog-table td:nth-child(8) {
+  min-width: 160px;
+}
+
+.catalog-table th:nth-child(9),
+.catalog-table td:nth-child(9) {
+  min-width: 110px;
+}
+
+
+/* =========================================
+   Actions
+   ========================================= */
+
+.action-col {
+  min-width: 145px;
+
+  text-align: left;
+
+  white-space: nowrap;
+}
+
+.action-cell {
+  min-width: 145px;
+
+  text-align: left;
+
+  white-space: nowrap;
+}
+
+.action-buttons {
+  display: flex;
+
+  align-items: center;
+  justify-content: flex-start;
+
+  gap: 7px;
+
+  white-space: nowrap;
+}
+
+
+/* =========================================
+   Action Buttons
+   ========================================= */
+
+.btn-action {
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  box-sizing: border-box;
+
+  min-width: 58px;
+  height: 32px;
+
+  padding: 0 11px;
+
+  border-radius: 7px;
+
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+
+  line-height: 1;
+
+  cursor: pointer;
+
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease,
+    box-shadow 0.2s ease;
+}
+
+.btn-action:hover {
+  transform: translateY(-1px);
+}
+
+.btn-action:active {
+  transform: translateY(0);
+}
+
+
+/* =========================================
+   Edit
+   ========================================= */
+
+.btn-edit {
+  border: 1px solid #d8e0e7;
+
+  background: #f5f7f9;
+
+  color: #1f2a45;
+}
+
+.btn-edit:hover {
+  border-color: #bfcbd6;
+
+  background: #eaf0f4;
+
+  box-shadow:
+    0 3px 8px rgba(31, 42, 69, 0.08);
+}
+
+
+/* =========================================
+   Delete
+   ========================================= */
+
+.btn-delete {
+  border: 1px solid #f0c9c7;
+
+  background: #fff4f3;
+
+  color: #ad0f0a;
+}
+
+.btn-delete:hover {
+  border-color: #e5aaa7;
+
+  background: #ffe7e5;
+
+  box-shadow:
+    0 3px 8px rgba(173, 15, 10, 0.08);
+}
+
+
+/* =========================================
+   Empty State
+   ========================================= */
+
+.empty-row {
+  padding: 45px 20px !important;
+
+  color: #8a949f;
+
+  font-size: 0.78rem;
+
+  text-align: center !important;
+}
+
+
+/* =========================================
+   Utility
+   ========================================= */
+
+.font-bold {
+  color: #1f2a45;
+  font-weight: 700;
+}
+
+.monospace {
+  font-family:
+    "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace;
+
+  font-size: 0.72rem;
+}
+
+
+/* =========================================
+   Tablet
+   ========================================= */
+
+@media (max-width: 900px) {
+
+  .catalog-table-card h3 {
+    padding: 20px 22px;
+    font-size: 1.05rem;
+  }
+
+  .catalog-table th {
+    padding: 12px 13px;
+  }
+
+  .catalog-table td {
+    padding: 13px;
+  }
+
+  .btn-action {
+    height: 31px;
+    min-width: 57px;
+  }
+}
+
+
+/* =========================================
+   Mobile
+   ========================================= */
+
+@media (max-width: 600px) {
+
+  .catalog-table-card {
+    border-radius: 14px;
+  }
+
+  .catalog-table-card h3 {
+    padding: 18px;
+    font-size: 1rem;
+  }
+
+  .catalog-table th {
+    padding: 11px 12px;
+    font-size: 0.59rem;
+  }
+
+  .catalog-table td {
+    padding: 12px;
+    font-size: 0.72rem;
+  }
+
+  .catalog-table th:first-child,
+  .catalog-table td:first-child {
+    padding-left: 16px;
+  }
+
+  .catalog-table th:last-child,
+  .catalog-table td:last-child {
+    padding-right: 16px;
+  }
+
+  .btn-action {
+    height: 30px;
+
+    min-width: 55px;
+
+    padding: 0 9px;
+
+    font-size: 0.67rem;
+  }
+
+  .action-col,
+  .action-cell {
+    min-width: 140px;
+  }
+}
+
+
+/* =========================================
+   Small Mobile
+   ========================================= */
+
+@media (max-width: 400px) {
+
+  .catalog-table-card {
+    border-radius: 12px;
+  }
+
+  .catalog-table-card h3 {
+    padding: 16px;
+    font-size: 0.95rem;
+  }
+
+  .catalog-table th {
+    padding: 10px;
+    font-size: 0.57rem;
+  }
+
+  .catalog-table td {
+    padding: 10px;
+    font-size: 0.7rem;
+  }
+
+  .catalog-table th:first-child,
+  .catalog-table td:first-child {
+    padding-left: 14px;
+  }
+
+  .catalog-table th:last-child,
+  .catalog-table td:last-child {
+    padding-right: 14px;
+  }
+
+  .action-col,
+  .action-cell {
+    min-width: 136px;
+  }
+
+  .action-buttons {
+    gap: 6px;
+  }
+
+  .btn-action {
+    height: 30px;
+    min-width: 53px;
+    padding: 0 8px;
+    font-size: 0.64rem;
+  }
+}
