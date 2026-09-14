@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = '/api/v1';
 
 export default function AccountabilityForm({ serializedAssets, initialAssetId, handleApiCall, onSuccess }) {
   const [lines, setLines] = useState(() =>

@@ -11,7 +11,8 @@ export default function IssuanceHistoryTable({ refreshKey }) {
 
   const fetchIssuances = useCallback(async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/v1/consumables/issuances');
+      const response = await axios.get('/api/v1/consumables/issuances');
+
       setIssuances(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('Failed to load issuance logs:', err);

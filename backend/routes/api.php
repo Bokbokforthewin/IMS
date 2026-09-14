@@ -12,6 +12,9 @@ use App\Http\Controllers\PermissionMatrixController;
 use App\Http\Controllers\AppConfigController;
 use App\Http\Controllers\UserController;
 use App\Services\AccountabilityExcelService;
+use App\Services\PropertyTagPdfService;
+use App\Http\Controllers\PropertyTagController;
+use App\Http\Controllers\DashboardController;
 
 Route::get('/app-config', [AppConfigController::class, 'index']);
 
@@ -30,6 +33,10 @@ Route::prefix('v1')
 ->group(function () {
 
     Route::get('/users', [UserController::class, 'index']);
+
+    // Dashboard Statistics
+    Route::get('/dashboard/statistics', [DashboardController::class, 'statistics']);
+    
     // Categories (Restricted to Admin / Supply Officer)
     Route::get('/categories', [CategoryController::class, 'index']);
     Route::post('/categories', [CategoryController::class, 'store']);
@@ -69,8 +76,12 @@ Route::prefix('v1')
     Route::post('/accountability/issue-asset', [AccountabilityController::class, 'issueAsset']);
         // ->middleware('permission:issue consumables');
     Route::get('/accountability/receipts', [AccountabilityController::class, 'getReceipts']);
+
+    //Excel and PDF download with QR code
     Route::get('/accountability/receipts/{receipt}/download-excel', [AccountabilityController::class, 'downloadExcel']);
+    Route::get('/accountability/receipt-lines/{line}/download-tag-pdf', [PropertyTagController::class, 'downloadTagPdf']);
     
+
     // Return & Transfer Assets
     Route::get('/asset-transfers', [AssetTransferController::class, 'index']);
     Route::post('/asset-transfers', [AssetTransferController::class, 'store']);

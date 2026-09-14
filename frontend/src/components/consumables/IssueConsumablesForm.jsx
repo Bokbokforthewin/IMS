@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = '/api/v1';
 
 export default function IssueConsumablesForm({ item, handleApiCall, onSuccess }) {
   const [form, setForm] = useState({
@@ -19,8 +19,17 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
   const fetchUsers = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/users`);
-      const data = await res.json();
-      setUsers(Array.isArray(data) ? data : []);
+      const json = await res.json();
+      
+      // Handle both direct arrays and Laravel wrapped/paginated responses ({ data: [...] })
+      let userList = [];
+      if (Array.isArray(json)) {
+        userList = json;
+      } else if (json && Array.isArray(json.data)) {
+        userList = json.data;
+      }
+      
+      setUsers(userList);
     } catch (err) {
       console.error('Failed to load users:', err);
       setUsers([]);

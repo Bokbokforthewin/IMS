@@ -15,6 +15,12 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const menuItems = [
+    // {
+    //   id: 'dashboard',
+    //   label: 'Dashboard',
+    //   description: 'Overview & Analytics',
+    //   icon: Boxes,
+    // },
     {
       id: 'catalog',
       label: 'Catalog',

@@ -22,6 +22,7 @@ return new class extends Migration
             $table->string('country_of_origin')->nullable();
             $table->decimal('unit_cost', 12, 2);
             $table->enum('status', ['Available', 'Assigned', 'Under Repair', 'Condemned'])->default('Available');
+             $table->string('pre_repair_status')->nullable();
             $table->text('condition_remarks')->nullable();
             $table->timestamps();
         });

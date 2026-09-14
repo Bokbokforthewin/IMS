@@ -82,6 +82,19 @@ export default function ReceiveForm({ items, receiveForm, setReceiveForm, handle
           />
         </div>
 
+        {receiveForm.is_serialized === false && (
+
+        <div className="receive-field">
+          <label>Quantity</label>
+          <input
+            type="number"
+            required
+            value={receiveForm.quantity || ''}
+            onChange={e => setReceiveForm({ ...receiveForm, quantity: e.target.value })}
+          />
+        </div>
+        )}
+
         {receiveForm.is_serialized ? (
           <div className="receive-subpanel">
             <h3 className="receive-subpanel__title">Serialized Fields</h3>
@@ -130,7 +143,7 @@ export default function ReceiveForm({ items, receiveForm, setReceiveForm, handle
             <div className="receive-field">
               <label>Estimated Useful Life (Optional)</label>
               <input
-                type="text"
+                type="number"
                 placeholder="e.g. 5 Years"
                 value={receiveForm.estimated_useful_life || ''}
                 onChange={e => setReceiveForm({ ...receiveForm, estimated_useful_life: e.target.value })}

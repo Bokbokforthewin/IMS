@@ -12,7 +12,7 @@ export default function ConsumablesPage({ handleApiCall, refreshData }) {
 
   const fetchStockStatus = useCallback(async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/v1/consumables/stock-status');
+      const response = await axios.get('/api/v1/consumables/stock-status');
       setStockStatus(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error('Failed to load stock status:', err);

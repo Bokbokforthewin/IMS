@@ -6,7 +6,7 @@ import ConsumablesPage from './pages/ConsumablesPage';
 import AccountabilityPage from './pages/AccountabilityPage';
 import TransferReturnPage from './pages/TransferReturnPage';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = '/api/v1';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('catalog');
@@ -136,6 +136,14 @@ export default function App() {
 
       {activeTab === 'transfer-return' && (
         <TransferReturnPage 
+          serializedAssets={serializedAssets}
+          handleApiCall={handleApiCall}
+          refreshData={fetchData}
+        />
+      )}
+
+      {activeTab === 'dashboard' && (
+        <DashboardPage
           serializedAssets={serializedAssets}
           handleApiCall={handleApiCall}
           refreshData={fetchData}

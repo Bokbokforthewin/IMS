@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Services\AccountabilityExcelService;
+use App\Services\PropertyTagPdfService;
 
 class AccountabilityController extends Controller
 {
@@ -168,6 +169,86 @@ class AccountabilityController extends Controller
         return response()->json(['error' => 'Failed to generate a unique document number after several attempts.'], 500);
     }
 
+    public function updateAssetStatus(Request $request, SerializedAsset $serializedAsset)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:Available,Assigned,Under Repair,Condemned',
+            'condition_remarks' => 'required_if:status,Under Repair,Condemned|nullable|string|max:1000',
+        ]);
+
+        $currentStatus = $serializedAsset->status;
+        $newStatus = $validated['status'];
+
+        // Condemned is terminal through this endpoint.
+        if ($currentStatus === 'Condemned') {
+            return response()->json([
+                'error' => 'This asset is condemned and its status cannot be changed here.'
+            ], 422);
+        }
+
+        // Entering repair: remember exactly what status it came from.
+        if ($newStatus === 'Under Repair') {
+            if ($currentStatus === 'Under Repair') {
+                return response()->json(['error' => 'Asset is already Under Repair.'], 422);
+            }
+
+            $serializedAsset->update([
+                'status' => 'Under Repair',
+                'pre_repair_status' => $currentStatus, // 'Available' or 'Assigned'
+                'condition_remarks' => $validated['condition_remarks'] ?? null,
+            ]);
+
+            return response()->json([
+                'message' => 'Asset marked Under Repair.',
+                'asset' => $serializedAsset->fresh(['item', 'currentHolder']),
+            ], 200);
+        }
+
+        // Leaving repair: can ONLY go back to the exact status it came from, or Condemned.
+        // No other transition is permitted from Under Repair — this is what
+        // makes "Under Repair -> Assigned" impossible unless it actually came from Assigned.
+        if ($currentStatus === 'Under Repair') {
+            $allowedReturn = $serializedAsset->pre_repair_status ?? 'Available';
+
+            if ($newStatus !== $allowedReturn && $newStatus !== 'Condemned') {
+                return response()->json([
+                    'error' => "This asset was under repair from '{$allowedReturn}' and can only return to '{$allowedReturn}', or be marked Condemned."
+                ], 422);
+            }
+
+            $serializedAsset->update([
+                'status' => $newStatus,
+                'pre_repair_status' => null, // clear once resolved
+                'condition_remarks' => $newStatus === 'Condemned' ? ($validated['condition_remarks'] ?? null) : null,
+            ]);
+
+            return response()->json([
+                'message' => "Asset status updated to '{$newStatus}'.",
+                'asset' => $serializedAsset->fresh(['item', 'currentHolder']),
+            ], 200);
+        }
+
+        // From Available or Assigned directly to Condemned (skipping repair entirely).
+        if ($newStatus === 'Condemned') {
+            $serializedAsset->update([
+                'status' => 'Condemned',
+                'pre_repair_status' => null,
+                'condition_remarks' => $validated['condition_remarks'] ?? null,
+            ]);
+
+            return response()->json([
+                'message' => 'Asset marked Condemned.',
+                'asset' => $serializedAsset->fresh(['item', 'currentHolder']),
+            ], 200);
+        }
+
+        // Any other combination (e.g. manually picking "Assigned" or "Available"
+        // without going through repair first) is not a valid manual transition here.
+        return response()->json([
+            'error' => "Cannot change status from '{$currentStatus}' to '{$newStatus}' directly. Use Return/Transfer for returning assigned assets."
+        ], 422);
+    }
+
     public function downloadExcel(int $id, AccountabilityExcelService $excelService)
     {
         $receipt = AccountabilityReceipt::with([
@@ -179,4 +260,14 @@ class AccountabilityController extends Controller
 
         return $excelService->generate($receipt);
     }
+
+    public function downloadPropertyTagPdf(int $lineId, PropertyTagPdfService $pdfService)
+{
+    $line = \App\Models\AccountabilityReceiptLine::with('serializedAsset.item')->findOrFail($lineId);
+
+    $pdf = $pdfService->generate($line);
+    $filename = "PropertyTag-{$line->serializedAsset->property_number}.pdf";
+
+    return $pdf->download($filename);
+}
 }

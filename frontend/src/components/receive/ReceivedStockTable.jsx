@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import EditReceivedItemModal from './EditReceivedItemModal.jsx';
 import DeleteReceivedItemModal from './DeleteReceivedItemModal.jsx';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = '/api/v1';
 
 export default function ReceivedStockTable({ refreshKey }) {
   const [history, setHistory] = useState([]);
