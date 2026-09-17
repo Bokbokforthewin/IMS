@@ -1,5 +1,6 @@
 import React from 'react';
 import './CatalogPage.css';
+import { Button } from "@/components/ui/button";
 
 export default function CategoryTable({
   categories,
@@ -40,7 +41,7 @@ export default function CategoryTable({
 
                   <td className="action-cell">
                     <div className="action-buttons">
-                      <button
+                      <Button
                         type="button"
                         onClick={() =>
                           handleOpenEditCategoryModal(cat)
@@ -48,9 +49,9 @@ export default function CategoryTable({
                         className="btn-action btn-edit"
                       >
                         Edit
-                      </button>
+                      </Button>
 
-                      <button
+                      <Button
                         type="button"
                         onClick={() =>
                           handleOpenDeleteModal(cat)
@@ -58,7 +59,7 @@ export default function CategoryTable({
                         className="btn-action btn-delete"
                       >
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>

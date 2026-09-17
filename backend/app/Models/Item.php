@@ -17,7 +17,7 @@ class Item extends Model
         'type', 
         'unit_of_measure', 
         'reorder_level', 
-        'is_serialized',
+        'tracking_type',
         'estimated_useful_life',
     ];
 
@@ -31,8 +31,19 @@ class Item extends Model
         return $this->hasMany(StockBatch::class);
     }
 
-    public function serializedAssets(): HasMany
+    // Helper methods for clean type checks
+    public function isSerialized(): bool
     {
-        return $this->hasMany(SerializedAsset::class);
+        return $this->tracking_type === 'serialized';
+    }
+
+    public function isNonSerialized(): bool
+    {
+        return $this->tracking_type === 'non-serialized';
+    }
+
+    public function isConsumable(): bool
+    {
+        return $this->tracking_type === 'consumable';
     }
 }

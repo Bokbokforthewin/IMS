@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AccountabilityReceiptLine;
 use App\Services\PropertyTagPdfService;
+use App\Models\SerializedAsset;
 
 class PropertyTagController extends Controller
 {
@@ -22,16 +23,11 @@ class PropertyTagController extends Controller
     /**
      * Public-facing details page shown when someone scans the QR code
      */
-    public function show(AccountabilityReceiptLine $line)
+    public function show(SerializedAsset $serializedAsset)
     {
-        $line->load([
-            'receipt.user',
-            'receipt.issuedBy',
-            'receipt.receivedMrBy',
-            'serializedAsset.item',
-            'serializedAsset.currentHolder',
-        ]);
+        $serializedAsset->load(['item', 'currentHolder']);
+        $attached = SerializedAsset::with('item')->where('attached_to', $serializedAsset->property_number)->get();
 
-        return view('property-tag.show', ['line' => $line]);
+        return view('property-tag.show', ['asset' => $serializedAsset, 'attached' => $attached]);
     }
 }

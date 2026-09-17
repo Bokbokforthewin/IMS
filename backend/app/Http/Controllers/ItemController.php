@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Log;
 
 class ItemController extends Controller
 {
-
     public function index()
     {
         try {
@@ -32,7 +31,8 @@ class ItemController extends Controller
             'type' => 'nullable|string|max:255',
             'unit_of_measure' => 'required|string|max:50',
             'reorder_level' => 'required|integer|min:0',
-            'is_serialized' => 'required|boolean',
+            'tracking_type' => 'required|in:serialized,non-serialized,consumable',
+            'property_number' => 'nullable|string|max:255',
         ]);
 
         try {
@@ -41,24 +41,19 @@ class ItemController extends Controller
                 $year = date('Y');
                 $month = date('m');
 
-                // Generate a clean 3-letter prefix from category name (e.g., Office Supplies -> OFF)
                 $cleanedName = preg_replace('/[^a-zA-Z]/', '', $category->name);
                 $catPrefix = strtoupper(substr($cleanedName, 0, 3));
-
                 if (strlen($catPrefix) < 3) {
                     $catPrefix = str_pad($catPrefix, 3, 'X', STR_PAD_RIGHT);
                 }
 
-                // Base prefix pattern for this category and month (e.g., OFF-2026-08-)
                 $prefixPattern = sprintf("%s-%s-%s-", $catPrefix, $year, $month);
 
-                // Find the latest item matching this specific prefix pattern with a row lock
                 $lastItem = Item::where('item_code', 'LIKE', $prefixPattern . '%')
                     ->orderBy('id', 'desc')
                     ->lockForUpdate()
                     ->first();
 
-                // Compute next sequence safely
                 $nextSeq = 1;
                 if ($lastItem && $lastItem->item_code) {
                     $parts = explode('-', $lastItem->item_code);
@@ -68,7 +63,12 @@ class ItemController extends Controller
 
                 $itemCode = sprintf("%s%03d", $prefixPattern, $nextSeq);
 
-                // Create the item record including brand, specifications, and type
+                // Enforce property_number = 'N/A' for non-serialized items
+                $propertyNumber = $validatedData['property_number'] ?? null;
+                if ($validatedData['tracking_type'] === 'non-serialized') {
+                    $propertyNumber = 'N/A';
+                }
+
                 $item = Item::create([
                     'category_id' => $validatedData['category_id'],
                     'item_code' => $itemCode,
@@ -78,7 +78,8 @@ class ItemController extends Controller
                     'type' => $validatedData['type'] ?? null,
                     'unit_of_measure' => $validatedData['unit_of_measure'],
                     'reorder_level' => $validatedData['reorder_level'],
-                    'is_serialized' => $validatedData['is_serialized'],
+                    'tracking_type' => $validatedData['tracking_type'],
+                    'property_number' => $propertyNumber,
                 ]);
 
                 return response()->json([
@@ -93,7 +94,7 @@ class ItemController extends Controller
             ], 500);
         }
     }
-   
+
     public function update(Request $request, Item $item)
     {
         $validatedData = $request->validate([
@@ -104,10 +105,16 @@ class ItemController extends Controller
             'type' => 'nullable|string|max:255',
             'unit_of_measure' => 'required|string|max:50',
             'reorder_level' => 'required|integer|min:0',
-            'is_serialized' => 'required|boolean',
+            'tracking_type' => 'required|in:serialized,non-serialized,consumable',
+            'property_number' => 'nullable|string|max:255',
         ]);
 
         try {
+            $propertyNumber = $validatedData['property_number'] ?? $item->property_number;
+            if ($validatedData['tracking_type'] === 'non-serialized') {
+                $propertyNumber = 'N/A';
+            }
+
             $item->update([
                 'category_id' => $validatedData['category_id'],
                 'name' => $validatedData['name'],
@@ -116,7 +123,8 @@ class ItemController extends Controller
                 'type' => $validatedData['type'] ?? null,
                 'unit_of_measure' => $validatedData['unit_of_measure'],
                 'reorder_level' => $validatedData['reorder_level'],
-                'is_serialized' => $validatedData['is_serialized'],
+                'tracking_type' => $validatedData['tracking_type'],
+                'property_number' => $propertyNumber,
             ]);
 
             return response()->json([
@@ -131,6 +139,7 @@ class ItemController extends Controller
             ], 500);
         }
     }
+
     public function destroy(Item $item)
     {
         try {

@@ -52,9 +52,13 @@ class AccountabilityController extends Controller
     public function issueAsset(Request $request)
     {
         $validated = $request->validate([
-            'lines' => 'required|array|min:1',
-            'lines.*.serialized_asset_id' => 'required|exists:serialized_assets,id|distinct',
-            'lines.*.accessories_notes' => 'nullable|string|max:1000',
+            'cart' => 'required|array|min:1',
+            'cart.*.key' => 'required|string',
+            'cart.*.type' => 'required|in:serialized,non-serialized',
+            'cart.*.serialized_asset_id' => 'required_if:cart.*.type,serialized|nullable|exists:serialized_assets,id',
+            'cart.*.item_id' => 'required_if:cart.*.type,non-serialized|nullable|exists:items,id',
+            'cart.*.quantity' => 'required_if:cart.*.type,non-serialized|nullable|integer|min:1',
+            'cart.*.attach_to_key' => 'nullable|string',
             'user_id' => 'required|exists:users,id',
             'issued_by_id' => 'required|exists:users,id',
             'date_issued' => 'required|date',
@@ -68,23 +72,110 @@ class AccountabilityController extends Controller
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             try {
                 return DB::transaction(function () use ($validated, $dateIssued, $year) {
-                    $assetIds = collect($validated['lines'])->pluck('serialized_asset_id');
+                    $touchedUnitCosts = [];
+                    // Resolves each cart entry to the concrete serialized_assets row
+                    // it ends up as — keyed by the frontend's cart key, so
+                    // attach_to_key lookups can resolve to a real property_number.
+                    $resolvedByKey = [];
+                    $lineInputs = []; // [{asset, quantity}]
 
-                    $assets = SerializedAsset::whereIn('id', $assetIds)
-                        ->lockForUpdate()
-                        ->get()
-                        ->keyBy('id');
+                    // Pass 1: lock and validate every referenced row up front
+                    foreach ($validated['cart'] as $cartItem) {
+                        if ($cartItem['type'] === 'serialized') {
+                            $asset = SerializedAsset::where('id', $cartItem['serialized_asset_id'])
+                                ->lockForUpdate()
+                                ->first();
 
-                    foreach ($assetIds as $id) {
-                        $asset = $assets->get($id);
-                        if (!$asset || $asset->status !== 'Available') {
-                            return response()->json([
-                                'error' => "Asset ID {$id} is not available for issuance."
-                            ], 422);
+                            if (!$asset || $asset->status !== 'Available') {
+                                return response()->json([
+                                    'error' => "Serialized asset #{$cartItem['serialized_asset_id']} is not available."
+                                ], 422);
+                            }
+                        } else {
+                            $requestedQty = $cartItem['quantity'];
+                            $totalAvailable = SerializedAsset::where('item_id', $cartItem['item_id'])
+                                ->where('status', 'Available')
+                                ->whereNull('current_holder_id')
+                                ->sum('quantity_on_hand');
+
+                            if ($totalAvailable < $requestedQty) {
+                                return response()->json([
+                                    'error' => "Insufficient stock for item #{$cartItem['item_id']}. Only {$totalAvailable} available."
+                                ], 422);
+                            }
                         }
                     }
 
-                    $maxCost = $assets->max('unit_cost') ?? 0;
+                    // Pass 2: resolve serialized items first, so their property_number
+                    // is known before any attach_to_key lookups need it.
+                    foreach ($validated['cart'] as $cartItem) {
+                        if ($cartItem['type'] !== 'serialized') continue;
+
+                        $asset = SerializedAsset::where('id', $cartItem['serialized_asset_id'])->lockForUpdate()->first();
+                        $touchedUnitCosts[] = (float) $asset->unit_cost;
+                        $resolvedByKey[$cartItem['key']] = $asset;
+                        $lineInputs[] = ['asset' => $asset, 'quantity' => 1];
+                    }
+
+                    // Pass 3: resolve non-serialized items via FIFO pool-splitting
+                    foreach ($validated['cart'] as $cartItem) {
+                        if ($cartItem['type'] !== 'non-serialized') continue;
+
+                        $attachTo = null;
+                        if (!empty($cartItem['attach_to_key']) && isset($resolvedByKey[$cartItem['attach_to_key']])) {
+                            $attachTo = $resolvedByKey[$cartItem['attach_to_key']]->property_number;
+                        }
+
+                        $qtyToDeduct = $cartItem['quantity'];
+
+                        $poolRows = SerializedAsset::where('item_id', $cartItem['item_id'])
+                            ->where('status', 'Available')
+                            ->whereNull('current_holder_id')
+                            ->where('quantity_on_hand', '>', 0)
+                            ->orderBy('created_at', 'asc')
+                            ->orderBy('id', 'asc')
+                            ->lockForUpdate()
+                            ->get();
+
+                        foreach ($poolRows as $pool) {
+                            if ($qtyToDeduct <= 0) break;
+                            $take = min($pool->quantity_on_hand, $qtyToDeduct);
+
+                            if ($take === $pool->quantity_on_hand) {
+                                // Whole row moves out of the warehouse — update in place.
+                                $pool->update([
+                                    'status' => 'Assigned',
+                                    'current_holder_id' => null, // set after we know user_id below
+                                    'attached_to' => $attachTo,
+                                ]);
+                                $issuedRow = $pool;
+                            } else {
+                                // Partial take — shrink the pool, spin off a new instance row.
+                                $pool->update(['quantity_on_hand' => $pool->quantity_on_hand - $take]);
+
+                                $issuedRow = SerializedAsset::create([
+                                    'item_id' => $pool->item_id,
+                                    'serial_number' => null,
+                                    'property_number' => null,
+                                    'model' => $pool->model,
+                                    'manufacturer_name' => $pool->manufacturer_name,
+                                    'country_of_origin' => $pool->country_of_origin,
+                                    'unit_cost' => $pool->unit_cost,
+                                    'quantity_on_hand' => $take,
+                                    'status' => 'Assigned',
+                                    'attached_to' => $attachTo,
+                                ]);
+                            }
+
+                            $touchedUnitCosts[] = (float) $pool->unit_cost;
+                            $lineInputs[] = ['asset' => $issuedRow, 'quantity' => $take];
+                            $resolvedByKey[$cartItem['key']] = $issuedRow;
+
+                            $qtyToDeduct -= $take;
+                        }
+                    }
+
+                    $maxCost = !empty($touchedUnitCosts) ? max($touchedUnitCosts) : 0;
                     $receiptType = ($maxCost >= 50000) ? 'PAR' : 'ICS';
 
                     $lastReceipt = AccountabilityReceipt::where('receipt_type', $receiptType)
@@ -99,26 +190,10 @@ class AccountabilityController extends Controller
                         $nextSeq = intval(end($parts)) + 1;
                     }
 
-                    // Fetch recipient to dynamically derive unit name acronym
+                    $documentNumber = sprintf("UNIT-NAME-%s-%04d", $year, $nextSeq);
+
                     $recipient = User::find($validated['user_id']);
                     $unitHead = $recipient?->findUnitHead();
-
-                    $rawUnitName = trim($recipient->unit ?? $recipient->department ?? 'OFFICE');
-                    if (preg_match('/^[A-Za-z0-9]{2,6}$/', $rawUnitName)) {
-                        $unitName = strtoupper($rawUnitName);
-                    } else {
-                        $words = explode(' ', $rawUnitName);
-                        $acronym = '';
-                        foreach ($words as $word) {
-                            $cleanWord = preg_replace('/[^A-Za-z0-9]/', '', $word);
-                            if (!empty($cleanWord)) {
-                                $acronym .= strtoupper($cleanWord[0]);
-                            }
-                        }
-                        $unitName = !empty($acronym) ? $acronym : 'OFFICE';
-                    }
-
-                    $documentNumber = sprintf("%s-%s-%04d", $unitName, $year, $nextSeq);
 
                     $receipt = AccountabilityReceipt::create([
                         'receipt_type' => $receiptType,
@@ -130,24 +205,18 @@ class AccountabilityController extends Controller
                         'remarks' => $validated['remarks'] ?? null,
                     ]);
 
-                    foreach ($validated['lines'] as $lineInput) {
-                        $asset = $assets->get($lineInput['serialized_asset_id']);
+                    foreach ($lineInputs as $li) {
+                        $li['asset']->update(['current_holder_id' => $validated['user_id']]);
 
                         $receipt->lines()->create([
-                            'serialized_asset_id' => $asset->id,
-                            'accessories_notes' => $lineInput['accessories_notes'] ?? null,
-                        ]);
-
-                        $asset->update([
-                            'status' => 'Assigned',
-                            'current_holder_id' => $validated['user_id'],
+                            'serialized_asset_id' => $li['asset']->id,
+                            'item_id' => $li['asset']->item_id,
+                            'quantity' => $li['quantity'],
                         ]);
                     }
 
-                    $totalCost = $assets->sum('unit_cost');
-
                     return response()->json([
-                        'message' => "Assets successfully issued under {$receiptType} ({$documentNumber}). Total value: ₱" . number_format($totalCost, 2),
+                        'message' => "Assets successfully issued under {$receiptType} ({$documentNumber}).",
                         'document_number' => $documentNumber,
                         'receipt_type' => $receiptType,
                         'receipt' => $receipt->load(['lines.serializedAsset.item', 'user', 'issuedBy', 'receivedMrBy'])
@@ -155,9 +224,7 @@ class AccountabilityController extends Controller
                 });
             } catch (\Illuminate\Database\QueryException $e) {
                 $errorCode = $e->errorInfo[1] ?? null;
-                if ($errorCode == 1062 && $attempt < $maxAttempts) {
-                    continue; // duplicate document_number race — retry with a fresh sequence
-                }
+                if ($errorCode == 1062 && $attempt < $maxAttempts) continue;
                 Log::error('Failed to issue asset(s): ' . $e->getMessage());
                 return response()->json(['error' => 'Failed to issue asset(s): ' . $e->getMessage()], 500);
             } catch (\Exception $e) {
@@ -262,12 +329,51 @@ class AccountabilityController extends Controller
     }
 
     public function downloadPropertyTagPdf(int $lineId, PropertyTagPdfService $pdfService)
-{
-    $line = \App\Models\AccountabilityReceiptLine::with('serializedAsset.item')->findOrFail($lineId);
+    {
+        $line = \App\Models\AccountabilityReceiptLine::with('serializedAsset.item')->findOrFail($lineId);
 
-    $pdf = $pdfService->generate($line);
-    $filename = "PropertyTag-{$line->serializedAsset->property_number}.pdf";
+        $pdf = $pdfService->generate($line);
+        $filename = "PropertyTag-{$line->serializedAsset->property_number}.pdf";
 
-    return $pdf->download($filename);
-}
+        return $pdf->download($filename);
+    }
+
+    public function availableForCart()
+    {
+        $serialized = SerializedAsset::with('item')
+            ->whereHas('item', fn($q) => $q->where('tracking_type', 'serialized'))
+            ->where('status', 'Available')
+            ->get();
+
+        $nonSerializedByItem = SerializedAsset::with('item')
+            ->whereHas('item', fn($q) => $q->where('tracking_type', 'non-serialized'))
+            ->where('status', 'Available')
+            ->where('quantity_on_hand', '>', 0)
+            ->get()
+            ->groupBy('item_id')
+            ->map(function ($rows) {
+                $first = $rows->first();
+                return [
+                    'item_id' => $first->item_id,
+                    'item_name' => $first->item->name,
+                    'unit_cost' => $rows->max('unit_cost'), // display purposes
+                    'total_available' => $rows->sum('quantity_on_hand'),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'serialized' => $serialized,
+            'non_serialized' => $nonSerializedByItem,
+        ], 200);
+    }
+
+    public function attachedItems(SerializedAsset $serializedAsset)
+    {
+        $attached = SerializedAsset::with('item')
+            ->where('attached_to', $serializedAsset->property_number)
+            ->get();
+
+        return response()->json($attached, 200);
+    }
 }

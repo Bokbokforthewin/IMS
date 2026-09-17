@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('type')->nullable(); //if applicable only
             $table->string('unit_of_measure'); // pcs, ream, box, set, roll, liter, gallon
             $table->integer('reorder_level')->default(5);
-            $table->boolean('is_serialized')->default(false);
+            $table->enum('tracking_type', ['serialized', 'non-serialized', 'consumable'])->default('consumable');
             $table->string('estimated_useful_life')->nullable(); // e.g. "5 Years", "3 Years"
             $table->timestamps();
         });

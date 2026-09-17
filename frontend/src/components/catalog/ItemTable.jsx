@@ -23,6 +23,7 @@ export default function ItemTable({
               <th>Unit</th>
               <th>Tracking Type</th>
               <th>Reorder Level</th>
+              <th>Estimated Useful Life</th>
               <th className="action-col">Actions</th>
             </tr>
           </thead>
@@ -66,13 +67,15 @@ export default function ItemTable({
                   </td>
 
                   <td>
-                    {item.is_serialized
-                      ? 'Serialized Asset'
-                      : 'Consumable / Bulk'}
+                    {item.tracking_type || '—'}
                   </td>
 
                   <td>
                     {item.reorder_level}
+                  </td>
+
+                  <td>
+                    {item.estimated_useful_life || '—'}
                   </td>
 
                   <td className="action-cell">

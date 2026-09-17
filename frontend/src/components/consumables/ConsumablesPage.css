@@ -1,6 +1,6 @@
 /* === Layout === */
 .consumables-page-container {
-  max-width: 900px;
+  max-width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -328,4 +328,224 @@
 
 .consumables-line-grouped td {
   border-top: none;
+}
+
+/* Container & Header */
+.sp-consumables-panel {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  padding: 20px 0;
+  background-color: #f5f5f5; /* Shopee gray background */
+}
+
+.sp-panel-header {
+  background: #fff;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ebebeb;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.sp-panel-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+  color: #1f2a45; /* Shopee Orange */
+}
+
+/* Empty State */
+.sp-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: #fff;
+  color: #757575;
+}
+
+.sp-empty-state img {
+  width: 100px;
+  margin-bottom: 15px;
+  opacity: 0.5;
+}
+
+/* Grid Layout */
+.sp-grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 15px;
+  padding: 0 20px;
+}
+
+/* Product Card */
+.sp-product-card {
+  background: #fff;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  transition: transform 0.2s, box-shadow 0.2s, border 0.2s;
+  overflow: hidden;
+  position: relative;
+}
+
+.sp-product-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Image & Badge Area */
+.sp-card-image-wrapper {
+  position: relative;
+  width: 100%;
+  padding-top: 100%; /* 1:1 Aspect Ratio */
+  background: #fafafa;
+  overflow: hidden;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.sp-card-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 10px;
+}
+
+/* Floating Status Badge */
+.sp-floating-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 9999px; /* Changed from 2px to create a perfect pill shape */
+  text-transform: uppercase;
+}
+
+.sp-badge-ok { background: #2ce76e; color: #166534; }
+.sp-badge-low { background: #fce749; color: #854d0e; }
+.sp-badge-empty { background: #f02525; color: #5c0101; }
+
+/* Card Content Details */
+.sp-card-content {
+  padding: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.sp-item-name {
+  font-size: 20px;
+  font-weight: bold;
+  color: #222;
+  line-height: 1.3;
+  margin-bottom: 6px;
+  /* Multi-line truncation */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sp-item-meta {
+  font-size: 12px;
+  color: #757575;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sp-item-code {
+  color: #555;
+}
+
+.sp-item-price {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2a45;
+  margin-top: auto; /* Pushes price/stock down if name is short */
+  margin-bottom: 8px;
+}
+
+.sp-item-stock-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #757575;
+  border-top: 1px dashed #ebebeb;
+  padding-top: 8px;
+}
+
+.sp-stock-qty {
+  font-weight: 500;
+  color: #222;
+}
+
+.sp-item-specs {
+  font-weight: 500;
+  font-size: 14px;
+  color: #333333;
+}
+
+/* Action Buttons */
+.sp-card-actions {
+  padding: 10px 12px 12px;
+  background: #fafafa;
+}
+
+.sp-btn {
+  width: 100%;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 2px;
+  cursor: pointer;
+  text-align: center;
+  border: none;
+  transition: background 0.2s, color 0.2s, border 0.2s;
+}
+
+.sp-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.sp-btn-primary {
+  background: #1f2a45;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.sp-btn-primary:hover:not(:disabled) {
+  background: #1f2a45;
+}
+
+.sp-btn-group-secondary {
+  display: flex;
+  gap: 8px;
+}
+
+.sp-btn-outline {
+  background: #fff;
+  color: #555;
+  border: 1px solid #ccc;
+}
+
+.sp-btn-outline:hover {
+  background: #f0f0f0;
+}
+
+.sp-btn-danger-outline {
+  background: #fff;
+  color: #1f2a45;
+  border: 1px solid #1f2a45;
+}
+
+.sp-btn-danger-outline:hover {
+  background: #fdf2f0;
 }

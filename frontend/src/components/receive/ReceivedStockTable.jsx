@@ -2,7 +2,23 @@ import React, { useState, useEffect, useCallback } from 'react';
 import EditReceivedItemModal from './EditReceivedItemModal.jsx';
 import DeleteReceivedItemModal from './DeleteReceivedItemModal.jsx';
 
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+
 const API_BASE_URL = '/api/v1';
+
+function money(n) {
+  return `₱${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+}
 
 export default function ReceivedStockTable({ refreshKey }) {
   const [history, setHistory] = useState([]);
@@ -44,67 +60,60 @@ export default function ReceivedStockTable({ refreshKey }) {
 
   return (
     <div className="receive-panel">
-      <h2 className="receive-panel__title">Received Stock</h2>
+      <h2 className="receive-panel__title">Received Stocks & Assets</h2>
 
       {loadingHistory && <p className="receive-table__loading">Loading...</p>}
 
-      {!loadingHistory && (
-        <div className="receive-table-wrapper">
-          <table className="receive-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Item Name</th>
-                <th>Item Code</th>
-                <th>Reference No.</th>
-                <th>Qty</th>
-                <th>Unit</th>
-                <th>Unit Cost</th>
-                <th>Total Cost</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.length === 0 ? (
-                <tr>
-                  <td colSpan="10" className="receive-table__empty">
-                    No received records found.
-                  </td>
-                </tr>
-              ) : (
-                history.map(row => (
-                  <tr key={`${row.type}-${row.id}`}>
-                    <td className="receive-table__date">
-                      {row.received_at ? new Date(row.received_at).toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td>
-                      <span className={`badge ${row.type === 'Asset' ? 'badge--asset' : 'badge--consumable'}`}>
-                        {row.type}
-                      </span>
-                    </td>
-                    <td className="receive-table__item-name">{row.item_name}</td>
-                    <td className="receive-table__item-code">{row.item_code}</td>
-                    <td className="receive-table__reference">{row.reference_no}</td>
-                    <td className="receive-table__qty">{row.quantity}</td>
-                    <td className="receive-table__unit">{row.unit_of_measure || '-'}</td>
-                    <td>₱{Number(row.unit_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="receive-table__total">
-                      ₱{Number(row.total_cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="receive-table__actions">
-                      <button type="button" className="receive-action-btn" onClick={() => openEdit(row)}>
-                        Edit
-                      </button>
-                      <button type="button" className="receive-action-btn receive-action-btn--danger" onClick={() => openDelete(row)}>
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {!loadingHistory && history.length === 0 && (
+        <p className="receive-table__empty">No received records found.</p>
+      )}
+
+      {!loadingHistory && history.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {history.map(row => (
+            <Card key={`${row.type}-${row.id}`} className="npm dlx shadcn@latest add card">
+              <CardHeader>
+                <CardAction>
+                  <Badge variant={row.type === 'Asset' ? 'default' : 'secondary'}>
+                    {row.type}
+                  </Badge>
+                </CardAction>
+                <CardTitle>{row.item_name}</CardTitle>
+                <CardDescription>
+                  {row.item_code} &middot; Ref: {row.reference_no}
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className="flex-1">
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <dt className="text-muted-foreground">Date</dt>
+                  <dd className="text-right">
+                    {row.received_at ? new Date(row.received_at).toLocaleDateString() : 'N/A'}
+                  </dd>
+
+                  <dt className="text-muted-foreground">Quantity</dt>
+                  <dd className="text-right">
+                    {row.quantity} {row.unit_of_measure || ''}
+                  </dd>
+
+                  <dt className="text-muted-foreground">Unit Cost</dt>
+                  <dd className="text-right">{money(row.unit_cost)}</dd>
+
+                  <dt className="text-muted-foreground font-medium">Total Cost</dt>
+                  <dd className="text-right font-semibold">{money(row.total_cost)}</dd>
+                </dl>
+              </CardContent>
+
+              <CardFooter className="gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => openEdit(row)}>
+                  Edit
+                </Button>
+                <Button variant="destructive" className="flex-1" onClick={() => openDelete(row)}>
+                  Delete
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
         </div>
       )}
 

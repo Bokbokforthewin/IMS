@@ -1,13 +1,11 @@
-/* === Layout === */
 .receive-page-container {
-  max-width: 900px;
+  max-width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
 
-/* === Shared panel look === */
 .receive-panel {
   background: #ffffff;
   border: 1px solid #e3e8e6;
@@ -22,7 +20,6 @@
   color: #1f2a45;
 }
 
-/* === Form === */
 .receive-form {
   max-width: 600px;
   margin: 0 auto;
@@ -77,7 +74,6 @@
   color: #1f2a45;
 }
 
-/* === Serialized / Consumable sub-panel === */
 .receive-subpanel {
   background: #f8fafa;
   border: 1px solid #e3e8e6;
@@ -93,7 +89,6 @@
   color: #1f2a45;
 }
 
-/* === Submit button === */
 .receive-submit-btn {
   width: 100%;
   padding: 11px 16px;
@@ -115,7 +110,6 @@
   background: #1c452f;
 }
 
-/* === Received stock table === */
 .receive-table-wrapper {
   overflow-x: auto;
 }
@@ -185,7 +179,6 @@
   font-size: 13px;
 }
 
-/* === Type badge === */
 .badge {
   display: inline-block;
   padding: 3px 8px;

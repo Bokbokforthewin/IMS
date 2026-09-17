@@ -76,11 +76,14 @@ Route::prefix('v1')
     Route::post('/accountability/issue-asset', [AccountabilityController::class, 'issueAsset']);
         // ->middleware('permission:issue consumables');
     Route::get('/accountability/receipts', [AccountabilityController::class, 'getReceipts']);
+    Route::get('/accountability/available-for-cart', [AccountabilityController::class, 'availableForCart']);
+    Route::get('/accountability/serialized-assets/{serializedAsset}/attached', [AccountabilityController::class, 'attachedItems']);
+
 
     //Excel and PDF download with QR code
     Route::get('/accountability/receipts/{receipt}/download-excel', [AccountabilityController::class, 'downloadExcel']);
     Route::get('/accountability/receipt-lines/{line}/download-tag-pdf', [PropertyTagController::class, 'downloadTagPdf']);
-    
+
 
     // Return & Transfer Assets
     Route::get('/asset-transfers', [AssetTransferController::class, 'index']);

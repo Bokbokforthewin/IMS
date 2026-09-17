@@ -17,18 +17,18 @@ class ConsumablesController extends Controller
             $items = Item::with(['stockBatches' => function ($q) {
                     $q->orderBy('received_date', 'asc');
                 }])
-                ->where('is_serialized', false)
+                ->where('tracking_type', 'Consumable')
                 ->get()
                 ->map(function ($item) {
                     $totalStock = $item->stockBatches->sum('quantity_on_hand');
                     $reorderLevel = $item->reorder_level ?? 5;
                     $nextBatch = $item->stockBatches->firstWhere('quantity_on_hand', '>', 0);
 
-                    $status = 'Normal';
+                    $status = 'In Stock';
                     if ($totalStock <= 0) {
                         $status = 'Out of Stock';
                     } elseif ($totalStock <= $reorderLevel) {
-                        $status = 'Low Stock (Reorder)';
+                        $status = 'Low on Stock';
                     }
 
                     return [

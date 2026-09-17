@@ -13,9 +13,23 @@ return new class extends Migration
     {
         Schema::create('accountability_receipt_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('accountability_receipt_id')->constrained('accountability_receipts')->onDelete('cascade');
-            $table->foreignId('serialized_asset_id')->constrained('serialized_assets')->onDelete('cascade');
-            $table->text('accessories_notes')->nullable(); // e.g. "Includes keyboard SN:..., mouse SN:..."
+            $table->foreignId('accountability_receipt_id')
+                ->constrained('accountability_receipts')
+                ->onDelete('cascade');
+                
+            $table->foreignId('item_id')
+                ->nullable()
+                ->constrained('items')
+                ->nullOnDelete();
+
+            // Define the serialized_asset_id foreign key properly:
+            $table->foreignId('serialized_asset_id')
+                ->nullable() // or omit ->nullable() if strictly required
+                ->constrained('serialized_assets')
+                ->onDelete('cascade');
+
+            $table->integer('quantity')->default(1);
+            $table->text('accessories_notes')->nullable();
             $table->timestamps();
         });
     }

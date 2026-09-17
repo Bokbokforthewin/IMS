@@ -32,6 +32,22 @@ export default function TransferOrReturnForm({ serializedAssets = [], handleApiC
     fetchUsers();
   }, [fetchUsers]);
 
+  const handleAssetChange = (assetId) => {
+    const selectedAsset = serializedAssets.find(a => String(a.id) === String(assetId));
+
+    // Auto-fill "Transferring From" with the asset's actual current holder,
+    // but leave the dropdown editable in case a correction is needed.
+    const derivedHolderId = selectedAsset?.current_holder_id
+      ? String(selectedAsset.current_holder_id)
+      : '';
+
+    setForm(prev => ({
+      ...prev,
+      serialized_asset_id: assetId,
+      user_id: derivedHolderId,
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -71,7 +87,7 @@ export default function TransferOrReturnForm({ serializedAssets = [], handleApiC
                 name="transfer_type"
                 value="RETURN"
                 checked={form.transfer_type === 'RETURN'}
-                onChange={e => setForm({ ...form, transfer_type: e.target.value, serialized_asset_id: '' })}
+                onChange={e => setForm({ ...form, transfer_type: e.target.value, serialized_asset_id: '', user_id: '' })}
               />
               Return Equipment (Back to Warehouse)
             </label>
@@ -81,7 +97,7 @@ export default function TransferOrReturnForm({ serializedAssets = [], handleApiC
                 name="transfer_type"
                 value="TRANSFER"
                 checked={form.transfer_type === 'TRANSFER'}
-                onChange={e => setForm({ ...form, transfer_type: e.target.value, serialized_asset_id: '' })}
+                onChange={e => setForm({ ...form, transfer_type: e.target.value, serialized_asset_id: '', user_id: '' })}
               />
               Transfer Equipment (Person to Person)
             </label>
@@ -93,7 +109,7 @@ export default function TransferOrReturnForm({ serializedAssets = [], handleApiC
           <select
             required
             value={form.serialized_asset_id}
-            onChange={e => setForm({ ...form, serialized_asset_id: e.target.value })}
+            onChange={e => handleAssetChange(e.target.value)}
           >
             <option value="">Select an asset...</option>
             {serializedAssets.map(a => {
@@ -119,7 +135,7 @@ export default function TransferOrReturnForm({ serializedAssets = [], handleApiC
         </div>
 
         <div className="transfer-field">
-          <label>Transferring From (Current Holder)</label>
+          <label>Return From (Current Holder)</label>
           <select
             required
             value={form.user_id}
@@ -132,10 +148,13 @@ export default function TransferOrReturnForm({ serializedAssets = [], handleApiC
               </option>
             ))}
           </select>
+          <small>
+            Auto-filled from the asset's recorded current holder — change it only if this doesn't match reality.
+          </small>
         </div>
 
         <div className="transfer-field">
-          <label>Transferring To</label>
+          <label>{form.transfer_type === 'RETURN' ? 'Return' : 'Transfer'} To</label>
           <select
             required
             value={form.transfered_to}

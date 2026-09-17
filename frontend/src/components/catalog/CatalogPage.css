@@ -1663,20 +1663,8 @@
    ========================================= */
 
 .btn-edit {
-  border: 1px solid #d8e0e7;
-
-  background: #f5f7f9;
-
-  color: #1f2a45;
-}
-
-.btn-edit:hover {
-  border-color: #bfcbd6;
-
-  background: #eaf0f4;
-
-  box-shadow:
-    0 3px 8px rgba(31, 42, 69, 0.08);
+  background: #1f2a45;
+  color: #ffffff;
 }
 
 
@@ -1685,20 +1673,8 @@
    ========================================= */
 
 .btn-delete {
-  border: 1px solid #f0c9c7;
-
-  background: #fff4f3;
-
-  color: #ad0f0a;
-}
-
-.btn-delete:hover {
-  border-color: #e5aaa7;
-
-  background: #ffe7e5;
-
-  box-shadow:
-    0 3px 8px rgba(173, 15, 10, 0.08);
+  background: #ad0f0a;
+  color: #ffffff;
 }
 
 

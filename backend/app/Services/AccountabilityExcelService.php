@@ -59,6 +59,44 @@ class AccountabilityExcelService
         $sheet->getRowDimension($row)->setRowHeight(max(30, ($lineCount * 15) + 10));
     }
 
+    /**
+     * Formats structured accessory data (JSON-encoded array of
+     * {name, brand, serial_number}) into clean individual lines.
+     * Falls back to treating it as plain legacy text if it isn't valid JSON,
+     * so older receipts created before this change still display correctly.
+     */
+    protected function formatAccessoryLines(?string $accessoriesNotes): array
+    {
+        if (empty($accessoriesNotes)) {
+            return [];
+        }
+
+        $decoded = json_decode($accessoriesNotes, true);
+
+        if (!is_array($decoded)) {
+            // Legacy plain-text value — show as-is under a single header line.
+            return ['Accessories: ' . $accessoriesNotes];
+        }
+
+        $lines = ['Accessories:'];
+        foreach ($decoded as $item) {
+            $name = trim($item['name'] ?? '');
+            if ($name === '') continue;
+
+            $parts = [$name];
+            if (!empty($item['brand'])) {
+                $parts[] = "Brand: {$item['brand']}";
+            }
+            if (!empty($item['serial_number'])) {
+                $parts[] = "SN: {$item['serial_number']}";
+            }
+
+            $lines[] = '- ' . implode(', ', $parts);
+        }
+
+        return $lines;
+    }
+
     protected function buildParDescription($line, $index, $totalLines): string
     {
         $asset = $line->serializedAsset;
@@ -85,12 +123,18 @@ class AccountabilityExcelService
         if (!empty($item->estimated_useful_life)) {
             $lines[] = "Estimated Useful Life: {$item->estimated_useful_life}";
         }
-        if (!empty($line->accessories_notes)) {
-            $lines[] = "Accessories: {$line->accessories_notes}";
-        }
+            $accessoryLines = $this->formatAccessoryLines($line->accessories_notes);
 
-        return implode("\n", $lines);
-    }
+                // Loop through each accessory and split its details by commas into newlines
+                foreach ($accessoryLines as $accessory) {
+                    $formattedAccessory = str_replace([', Brand:', ', SN:'], ["\nBrand:", "\nSN:"], $accessory);
+                    
+                    $formattedAccessory = str_replace('- Mouse,', '- Mouse', $formattedAccessory);
+                    
+                    $lines[] = $formattedAccessory . "\n";
+                }            
+                return implode("\n", $lines);
+        }
 
     protected function buildIcsDescription($line, $index, $totalLines): string
     {
@@ -112,12 +156,18 @@ class AccountabilityExcelService
         if (!empty($asset->serial_number)) {
             $lines[] = "Serial No.: {$asset->serial_number}";
         }
-        if (!empty($line->accessories_notes)) {
-            $lines[] = "Accessories: {$line->accessories_notes}";
-        }
+            $accessoryLines = $this->formatAccessoryLines($line->accessories_notes);
 
-        return implode("\n", $lines);
-    }
+                // Loop through each accessory and split its details by commas into newlines
+                foreach ($accessoryLines as $accessory) {
+                    $formattedAccessory = str_replace([', Brand:', ', SN:'], ["\nBrand:", "\nSN:"], $accessory);
+                    
+                    $formattedAccessory = str_replace('- Mouse,', '- Mouse', $formattedAccessory);
+                    
+                    $lines[] = $formattedAccessory . "\n";
+                }            
+                return implode("\n", $lines);
+        }
 
     protected function buildPar($receipt): Spreadsheet
     {

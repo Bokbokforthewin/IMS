@@ -1,6 +1,4 @@
-/* =========================================================
-   SIDEBAR
-   ========================================================= */
+
 
 .sidebar {
   position: relative;
@@ -25,11 +23,6 @@
     min-width 0.3s ease,
     padding 0.3s ease;
 }
-
-
-/* =========================================================
-   TOGGLE BUTTON
-   ========================================================= */
 
 .sidebar__toggle-btn {
   position: absolute;
@@ -67,11 +60,6 @@
   transform: scale(0.94);
 }
 
-
-/* =========================================================
-   NAVIGATION
-   ========================================================= */
-
 .sidebar__nav {
   flex: 1;
   min-height: 0;
@@ -98,11 +86,6 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
-
-/* =========================================================
-   MENU
-   ========================================================= */
-
 .sidebar__menu {
   display: flex;
   flex-direction: column;
@@ -113,11 +96,6 @@
 
   list-style: none;
 }
-
-
-/* =========================================================
-   NAVIGATION ITEM
-   ========================================================= */
 
 .sidebar__item {
   position: relative;
@@ -154,11 +132,6 @@
   transform: translateX(2px);
 }
 
-
-/* =========================================================
-   ACTIVE ITEM
-   ========================================================= */
-
 .sidebar__item--active {
   background: #eef8f3;
   color: #1f2a45;
@@ -169,12 +142,6 @@
   color: #1f2a45;
   transform: none;
 }
-
-
-/* =========================================================
-   ICON
-   ========================================================= */
-
 .sidebar__item-icon {
   display: flex;
   align-items: center;
@@ -207,11 +174,6 @@
   box-shadow:
     0 5px 12px rgba(31, 42, 69, 0.35);
 }
-
-
-/* =========================================================
-   ITEM CONTENT
-   ========================================================= */
 
 .sidebar__item-content {
   display: flex;
@@ -273,11 +235,6 @@
   color: #6e8278;
 }
 
-
-/* =========================================================
-   ACTIVE INDICATOR
-   ========================================================= */
-
 .sidebar__active-indicator {
   position: absolute;
 
@@ -298,11 +255,6 @@
   transition:
     opacity 0.2s ease;
 }
-
-
-/* =========================================================
-   FOOTER
-   ========================================================= */
 
 .sidebar__footer {
   padding: 16px 6px 2px;
@@ -338,22 +290,12 @@
   text-overflow: ellipsis;
 }
 
-
-/* =========================================================
-   COLLAPSED SIDEBAR
-   ========================================================= */
-
 .sidebar.sidebar--collapsed {
   width: 80px;
   min-width: 80px;
 
   padding: 24px 10px;
 }
-
-
-/* ---------------------------------------------------------
-   Collapse Item Text
-   --------------------------------------------------------- */
 
 .sidebar.sidebar--collapsed .sidebar__item-content {
   width: 0;
@@ -368,30 +310,15 @@
   pointer-events: none;
 }
 
-
-/* ---------------------------------------------------------
-   Collapse Active Indicator
-   --------------------------------------------------------- */
-
 .sidebar.sidebar--collapsed .sidebar__active-indicator {
   opacity: 0;
 }
-
-
-/* ---------------------------------------------------------
-   Collapse Footer
-   --------------------------------------------------------- */
 
 .sidebar.sidebar--collapsed .sidebar__footer {
   opacity: 0;
 
   pointer-events: none;
 }
-
-
-/* ---------------------------------------------------------
-   Center Icons
-   --------------------------------------------------------- */
 
 .sidebar.sidebar--collapsed .sidebar__item {
   justify-content: center;
@@ -402,11 +329,6 @@
 .sidebar.sidebar--collapsed .sidebar__item:hover {
   transform: none;
 }
-
-
-/* ---------------------------------------------------------
-   Move Toggle Button
-   --------------------------------------------------------- */
 
 .sidebar.sidebar--collapsed .sidebar__toggle-btn {
   right: 50%;
@@ -421,11 +343,6 @@
 .sidebar.sidebar--collapsed .sidebar__toggle-btn:active {
   transform: translateX(50%) scale(0.94);
 }
-
-
-/* =========================================================
-   SMALLER DESKTOP
-   ========================================================= */
 
 @media (max-width: 1100px) {
   .sidebar:not(.sidebar--collapsed) {
@@ -450,11 +367,6 @@
   }
 }
 
-
-/* =========================================================
-   TABLET
-   ========================================================= */
-
 @media (max-width: 800px) {
   .sidebar:not(.sidebar--collapsed) {
     width: 220px;
@@ -478,15 +390,7 @@
   }
 }
 
-
-/* =========================================================
-   PHONE
-   ========================================================= */
-
 @media (max-width: 600px) {
-  /* -------------------------------------------------------
-     OPEN PHONE SIDEBAR
-     ------------------------------------------------------- */
 
   .sidebar:not(.sidebar--collapsed) {
     width: 220px;
@@ -494,9 +398,6 @@
 
     padding: 20px 10px;
   }
-
-
-  /* Navigation */
 
   .sidebar__nav {
     margin-top: 42px;
@@ -506,9 +407,6 @@
     gap: 5px;
   }
 
-
-  /* Navigation Items */
-
   .sidebar__item {
     min-height: 56px;
 
@@ -516,9 +414,6 @@
 
     border-radius: 10px;
   }
-
-
-  /* Text */
 
   .sidebar__item-label {
     font-size: 13px;
@@ -528,9 +423,6 @@
     font-size: 9px;
   }
 
-
-  /* Icon */
-
   .sidebar__item-icon {
     width: 35px;
     height: 35px;
@@ -538,17 +430,9 @@
     border-radius: 9px;
   }
 
-
-  /* Content width */
-
   .sidebar__item-content {
     max-width: 135px;
   }
-
-
-  /* -------------------------------------------------------
-     COLLAPSED PHONE
-     ------------------------------------------------------- */
 
   .sidebar.sidebar--collapsed {
     width: 64px;
@@ -568,11 +452,6 @@
     width: 35px;
     height: 35px;
   }
-
-
-  /* -------------------------------------------------------
-     Toggle
-     ------------------------------------------------------- */
 
   .sidebar__toggle-btn {
     top: 7px;
@@ -597,15 +476,7 @@
   }
 }
 
-
-/* =========================================================
-   VERY SMALL PHONE
-   ========================================================= */
-
 @media (max-width: 400px) {
-  /* -------------------------------------------------------
-     OPEN
-     ------------------------------------------------------- */
 
   .sidebar:not(.sidebar--collapsed) {
     width: 205px;
@@ -615,11 +486,6 @@
   .sidebar:not(.sidebar--collapsed) .sidebar__item-content {
     max-width: 120px;
   }
-
-
-  /* -------------------------------------------------------
-     COLLAPSED
-     ------------------------------------------------------- */
 
   .sidebar.sidebar--collapsed {
     width: 58px;

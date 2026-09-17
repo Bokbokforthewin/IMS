@@ -1,10 +1,7 @@
-.accountability-container {
-  border: 1px solid #ccc;
-  padding: 20px;
-  border-radius: 5px;
-  max-width: 800px;
+/* .accountability-container {
+  max-width: 100%;
   margin: 0 auto;
-  background: #fff;
+  background: #ffffff;
 }
 
 .accountability-subtitle {
@@ -127,3 +124,27 @@
   font-size: 12px;
   font-weight: 700;
 }
+
+.sp-badge-assigned { 
+  background: #e0f2fe; 
+  color: #0369a1;
+ }
+
+ .sp-stock-qty {
+  font-weight: 500;
+  font-size: 14px;
+ }
+
+ .btn-excel-download {
+  background-color: #52e725;
+  border-radius: 50px;
+  margin: 0px 10px 0px 0px;
+  font-size: 14px;
+ }
+
+ .btn-pdf-download {
+  background-color: #007bff;
+  border-radius: 50px;
+  margin: 0px 10px 0px 0px;
+  font-size: 14px;
+ } */

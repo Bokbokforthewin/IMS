@@ -1,3 +1,4 @@
+
 /* ============================================================
    Header
    ============================================================ */
@@ -10,15 +11,18 @@
 
   position: relative;
   z-index: 50;
+
+  width: 100%;
 }
 
 .site-header__inner {
   display: flex;
   align-items: center;
 
+  width: 100%;
   min-height: 8vh;
 
-  width: 100%;
+  overflow: hidden;
 }
 
 
@@ -31,34 +35,120 @@
   align-items: center;
 
   /*
-   * Responsive left spacing:
-   * 20px minimum
-   * scales with viewport width
-   * 150px maximum
+   * Keep the entire header brand horizontal.
    */
-  margin-inline-start: clamp(20px, 8vw, 20px);
+  flex-direction: row;
+  flex-wrap: nowrap;
 
-  gap: clamp(8px, 1.2vw, 12px);
+  /*
+   * Responsive left spacing.
+   */
+  margin-inline-start: clamp(6px, 8vw, 20px);
+
+  gap: clamp(6px, 1.2vw, 12px);
 
   min-width: 0;
+  max-width: 100%;
+
+  white-space: nowrap;
 }
 
 
 /* ============================================================
-   Logo
+   Logo Container
    ============================================================ */
+
+/*
+ * This is the outer container from Header.jsx.
+ */
 
 .site-header__logo {
   display: flex;
   align-items: center;
   justify-content: center;
 
+  /*
+   * Prevent the Logo component from wrapping.
+   */
+  flex-direction: row;
+  flex-wrap: nowrap;
+
+  flex: 0 0 auto;
   flex-shrink: 0;
+
+  width: max-content;
+  min-width: max-content;
+
+  white-space: nowrap;
 
   filter:
     drop-shadow(
       0 0 4px rgba(226, 224, 224, 0.5)
     );
+}
+
+
+/* ============================================================
+   Logo Component
+   ============================================================ */
+
+/*
+ * IMPORTANT:
+ *
+ * Logo.jsx has its own:
+ *
+ * <div className="logo">
+ *
+ * This is the element that directly contains the
+ * two PNG images.
+ *
+ * Force it to remain horizontal at ALL screen sizes.
+ */
+
+.logo {
+  display: flex;
+
+  flex-direction: row;
+  flex-wrap: nowrap;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: clamp(3px, 0.5vw, 7px);
+
+  width: max-content;
+  min-width: max-content;
+
+  flex: 0 0 auto;
+  flex-shrink: 0;
+
+  white-space: nowrap;
+}
+
+
+/* ============================================================
+   Logo Images
+   ============================================================ */
+
+.logo__image {
+  display: block;
+
+  /*
+   * Never allow either logo to shrink or wrap.
+   */
+  flex: 0 0 auto;
+  flex-shrink: 0;
+
+  /*
+   * Keep the proportions of the original PNG.
+   */
+  object-fit: contain;
+
+  /*
+   * Prevent browser CSS from overriding the dimensions
+   * supplied by the React component.
+   */
+  max-width: none;
 }
 
 
@@ -70,6 +160,7 @@
   width: 2px;
   height: 35px;
 
+  flex: 0 0 2px;
   flex-shrink: 0;
 
   background-color: #d1d5db;
@@ -86,11 +177,21 @@
 
   min-width: 0;
 
+  /*
+   * Text is allowed to shrink rather than pushing the
+   * logos onto another line.
+   */
+  flex: 1 1 auto;
+
+  overflow: hidden;
+
   line-height: 1.15;
 }
 
 
-/* Department of Health */
+/* ============================================================
+   Department of Health
+   ============================================================ */
 
 .site-header__sub {
   color: #ffffff;
@@ -100,11 +201,16 @@
 
   white-space: nowrap;
 
+  overflow: hidden;
+  text-overflow: ellipsis;
+
   text-align: left;
 }
 
 
-/* NEGROS ISLAND REGION */
+/* ============================================================
+   NEGROS ISLAND REGION
+   ============================================================ */
 
 .site-header__name {
   color: #ffffff;
@@ -115,6 +221,7 @@
   letter-spacing: 0.01em;
 
   white-space: nowrap;
+
   overflow: hidden;
   text-overflow: ellipsis;
 
@@ -122,7 +229,9 @@
 }
 
 
-/* Republic of the Philippines */
+/* ============================================================
+   Republic of the Philippines
+   ============================================================ */
 
 .site-header__sub-secondary {
   color: rgba(255, 255, 255, 0.62);
@@ -132,6 +241,9 @@
   font-style: italic;
 
   white-space: nowrap;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
 
   text-align: left;
 }
@@ -148,8 +260,12 @@
     gap: 9px;
   }
 
+  .logo {
+    gap: 5px;
+  }
+
   .site-header__divider {
-    height: 32px;
+    height: 44px;
   }
 
   .site-header__name {
@@ -164,9 +280,17 @@
 
 @media (max-width: 600px) {
 
+  .site-header__inner {
+    min-height: 60px;
+  }
+
   .site-header__brand {
     margin-inline-start: 15px;
     gap: 8px;
+  }
+
+  .logo {
+    gap: 4px;
   }
 
   .site-header__name {
@@ -182,7 +306,7 @@
   }
 
   .site-header__divider {
-    height: 30px;
+    height: 38px;
   }
 }
 
@@ -198,82 +322,8 @@
     gap: 7px;
   }
 
-  .site-header__name {
-    font-size: 14px;
-  }
-
-  .site-header__sub {
-    font-size: 8px;
-  }
-
-  .site-header__sub-secondary {
-    display: none;
-  }
-
-  .site-header__divider {
-    height: 27px;
-  }
-}
-
-
-/* ============================================================
-   Very Small Mobile
-   ============================================================ */
-
-@media (max-width: 360px) {
-
-  .site-header__brand {
-    margin-inline-start: 6px;
-    gap: 6px;
-  }
-
-  .site-header__name {
-    font-size: 13px;
-  }
-
-  .site-header__sub {
-    font-size: 7.5px;
-  }
-
-  .site-header__divider {
-    display: none;
-  }
-}
-
-
-/* ============================================================
-   Tablet
-   ============================================================ */
-
-@media (max-width: 900px) {
-
-  .site-header__brand {
-    gap: 9px;
-  }
-
-  .site-header__divider {
-    height: 44px;
-  }
-}
-
-
-/* ============================================================
-   Mobile
-   ============================================================ */
-
-@media (max-width: 480px) {
-
-  .site-header__inner {
-    min-height: 60px;
-  }
-
-  .site-header__brand {
-    gap: 8px;
-  }
-
-  .site-header__divider {
-    width: 2px;
-    height: 38px;
+  .logo {
+    gap: 3px;
   }
 
   .site-header__name {
@@ -287,6 +337,11 @@
   .site-header__sub-secondary {
     display: none;
   }
+
+  .site-header__divider {
+    width: 2px;
+    height: 38px;
+  }
 }
 
 
@@ -295,6 +350,15 @@
    ============================================================ */
 
 @media (max-width: 360px) {
+
+  .site-header__brand {
+    margin-inline-start: 6px;
+    gap: 6px;
+  }
+
+  .logo {
+    gap: 2px;
+  }
 
   .site-header__name {
     font-size: 14px;

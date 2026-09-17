@@ -14,69 +14,23 @@ class InventoryController extends Controller
     /**
      * Store inbound stock deliveries (Handles both Serialized Assets and Bulk/Consumables).
      */
-    public function storeStock(Request $request)
+   public function storeStock(Request $request)
     {
         $validatedData = $request->validate([
             'item_id' => 'required|exists:items,id',
             'unit_cost' => 'required|numeric|min:0',
             'arrival_date' => 'nullable|date',
-            'is_serialized' => 'required|boolean',
         ]);
 
+        $item = Item::findOrFail($validatedData['item_id']);
         $arrivalDate = $validatedData['arrival_date'] ?? date('Y-m-d');
         $year = date('Y', strtotime($arrivalDate));
         $month = date('m', strtotime($arrivalDate));
         $day = date('d', strtotime($arrivalDate));
 
         try {
-            return DB::transaction(function () use ($request, $validatedData, $year, $month, $day, $arrivalDate) {
-               if ($validatedData['is_serialized']) {
-                $serializedData = $request->validate([
-                    'serial_number' => 'nullable|string|max:255|unique:serialized_assets,serial_number',
-                    'model' => 'nullable|string|max:255',
-                    'manufacturer_name' => 'nullable|string|max:255',
-                    'country_of_origin' => 'nullable|string|max:255',
-                    'estimated_useful_life' => 'nullable|string|max:255',
-                ]);
-
-                $lastProperty = SerializedAsset::whereYear('created_at', $year)
-                    ->orderBy('id', 'desc')
-                    ->lockForUpdate()
-                    ->first();
-
-                $nextSeq = 1;
-                if ($lastProperty && $lastProperty->property_number) {
-                    $parts = explode('-', $lastProperty->property_number);
-                    $nextSeq = intval(end($parts)) + 1;
-                }
-
-                $propertyNumber = sprintf("DOH NIR-%s-%04d", $year, $nextSeq);
-
-                $asset = SerializedAsset::create([
-                    'item_id' => $validatedData['item_id'],
-                    'serial_number' => $serializedData['serial_number'],
-                    'property_number' => $propertyNumber,
-                    'model' => $serializedData['model'] ?? null,
-                    'manufacturer_name' => $serializedData['manufacturer_name'] ?? null,
-                    'country_of_origin' => $serializedData['country_of_origin'] ?? null,
-                    'unit_cost' => $validatedData['unit_cost'],
-                    'status' => 'Available',
-                ]);
-
-                // Estimated useful life lives on the catalog Item (shared across every unit
-                // of this item type), so update it there rather than per-asset.
-                if (!empty($serializedData['estimated_useful_life'])) {
-                    Item::where('id', $validatedData['item_id'])
-                        ->update(['estimated_useful_life' => $serializedData['estimated_useful_life']]);
-                }
-
-                return response()->json([
-                    'message' => 'Serialized asset successfully recorded',
-                    'property_number' => $propertyNumber,
-                    'asset' => $asset
-                ], 201);
-
-                } else {
+            return DB::transaction(function () use ($request, $validatedData, $item, $year, $month, $day, $arrivalDate) {
+                if ($item->isConsumable()) {
                     $batchData = $request->validate([
                         'quantity' => 'required|integer|min:1',
                     ]);
@@ -99,7 +53,7 @@ class InventoryController extends Controller
                     $batch = StockBatch::create([
                         'item_id' => $validatedData['item_id'],
                         'iar_number' => $iarNumber,
-                        'received_date' => $arrivalDate,   // now a real column
+                        'received_date' => $arrivalDate,
                         'quantity_on_hand' => $batchData['quantity'],
                         'unit_cost' => $validatedData['unit_cost'],
                     ]);
@@ -110,6 +64,70 @@ class InventoryController extends Controller
                         'batch' => $batch
                     ], 201);
                 }
+
+                // Serialized or non-serialized handling
+                $isSerialized = $item->isSerialized();
+
+                $serializedData = $request->validate([
+                    'serial_number' => $isSerialized
+                        ? 'required|string|max:255|unique:serialized_assets,serial_number'
+                        : 'nullable|string|max:255|unique:serialized_assets,serial_number',
+                    'model' => 'nullable|string|max:255',
+                    'manufacturer_name' => 'nullable|string|max:255',
+                    'country_of_origin' => 'nullable|string|max:255',
+                    'estimated_useful_life' => 'nullable|string|max:255',
+                    'quantity' => !$isSerialized 
+                        ? 'required|integer|min:1' 
+                        : 'nullable|integer',
+                    // ADDED: Validate attached_to property number if provided
+                    'attached_to' => 'nullable|string|exists:serialized_assets,property_number',
+                ]);
+
+                $propertyNumber = null;
+
+                // Only generate a property number if the asset is strictly serialized
+                if ($isSerialized) {
+                    $lastProperty = SerializedAsset::whereNotNull('property_number')
+                        ->whereYear('created_at', $year)
+                        ->orderBy('id', 'desc')
+                        ->lockForUpdate()
+                        ->first();
+
+                    $nextSeq = 1;
+                    if ($lastProperty && $lastProperty->property_number) {
+                        $parts = explode('-', $lastProperty->property_number);
+                        $nextSeq = intval(end($parts)) + 1;
+                    }
+
+                    $propertyNumber = sprintf("DOH NIR-%s-%04d", $year, $nextSeq);
+                }
+
+                $asset = SerializedAsset::create([
+                    'item_id' => $validatedData['item_id'],
+                    'serial_number' => $serializedData['serial_number'] ?? null,
+                    'property_number' => $propertyNumber,
+                    'model' => $serializedData['model'] ?? null,
+                    'manufacturer_name' => $serializedData['manufacturer_name'] ?? null,
+                    'country_of_origin' => $serializedData['country_of_origin'] ?? null,
+                    'unit_cost' => $validatedData['unit_cost'],
+                    'status' => 'Available',
+                    // Set to 1 for serialized, or use submitted quantity for non-serialized
+                    'quantity_on_hand' => $isSerialized ? 1 : $serializedData['quantity'],
+                    // ADDED: Saves host property number or null
+                    'attached_to' => $serializedData['attached_to'] ?? null,
+                ]);
+
+                if (!empty($serializedData['estimated_useful_life'])) {
+                    $item->update(['estimated_useful_life' => $serializedData['estimated_useful_life']]);
+                }
+
+                return response()->json([
+                    'message' => $isSerialized
+                        ? 'Serialized asset successfully recorded'
+                        : 'Non-serialized asset successfully recorded',
+                    'property_number' => $propertyNumber,
+                    'asset' => $asset
+                ], 201);
             });
         } catch (\Exception $e) {
             Log::error('Failed to save inbound stock: ' . $e->getMessage());
@@ -134,7 +152,8 @@ class InventoryController extends Controller
             return response()->json(['error' => 'Failed to retrieve stock batches.'], 500);
         }
     }
-      public function receivedHistory(Request $request)
+
+    public function receivedHistory(Request $request)
     {
         $request->validate([
             'type' => 'nullable|in:Consumable,Asset',
@@ -204,7 +223,7 @@ class InventoryController extends Controller
                         'item_name' => $a->item->name ?? 'N/A',
                         'item_code' => $a->item->item_code ?? 'N/A',
                         'unit_of_measure' => $a->item->unit_of_measure ?? null,
-                        'reference_no' => $a->property_number,
+                        'reference_no' => $a->property_number, // Will safely be null for non-serialized
                         'quantity' => 1,
                         'unit_cost' => (float) $a->unit_cost,
                         'total_cost' => (float) $a->unit_cost,
@@ -236,7 +255,8 @@ class InventoryController extends Controller
             return response()->json(['error' => 'Failed to retrieve received stock history.'], 500);
         }
     }
-        /**
+
+    /**
      * Update an existing consumable stock batch (correction, not a new receipt).
      */
     public function updateStockBatch(Request $request, StockBatch $stockBatch)
@@ -330,6 +350,7 @@ class InventoryController extends Controller
             return response()->json(['error' => 'Failed to delete serialized asset.'], 500);
         }
     }
+
     public function updateAssetStatus(Request $request, SerializedAsset $serializedAsset)
     {
         $validated = $request->validate([

@@ -106,7 +106,6 @@ export default function EditAssetStatusModal({ isOpen, onClose, asset, onSaved }
             <div className="form-group">
               <label>Reason / Remarks <span style={{ color: '#c0392b' }}>*</span></label><br />
               <textarea
-                required
                 value={remarks}
                 onChange={e => setRemarks(e.target.value)}
                 placeholder="e.g. Won't power on, sent to IT for diagnosis"
