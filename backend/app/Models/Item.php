@@ -31,15 +31,9 @@ class Item extends Model
         return $this->hasMany(StockBatch::class);
     }
 
-    // Helper methods for clean type checks
-    public function isSerialized(): bool
+    public function isAsset(): bool
     {
-        return $this->tracking_type === 'serialized';
-    }
-
-    public function isNonSerialized(): bool
-    {
-        return $this->tracking_type === 'non-serialized';
+        return $this->tracking_type === 'asset';
     }
 
     public function isConsumable(): bool

@@ -69,7 +69,7 @@ export default function ReceivedStockTable({ refreshKey }) {
       )}
 
       {!loadingHistory && history.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {history.map(row => (
             <Card key={`${row.type}-${row.id}`} className="npm dlx shadcn@latest add card">
               <CardHeader>

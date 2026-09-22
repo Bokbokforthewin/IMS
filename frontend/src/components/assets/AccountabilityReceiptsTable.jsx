@@ -43,15 +43,14 @@ function groupLines(lines) {
 const handleDownload = async (receiptId, documentNumber) => {
   try {
     const response = await axios.get(
-      `${API_BASE_URL}/accountability/receipts/${receiptId}/download`,
+      `${API_BASE_URL}/accountability/receipts/${receiptId}/download-excel`,
       { responseType: 'blob' }
     );
 
-    // Create a temporary link to trigger the file download
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `${documentNumber}.pdf`);
+    link.setAttribute('download', `${documentNumber}.xlsx`); // Update extension to .xlsx
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -87,66 +86,69 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
         <p className="text-muted-foreground text-sm">No accountability receipts generated yet.</p>
       ) : (
         <div className="space-y-4">
-          {receipts.map(receipt => {
+          {receipts.map((receipt) => {
             const grouped = groupLines(receipt.lines || []);
 
             return (
               <Card key={receipt.id}>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="font-mono">{receipt.document_number}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Issued to {receipt.user?.name || 'N/A'} — {receipt.date_issued}
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Badge variant={receipt.receipt_type === 'PAR' ? 'default' : 'secondary'}>
-                      {receipt.receipt_type}
-                    </Badge>
-                    
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDownload(receipt.id, receipt.document_number)}
-                    >
-                      <Download className="h-4 w-4 mr-1" />
-                      Download
-                    </Button>
-                  </div>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-base font-semibold">
+                    {receipt.document_number} — <span className="font-normal">{receipt.user?.name}</span>
+                  </CardTitle>
+                  {/* Added button to trigger Excel download */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDownload(receipt.id, receipt.document_number)}
+                  >
+                    <Download className="w-4 h-4 mr-2" /> Excel
+                  </Button>
                 </CardHeader>
-
-                <CardContent>
-                  <div className="space-y-3">
-                    {grouped.map(({ primary, children }) => (
-                      <div key={primary.id} className="border rounded-md p-3">
-                        <div className="flex items-center justify-between">
+                <CardContent className="space-y-2">
+                  {grouped.map(({ primary, children }) => (
+                    <div key={primary.id} className="border rounded-md p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
                           <div className="font-medium">
                             {primary.serialized_asset?.item?.name}
                             {primary.serialized_asset?.serial_number && (
                               <span className="text-muted-foreground font-normal">
-                                {' '}— SN: {primary.serialized_asset.serial_number}
+                                {" "}— SN: {primary.serialized_asset.serial_number}
                               </span>
                             )}
                           </div>
-                          <div className="text-sm">
+                          <div className="text-sm text-muted-foreground">
                             Qty: {primary.quantity} — {money(primary.serialized_asset?.unit_cost)}
                           </div>
                         </div>
-
-                        {children.length > 0 && (
-                          <div className="mt-2 pl-4 border-l-2 border-muted space-y-1">
-                            {children.map(child => (
-                              <div key={child.id} className="flex items-center justify-between text-sm text-muted-foreground">
-                                <span>↳ {child.serialized_asset?.item?.name}</span>
-                                <span>Qty: {child.quantity} — {money(child.serialized_asset?.unit_cost)}</span>
-                              </div>
-                            ))}
-                          </div>
+                        {primary.serialized_asset?.property_number && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              window.open(
+                                `${API_BASE_URL}/accountability/serialized-assets/${primary.serialized_asset.id}/download-tag-pdf`,
+                                '_blank'
+                              )
+                            }
+                          >
+                            Tag PDF
+                          </Button>
                         )}
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Render attached child lines */}
+                      {children.map((child) => (
+                        <div key={child.id} className="ml-4 pl-3 border-l-2 flex items-center justify-between text-sm">
+                          <div>
+                            <span>{child.serialized_asset?.item?.name}</span>
+                            <Badge variant="secondary" className="ml-2">Attached</Badge>
+                          </div>
+                          <span className="text-muted-foreground">{money(child.serialized_asset?.unit_cost)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             );

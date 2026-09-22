@@ -1,34 +1,26 @@
 import React from 'react';
-import './Modal.css';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function Modal({ isOpen, title, onClose, children }) {
-  if (!isOpen) return null;
-
   return (
-    <div className="modal-overlay" onMouseDown={onClose}>
-      <div
-        className="modal"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="modal__header">
-          <h3 className="modal__title">
-            {title}
-          </h3>
-
-          <button
-            type="button"
-            className="modal__close"
-            onClick={onClose}
-            aria-label="Close modal"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="modal__content">
+    // onOpenChange fires when the user clicks the overlay or presses Escape
+    // It passes a boolean, so if it's false, we trigger your onClose function
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      {/* You can adjust sm:max-w-[425px] to make the modal wider or narrower */}
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        
+        <div className="py-4">
           {children}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

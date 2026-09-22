@@ -3,6 +3,7 @@ import AssetCatalogBrowse from '../components/assets/AssetCatalogBrowse.jsx';
 import CartReview from '../components/assets/CartReview.jsx';
 import DeliveryForm from '../components/assets/DeliveryForm.jsx';
 import AccountabilityReceiptsTable from '../components/assets/AccountabilityReceiptsTable.jsx';
+import AccountabilityForm from '@/components/assets/AccountabilityForm.jsx';
 
 const API_BASE_URL = '/api/v1';
 
@@ -20,45 +21,19 @@ export default function AccountabilityPage({ handleApiCall }) {
 
   useEffect(() => { fetchCatalog(); }, [fetchCatalog, refreshKey]);
 
-  const addSerializedToCart = (asset) => {
-    const key = `s-${asset.id}`;
-    if (cart.some(c => c.key === key)) return;
-    setCart([...cart, {
-      key,
-      type: 'serialized',
-      serialized_asset_id: asset.id,
-      name: `${asset.item?.name} — SN: ${asset.serial_number}`,
-      unit_cost: Number(asset.unit_cost),
-      quantity: 1,
-      maxQty: 1,
-    }]);
-  };
-
-  // attachToKey: the cart `key` of a serialized item already in the cart,
-  // or null/undefined for a standalone (unattached) non-serialized item.
-  const addNonSerializedToCart = (item, qty, attachToKey) => {
-    const key = `ns-${item.item_id}-${attachToKey || 'standalone'}`;
-    const existing = cart.find(c => c.key === key);
-
-    if (existing) {
-      updateCartQuantity(key, existing.quantity + qty);
-      return;
-    }
-
-    const attachedTo = attachToKey ? cart.find(c => c.key === attachToKey) : null;
-
-    setCart([...cart, {
-      key,
-      type: 'non-serialized',
-      item_id: item.item_id,
-      name: item.item_name,
-      unit_cost: Number(item.unit_cost),
-      quantity: qty,
-      maxQty: item.total_available,
-      attachToKey: attachToKey || null,
-      attachToLabel: attachedTo ? attachedTo.name : null,
-    }]);
-  };
+  const addAssetToCart = (asset, attachToKey) => {
+  const key = `a-${asset.id}`;
+  if (cart.some(c => c.key === key)) return;
+  setCart([...cart, {
+    key,
+    serialized_asset_id: asset.id,
+    name: `${asset.item?.name} — SN: ${asset.serial_number}`,
+    unit_cost: Number(asset.unit_cost),
+    propertyNumber: asset.property_number,
+    attachToKey: attachToKey || null,
+    attachToLabel: null,
+  }]);
+};
 
   const updateCartQuantity = (key, quantity) => {
     setCart(cart.map(c => c.key === key ? { ...c, quantity: Math.max(1, Math.min(quantity, c.maxQty)) } : c));
@@ -88,12 +63,13 @@ export default function AccountabilityPage({ handleApiCall }) {
 
   return (
     <div className="space-y-6">
+      {/* <AccountabilityForm refreshKey={refreshKey} /> */}
       {step === 'browse' && (
         <AssetCatalogBrowse
           catalog={catalog}
           cart={cart}
-          onAddSerialized={addSerializedToCart}
-          onAddNonSerialized={addNonSerializedToCart}
+
+          addAssetToCart={addAssetToCart}
           onProceed={() => setStep('cart')}
         />
       )}

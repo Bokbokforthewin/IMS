@@ -34,7 +34,7 @@ class SerializedAsset extends Model
         return $this->belongsTo(User::class, 'current_holder_id');
     }
 
-    public function receiptLines(): HasMany
+    public function lines(): HasMany
     {
         return $this->hasMany(AccountabilityReceiptLine::class);
     }

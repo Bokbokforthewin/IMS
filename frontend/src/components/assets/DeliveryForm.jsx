@@ -25,20 +25,15 @@ export default function DeliveryForm({ cart, handleApiCall, onBack, onSuccess })
     setSubmitting(true);
 
     const payload = {
-    cart: cart.map(c => c.type === 'serialized'
-        ? { key: c.key, type: 'serialized', serialized_asset_id: c.serialized_asset_id }
-        : {
-            key: c.key,
-            type: 'non-serialized',
-            item_id: c.item_id,
-            quantity: c.quantity,
-            attach_to_key: c.attachToKey || undefined,
-        }
-    ),
-    user_id: userId,
-    issued_by_id: issuedById,
-    date_issued: dateIssued,
-    remarks,
+      cart: cart.map(c => ({
+        key: c.key,
+        serialized_asset_id: c.serialized_asset_id,
+        attach_to_key: c.attachToKey || undefined,
+      })),
+      user_id: userId,
+      issued_by_id: issuedById,
+      date_issued: dateIssued,
+      remarks,
     };
 
     handleApiCall('/accountability/issue-asset', payload, () => {

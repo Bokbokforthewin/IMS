@@ -57,6 +57,8 @@ Route::prefix('v1')
 
     // Inventory & Stock Management
     Route::post('/stocks/receive', [InventoryController::class, 'storeStock']);
+    Route::post('/stocks/receive-bundle', [InventoryController::class, 'storeBundleStock']);
+    
         // ->middleware('permission:receive stock');
     Route::get('/stock-batches', [InventoryController::class, 'indexStockBatches']);
     Route::get('/inventory/received-history', [InventoryController::class, 'receivedHistory']);
@@ -82,8 +84,7 @@ Route::prefix('v1')
 
     //Excel and PDF download with QR code
     Route::get('/accountability/receipts/{receipt}/download-excel', [AccountabilityController::class, 'downloadExcel']);
-    Route::get('/accountability/receipt-lines/{line}/download-tag-pdf', [PropertyTagController::class, 'downloadTagPdf']);
-
+    Route::get('/accountability/serialized-assets/{serializedAsset}/download-tag-pdf', [AccountabilityController::class, 'downloadPropertyTagPdf']);
 
     // Return & Transfer Assets
     Route::get('/asset-transfers', [AssetTransferController::class, 'index']);

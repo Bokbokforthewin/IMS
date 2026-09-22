@@ -38,11 +38,6 @@ class AccountabilityExcelService
         ]);
     }
 
-    /**
-     * Estimates how many visual lines a text block will wrap into given a
-     * column's approximate character width — counting only literal "\n"
-     * breaks undercounts long unbroken lines that wrap on their own.
-     */
     protected function calculateWrappedLines(string $text, int $columnCharWidth): int
     {
         $totalLines = 0;
@@ -60,44 +55,12 @@ class AccountabilityExcelService
     }
 
     /**
-     * Formats structured accessory data (JSON-encoded array of
-     * {name, brand, serial_number}) into clean individual lines.
-     * Falls back to treating it as plain legacy text if it isn't valid JSON,
-     * so older receipts created before this change still display correctly.
+     * Builds the multi-line description cell for a single receipt line.
+     * If this asset is bundled with something on a DIFFERENT document
+     * (e.g. a mouse on the ICS attached to a PC on the PAR), that's noted
+     * as a cross-reference only — the bundled item is never nested here.
      */
-    protected function formatAccessoryLines(?string $accessoriesNotes): array
-    {
-        if (empty($accessoriesNotes)) {
-            return [];
-        }
-
-        $decoded = json_decode($accessoriesNotes, true);
-
-        if (!is_array($decoded)) {
-            // Legacy plain-text value — show as-is under a single header line.
-            return ['Accessories: ' . $accessoriesNotes];
-        }
-
-        $lines = ['Accessories:'];
-        foreach ($decoded as $item) {
-            $name = trim($item['name'] ?? '');
-            if ($name === '') continue;
-
-            $parts = [$name];
-            if (!empty($item['brand'])) {
-                $parts[] = "Brand: {$item['brand']}";
-            }
-            if (!empty($item['serial_number'])) {
-                $parts[] = "SN: {$item['serial_number']}";
-            }
-
-            $lines[] = '- ' . implode(', ', $parts);
-        }
-
-        return $lines;
-    }
-
-    protected function buildParDescription($line, $index, $totalLines): string
+    protected function buildLineDescription($line, $index, $totalLines): string
     {
         $asset = $line->serializedAsset;
         $item = $asset->item;
@@ -123,51 +86,15 @@ class AccountabilityExcelService
         if (!empty($item->estimated_useful_life)) {
             $lines[] = "Estimated Useful Life: {$item->estimated_useful_life}";
         }
-            $accessoryLines = $this->formatAccessoryLines($line->accessories_notes);
-
-                // Loop through each accessory and split its details by commas into newlines
-                foreach ($accessoryLines as $accessory) {
-                    $formattedAccessory = str_replace([', Brand:', ', SN:'], ["\nBrand:", "\nSN:"], $accessory);
-                    
-                    $formattedAccessory = str_replace('- Mouse,', '- Mouse', $formattedAccessory);
-                    
-                    $lines[] = $formattedAccessory . "\n";
-                }            
-                return implode("\n", $lines);
-        }
-
-    protected function buildIcsDescription($line, $index, $totalLines): string
-    {
-        $asset = $line->serializedAsset;
-        $item = $asset->item;
-
-        $prefix = $totalLines > 1 ? sprintf('%02d. ', $index + 1) : '';
-        $lines = [$prefix . $item->name];
-
-        if (!empty($item->brand)) {
-            $lines[] = "Brand: {$item->brand}";
-        }
-        if (!empty($asset->model)) {
-            $lines[] = "Model: {$asset->model}";
-        }
         if (!empty($item->specifications)) {
             $lines[] = $item->specifications;
         }
-        if (!empty($asset->serial_number)) {
-            $lines[] = "Serial No.: {$asset->serial_number}";
+        if (!empty($asset->attached_to)) {
+            $lines[] = "Bundled with property no.: {$asset->attached_to}";
         }
-            $accessoryLines = $this->formatAccessoryLines($line->accessories_notes);
 
-                // Loop through each accessory and split its details by commas into newlines
-                foreach ($accessoryLines as $accessory) {
-                    $formattedAccessory = str_replace([', Brand:', ', SN:'], ["\nBrand:", "\nSN:"], $accessory);
-                    
-                    $formattedAccessory = str_replace('- Mouse,', '- Mouse', $formattedAccessory);
-                    
-                    $lines[] = $formattedAccessory . "\n";
-                }            
-                return implode("\n", $lines);
-        }
+        return implode("\n", $lines);
+    }
 
     protected function buildPar($receipt): Spreadsheet
     {
@@ -225,15 +152,15 @@ class AccountabilityExcelService
 
         foreach ($lines as $index => $line) {
             $asset = $line->serializedAsset;
-            $unitCost = (float) $asset->unit_cost;
+            $unitCost = (float) $asset->unit_cost * $line->quantity;
             $grandTotal += $unitCost;
 
-            $description = $this->buildParDescription($line, $index, $totalLines);
+            $description = $this->buildLineDescription($line, $index, $totalLines);
 
-            $sheet->setCellValue("A{$row}", 1);
+            $sheet->setCellValue("A{$row}", $line->quantity);
             $sheet->setCellValue("B{$row}", $asset->item->unit_of_measure ?? 'Unit');
             $sheet->setCellValue("C{$row}", $description);
-            $sheet->setCellValue("D{$row}", $asset->property_number);
+            $sheet->setCellValue("D{$row}", $asset->property_number ?? 'N/A');
             $sheet->setCellValue("E{$row}", $asset->created_at?->format('n/j/Y'));
             $sheet->setCellValue("F{$row}", $unitCost);
             $sheet->getStyle("F{$row}")->getNumberFormat()->setFormatCode('#,##0.00');
@@ -261,7 +188,7 @@ class AccountabilityExcelService
         $sheet->getStyle("F{$row}")->getFont()->setBold(true);
         $sheet->getStyle("A{$row}:F{$row}")->applyFromArray($this->thinBorder);
 
-                $row += 2;
+        $row += 2;
         $labelRow = $row;
         $sheet->mergeCells("A{$row}:C{$row}");
         $sheet->mergeCells("D{$row}:F{$row}");
@@ -277,7 +204,6 @@ class AccountabilityExcelService
         $sheet->getStyle("A{$row}:F{$row}")->getFont()->setBold(true);
         $sheet->getStyle("A{$row}:F{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        // TOP boxes: label row through name row
         $sheet->getStyle("A{$labelRow}:C{$nameRow}")->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
         $sheet->getStyle("D{$labelRow}:F{$nameRow}")->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
 
@@ -306,7 +232,6 @@ class AccountabilityExcelService
         $sheet->getStyle("A{$row}:F{$row}")->getFont()->setSize(9);
         $sheet->getStyle("A{$row}:F{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        // BOTTOM boxes: designation row through the "DATE" label row
         $sheet->getStyle("A{$designationRow}:C{$dateLabelRow}")->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
         $sheet->getStyle("D{$designationRow}:F{$dateLabelRow}")->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
 
@@ -391,12 +316,12 @@ class AccountabilityExcelService
             $asset = $line->serializedAsset;
             $item = $asset->item;
             $unitCost = (float) $asset->unit_cost;
-            $totalCost = $unitCost * 1;
+            $totalCost = $unitCost * $line->quantity;
             $grandTotal += $totalCost;
 
-            $description = $this->buildIcsDescription($line, $index, $totalLines);
+            $description = $this->buildLineDescription($line, $index, $totalLines);
 
-            $sheet->setCellValue("A{$row}", 1);
+            $sheet->setCellValue("A{$row}", $line->quantity);
             $sheet->setCellValue("B{$row}", $item->unit_of_measure ?? 'Unit');
             $sheet->setCellValue("C{$row}", $unitCost);
             $sheet->setCellValue("D{$row}", $totalCost);
@@ -429,7 +354,6 @@ class AccountabilityExcelService
         $sheet->getStyle("D{$row}")->getFont()->setBold(true);
         $sheet->getStyle("A{$row}:G{$row}")->applyFromArray($this->thinBorder);
 
-        // --- Signature block: exactly 4 outline boxes ---
         $row += 2;
         $labelRow = $row;
         $sheet->mergeCells("A{$row}:D{$row}");
@@ -446,7 +370,6 @@ class AccountabilityExcelService
         $sheet->getStyle("A{$row}:G{$row}")->getFont()->setBold(true);
         $sheet->getStyle("A{$row}:G{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        // TOP boxes: label row through name row — one outer box per side
         $sheet->getStyle("A{$labelRow}:D{$nameRow}")->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
         $sheet->getStyle("E{$labelRow}:G{$nameRow}")->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
 
@@ -483,7 +406,6 @@ class AccountabilityExcelService
         $sheet->getStyle("A{$row}:G{$row}")->getFont()->setSize(9)->setItalic(true);
         $sheet->getStyle("A{$row}:G{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        // BOTTOM boxes: "Signature Over Printed Name" through final "Date" label — one outer box per side
         $sheet->getStyle("A{$sigCaptionRow}:D{$dateLabelRow}")->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
         $sheet->getStyle("E{$sigCaptionRow}:G{$dateLabelRow}")->getBorders()->getOutline()->setBorderStyle(Border::BORDER_THIN);
 

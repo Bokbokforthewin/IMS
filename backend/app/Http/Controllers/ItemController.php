@@ -31,8 +31,8 @@ class ItemController extends Controller
             'type' => 'nullable|string|max:255',
             'unit_of_measure' => 'required|string|max:50',
             'reorder_level' => 'required|integer|min:0',
-            'tracking_type' => 'required|in:serialized,non-serialized,consumable',
-            'property_number' => 'nullable|string|max:255',
+            'tracking_type' => 'required|in:asset,consumable',
+            'estimated_useful_life' => 'nullable|string|max:255',
         ]);
 
         try {
@@ -57,29 +57,22 @@ class ItemController extends Controller
                 $nextSeq = 1;
                 if ($lastItem && $lastItem->item_code) {
                     $parts = explode('-', $lastItem->item_code);
-                    $lastSeqNum = intval(end($parts));
-                    $nextSeq = $lastSeqNum + 1;
+                    $nextSeq = intval(end($parts)) + 1;
                 }
 
                 $itemCode = sprintf("%s%03d", $prefixPattern, $nextSeq);
-
-                // Enforce property_number = 'N/A' for non-serialized items
-                $propertyNumber = $validatedData['property_number'] ?? null;
-                if ($validatedData['tracking_type'] === 'non-serialized') {
-                    $propertyNumber = 'N/A';
-                }
 
                 $item = Item::create([
                     'category_id' => $validatedData['category_id'],
                     'item_code' => $itemCode,
                     'name' => $validatedData['name'],
-                    'brand' => $validatedData['brand'] ?? 'N/A',
+                    'brand' => $validatedData['brand'] ?? null,
                     'specifications' => $validatedData['specifications'] ?? null,
                     'type' => $validatedData['type'] ?? null,
                     'unit_of_measure' => $validatedData['unit_of_measure'],
                     'reorder_level' => $validatedData['reorder_level'],
                     'tracking_type' => $validatedData['tracking_type'],
-                    'property_number' => $propertyNumber,
+                    'estimated_useful_life' => $validatedData['estimated_useful_life'] ?? null,
                 ]);
 
                 return response()->json([
@@ -105,33 +98,17 @@ class ItemController extends Controller
             'type' => 'nullable|string|max:255',
             'unit_of_measure' => 'required|string|max:50',
             'reorder_level' => 'required|integer|min:0',
-            'tracking_type' => 'required|in:serialized,non-serialized,consumable',
-            'property_number' => 'nullable|string|max:255',
+            'tracking_type' => 'required|in:asset,consumable',
+            'estimated_useful_life' => 'nullable|string|max:255',
         ]);
 
         try {
-            $propertyNumber = $validatedData['property_number'] ?? $item->property_number;
-            if ($validatedData['tracking_type'] === 'non-serialized') {
-                $propertyNumber = 'N/A';
-            }
-
-            $item->update([
-                'category_id' => $validatedData['category_id'],
-                'name' => $validatedData['name'],
-                'brand' => $validatedData['brand'] ?? 'N/A',
-                'specifications' => $validatedData['specifications'] ?? null,
-                'type' => $validatedData['type'] ?? null,
-                'unit_of_measure' => $validatedData['unit_of_measure'],
-                'reorder_level' => $validatedData['reorder_level'],
-                'tracking_type' => $validatedData['tracking_type'],
-                'property_number' => $propertyNumber,
-            ]);
+            $item->update($validatedData);
 
             return response()->json([
                 'message' => 'Catalog item successfully updated!',
                 'item' => $item->load('category')
             ], 200);
-
         } catch (\Exception $e) {
             Log::error('Failed to update catalog item: ' . $e->getMessage());
             return response()->json([
@@ -144,16 +121,10 @@ class ItemController extends Controller
     {
         try {
             $item->delete();
-
-            return response()->json([
-                'message' => 'Catalog item successfully deleted!',
-            ], 200);
-
+            return response()->json(['message' => 'Catalog item successfully deleted!'], 200);
         } catch (\Exception $e) {
             Log::error('Failed to delete catalog item: ' . $e->getMessage());
-            return response()->json([
-                'error' => 'An error occurred while deleting the item.'
-            ], 500);
+            return response()->json(['error' => 'An error occurred while deleting the item.'], 500);
         }
     }
 }

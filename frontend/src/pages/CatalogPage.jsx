@@ -8,10 +8,7 @@ import ItemTable from '../components/catalog/ItemTable.jsx';
 
 import Modal from '../components/Modal.jsx';
 import EditCategoryModal from '../components/catalog/EditCategoryModal.jsx';
-import DeleteCategoryModal from '../components/catalog/DeleteCategoryModal.jsx';
-
 import EditItemModal from '../components/catalog/EditItemModal.jsx';
-import DeleteItemModal from '../components/catalog/DeleteItemModal.jsx';
 
 import '../components/catalog/CatalogPage.css';
 import '../components/catalog/CatalogForms.css';
@@ -31,15 +28,7 @@ export default function CatalogPage({
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
 
-  // Category Delete State
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState(null);
-
-  // Item Delete State
-  const [isDeleteItemModalOpen, setIsDeleteItemModalOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState(null);
-
-  // Category Edit State
+  // Category Edit State (If managed via modal)
   const [isEditCategoryModalOpen, setIsEditCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState({ id: '', name: '', description: '' });
 
@@ -57,32 +46,22 @@ export default function CatalogPage({
     is_serialized: false
   });
 
-  // Item Delete Handlers
-  const handleOpenDeleteItemModal = (item) => {
-    setItemToDelete(item);
-    setIsDeleteItemModalOpen(true);
+  // Direct Category Handlers
+  const handleDeleteCategory = (categoryId) => {
+    handleApiCall(`/categories/${categoryId}`, null, null, 'DELETE');
   };
 
-  const handleDeleteItem = () => {
-    if (!itemToDelete) return;
-    handleApiCall(`/items/${itemToDelete.id}`, null, () => {
-      setIsDeleteItemModalOpen(false);
-      setItemToDelete(null);
-    }, 'DELETE');
+  const handleSaveCategory = (updatedCategory) => {
+    handleApiCall(`/categories/${updatedCategory.id}`, updatedCategory, null, 'PUT');
   };
 
-  // Category Delete Handlers
-  const handleOpenDeleteModal = (cat) => {
-    setCategoryToDelete(cat);
-    setIsDeleteModalOpen(true);
+  // Direct Item Handlers
+  const handleDeleteItem = (itemId) => {
+    handleApiCall(`/items/${itemId}`, null, null, 'DELETE');
   };
 
-  const handleDeleteCategory = () => {
-    if (!categoryToDelete) return;
-    handleApiCall(`/categories/${categoryToDelete.id}`, null, () => {
-      setIsDeleteModalOpen(false);
-      setCategoryToDelete(null);
-    }, 'DELETE');
+  const handleSaveItem = (updatedItem) => {
+    handleApiCall(`/items/${updatedItem.id}`, updatedItem, null, 'PUT');
   };
 
   // Category Edit Handlers
@@ -142,14 +121,14 @@ export default function CatalogPage({
       {/* Tables Section */}
       <CategoryTable 
         categories={categories} 
-        handleOpenEditCategoryModal={handleOpenEditCategoryModal} 
-        handleOpenDeleteModal={handleOpenDeleteModal} 
+        handleSaveCategory={handleSaveCategory}
+        handleDeleteCategory={handleDeleteCategory}
       />
 
       <ItemTable 
         items={items} 
-        handleOpenEditItemModal={handleOpenEditItemModal} 
-        handleOpenDeleteItemModal={handleOpenDeleteItemModal} 
+        handleSaveItem={handleSaveItem}
+        handleDeleteItem={handleDeleteItem} 
       />
 
       {/* Add Category Modal */}
@@ -181,21 +160,13 @@ export default function CatalogPage({
         />
       </Modal>
 
-      {/* Edit Category Modal */}
+      {/* Edit Category Modal (If using external modal) */}
       <EditCategoryModal 
         isOpen={isEditCategoryModalOpen}
         onClose={() => setIsEditCategoryModalOpen(false)}
         editingCategory={editingCategory}
         setEditingCategory={setEditingCategory}
         handleUpdateCategory={handleUpdateCategory}
-      />
-
-      {/* Delete Category Modal */}
-      <DeleteCategoryModal 
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        categoryToDelete={categoryToDelete}
-        handleDeleteCategory={handleDeleteCategory}
       />
 
       {/* Edit Item Modal */}
@@ -206,14 +177,6 @@ export default function CatalogPage({
         setEditingItem={setEditingItem}
         categories={categories}
         handleUpdateItem={handleUpdateItem}
-      />
-
-      {/* Delete Item Modal */}
-      <DeleteItemModal 
-        isOpen={isDeleteItemModalOpen}
-        onClose={() => setIsDeleteItemModalOpen(false)}
-        itemToDelete={itemToDelete}
-        handleDeleteItem={handleDeleteItem}
       />
     </div>
   );
