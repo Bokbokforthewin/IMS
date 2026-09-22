@@ -263,6 +263,15 @@ class AccountabilityController extends Controller
             ->whereHas('item', fn($q) => $q->where('tracking_type', 'asset'))
             ->where('status', 'Available')
             ->whereNull('current_holder_id')
+            ->where(function ($query) {
+                // Only include if it has no parent, OR if its parent is also Available
+                $query->whereNull('attached_to')
+                    ->orWhereIn('attached_to', function ($subQuery) {
+                        $subQuery->select('property_number')
+                                ->from('serialized_assets')
+                                ->where('status', 'Available');
+                    });
+            })
             ->orderBy('item_id')
             ->get();
 
