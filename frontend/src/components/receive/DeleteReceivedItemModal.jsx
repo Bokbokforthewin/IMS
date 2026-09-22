@@ -1,5 +1,17 @@
 import React, { useState } from 'react';
-import Modal from '../Modal.jsx';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
+
+const API_BASE_URL = 'http://localhost:8000/api/v1';
 
 export default function DeleteReceivedItemModal({ isOpen, onClose, row, onDeleted }) {
   const [deleting, setDeleting] = useState(false);
@@ -12,19 +24,24 @@ export default function DeleteReceivedItemModal({ isOpen, onClose, row, onDelete
     ? `/inventory/stock-batches/${row.id}`
     : `/inventory/serialized-assets/${row.id}`;
 
-  const handleDelete = async () => {
+  const handleDelete = async (e) => {
+    // Prevent default closing so modal remains open if an API error occurs
+    e.preventDefault();
     setDeleting(true);
     setError(null);
+
     try {
-      const res = await fetch(`http://localhost:8000/api/v1${endpoint}`, {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'DELETE',
-        headers: { 'Accept': 'application/json' },
+        headers: { Accept: 'application/json' },
       });
       const data = await res.json();
+
       if (!res.ok) {
         setError(data.error || 'Failed to delete record.');
         return;
       }
+
       onDeleted();
       onClose();
     } catch (err) {
@@ -35,22 +52,44 @@ export default function DeleteReceivedItemModal({ isOpen, onClose, row, onDelete
   };
 
   return (
-    <Modal isOpen={isOpen} title="Confirm Delete" onClose={onClose}>
-      {error && <div className="receive-modal-error">{error}</div>}
+    <AlertDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              {/* Error Callout */}
+              {error && (
+                <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm font-medium text-destructive">
+                  {error}
+                </div>
+              )}
 
-      <p>
-        Are you sure you want to delete <strong>{row.item_name}</strong> ({row.reference_no})?
-        This cannot be undone.
-      </p>
+              <p>
+                This action cannot be undone. This will permanently delete the received item record for{' '}
+                <strong className="font-bold text-foreground">{row.item_name}</strong>{' '}
+                {row.reference_no && (
+                  <span className="font-mono text-xs text-foreground">({row.reference_no})</span>
+                )}
+                .
+              </p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
 
-      <div className="receive-modal-actions">
-        <button type="button" onClick={onClose} className="receive-cancel-btn">
-          Cancel
-        </button>
-        <button type="button" onClick={handleDelete} disabled={deleting} className="receive-delete-btn">
-          {deleting ? 'Deleting...' : 'Delete'}
-        </button>
-      </div>
-    </Modal>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onClose} disabled={deleting}>
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={deleting}
+            className={buttonVariants({ variant: 'destructive' })}
+          >
+            {deleting ? 'Deleting...' : 'Continue'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

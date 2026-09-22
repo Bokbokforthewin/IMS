@@ -31,6 +31,8 @@ function money(n) {
 export default function StockStatusGrid({ stockStatus, onChanged, handleApiCall, onIssued }) {
   const safeStock = Array.isArray(stockStatus) ? stockStatus : [];
 
+  const receivedStock = safeStock.filter((stock) => Number(stock.total_stock) > 0);
+
   const [editingItem, setEditingItem] = useState(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -71,17 +73,17 @@ export default function StockStatusGrid({ stockStatus, onChanged, handleApiCall,
     if (typeof onIssued === 'function') onIssued();
   };
 
-  return (
+ return (
     <div className="sp-consumables-panel">
       <div className="sp-panel-header">
         <h3 className="sp-panel-title">Consumable Stocks</h3>
       </div>
 
-      {safeStock.length === 0 ? (
-        <p className="sp-empty-state">No stock status data available.</p>
+      {receivedStock.length === 0 ? (
+        <p className="sp-empty-state">No received consumable stock available.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {safeStock.map((stock) => {
+          {receivedStock.map((stock) => {
             const isOutOfStock = !stock.total_stock || stock.total_stock <= 0;
 
             return (

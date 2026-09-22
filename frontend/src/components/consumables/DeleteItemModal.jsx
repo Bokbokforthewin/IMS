@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import Modal from '../Modal.jsx';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
 
 const API_BASE_URL = 'http://localhost:8000/api/v1';
 
@@ -9,19 +19,24 @@ export default function DeleteItemModal({ isOpen, onClose, item, onDeleted }) {
 
   if (!item) return null;
 
-  const handleDelete = async () => {
+  const handleDelete = async (e) => {
+    // Prevent default closing behavior so modal stays open if API error occurs
+    e.preventDefault();
     setDeleting(true);
     setError(null);
+
     try {
       const res = await fetch(`${API_BASE_URL}/items/${item.id}`, {
         method: 'DELETE',
-        headers: { 'Accept': 'application/json' },
+        headers: { Accept: 'application/json' },
       });
       const data = await res.json();
+
       if (!res.ok) {
         setError(data.error || 'Failed to delete item.');
         return;
       }
+
       onDeleted();
       onClose();
     } catch (err) {
@@ -32,22 +47,45 @@ export default function DeleteItemModal({ isOpen, onClose, item, onDeleted }) {
   };
 
   return (
-    <Modal isOpen={isOpen} title="Confirm Delete Item" onClose={onClose}>
-      {error && <div className="consumables-alert consumables-alert--error">{error}</div>}
+    <AlertDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              {/* Error Callout */}
+              {error && (
+                <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm font-medium text-destructive">
+                  {error}
+                </div>
+              )}
 
-      <p>
-        Are you sure you want to delete <strong>{item.name}</strong> ({item.item_code})?
-        This can only succeed if the item has zero stock on hand and no issuance history.
-      </p>
+              <p>
+                This action cannot be undone. This will permanently delete the item{' '}
+                <strong className="font-bold text-foreground">{item.name}</strong>{' '}
+                <span className="font-mono text-xs text-foreground">({item.item_code})</span>.
+              </p>
 
-      <div className="consumables-modal-actions">
-        <button type="button" onClick={onClose} className="consumables-cancel-btn">
-          Cancel
-        </button>
-        <button type="button" onClick={handleDelete} disabled={deleting} className="consumables-delete-btn">
-          {deleting ? 'Deleting...' : 'Delete'}
-        </button>
-      </div>
-    </Modal>
+              <p className="text-xs">
+                Note: Deletion will only succeed if the item has zero stock on hand and no issuance history.
+              </p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onClose} disabled={deleting}>
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={deleting}
+            className={buttonVariants({ variant: 'destructive' })}
+          >
+            {deleting ? 'Deleting...' : 'Continue'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
