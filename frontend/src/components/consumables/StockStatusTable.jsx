@@ -117,25 +117,9 @@ export default function StockStatusGrid({
                   </CardAction>
 
                   <CardTitle>{stock.name}</CardTitle>
-                  <CardDescription>
-                    {stock.item_brand || 'No brand'}
-                  </CardDescription>
                 </CardHeader>
 
                 <CardContent className="flex-1">
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                    <dt className="text-muted-foreground">Quantity</dt>
-                    <dd className="text-right">
-                      {stock.total_stock} {stock.unit_of_measure}
-                    </dd>
-
-                    <dt className="font-medium text-muted-foreground">
-                      Price
-                    </dt>
-                    <dd className="text-right font-semibold">
-                      {money(stock.cost)}
-                    </dd>
-                  </dl>
 
                   <Button
                     variant="link"

@@ -2,13 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 const API_BASE_URL = '/api/v1';
 
-function emptyAccessory() {
-  return { name: '', brand: '', serial_number: '' };
-}
-
 export default function AccountabilityForm({ serializedAssets, initialAssetId, handleApiCall, onSuccess }) {
   const [lines, setLines] = useState(() =>
-    initialAssetId ? [{ serialized_asset_id: Number(initialAssetId), accessories: [] }] : []
+    initialAssetId
+      ? [{ key: `a-${initialAssetId}`, serialized_asset_id: Number(initialAssetId), attachToKey: null }]
+      : []
   );
   const [pendingAssetId, setPendingAssetId] = useState('');
   const [userId, setUserId] = useState('');
@@ -35,13 +33,17 @@ export default function AccountabilityForm({ serializedAssets, initialAssetId, h
 
   useEffect(() => {
     if (initialAssetId) {
-      setLines([{ serialized_asset_id: Number(initialAssetId), accessories: [] }]);
+      setLines([{ key: `a-${initialAssetId}`, serialized_asset_id: Number(initialAssetId), attachToKey: null }]);
     }
   }, [initialAssetId]);
 
+  // Only genuinely available, unheld assets can be added to this delivery.
   const availableAssets = (serializedAssets || []).filter(
-    a => a.status === 'Available' && !lines.some(l => l.serialized_asset_id === a.id)
+    a => a.status === 'Available' && !a.current_holder_id &&
+    !lines.some(l => l.serialized_asset_id === a.id)
   );
+
+  const findAsset = (id) => (serializedAssets || []).find(a => a.id === id);
 
   const recipient = users.find(u => u.id == userId);
   const unitHead = recipient
@@ -50,43 +52,30 @@ export default function AccountabilityForm({ serializedAssets, initialAssetId, h
 
   const addLine = () => {
     if (!pendingAssetId) return;
-    setLines([...lines, { serialized_asset_id: Number(pendingAssetId), accessories: [] }]);
+    const id = Number(pendingAssetId);
+    setLines([...lines, { key: `a-${id}`, serialized_asset_id: id, attachToKey: null }]);
     setPendingAssetId('');
   };
 
-  const removeLine = (assetId) => {
-    setLines(lines.filter(l => l.serialized_asset_id !== assetId));
+  const removeLine = (key) => {
+    // Detach anything that was pointing at the removed line
+    setLines(lines
+      .filter(l => l.key !== key)
+      .map(l => (l.attachToKey === key ? { ...l, attachToKey: null } : l))
+    );
   };
 
-  const addAccessory = (assetId) => {
-    setLines(lines.map(l =>
-      l.serialized_asset_id === assetId
-        ? { ...l, accessories: [...l.accessories, emptyAccessory()] }
-        : l
-    ));
-  };
-
-  const updateAccessory = (assetId, index, field, value) => {
-    setLines(lines.map(l => {
-      if (l.serialized_asset_id !== assetId) return l;
-      const updated = [...l.accessories];
-      updated[index] = { ...updated[index], [field]: value };
-      return { ...l, accessories: updated };
-    }));
-  };
-
-  const removeAccessory = (assetId, index) => {
-    setLines(lines.map(l => {
-      if (l.serialized_asset_id !== assetId) return l;
-      return { ...l, accessories: l.accessories.filter((_, i) => i !== index) };
-    }));
+  const updateAttachment = (key, attachToKey) => {
+    setLines(lines.map(l => (l.key === key ? { ...l, attachToKey: attachToKey || null } : l)));
   };
 
   const totalCost = lines.reduce((sum, l) => {
-    const asset = serializedAssets.find(a => a.id === l.serialized_asset_id);
-    const cost = Number(asset?.unit_cost ?? asset?.item?.unit_cost ?? 0);
-    return sum + cost;
+    const asset = findAsset(l.serialized_asset_id);
+    return sum + Number(asset?.unit_cost ?? asset?.item?.unit_cost ?? 0);
   }, 0);
+
+  // Only assets that can carry a property number make sense as attach targets.
+  const attachTargets = lines.filter(l => findAsset(l.serialized_asset_id)?.property_number);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -94,14 +83,12 @@ export default function AccountabilityForm({ serializedAssets, initialAssetId, h
 
     setSubmitting(true);
 
-    // Strip out any accessory rows the user added but never filled in
-    const payloadLines = lines.map(l => ({
-      serialized_asset_id: l.serialized_asset_id,
-      accessories: l.accessories.filter(a => a.name.trim() !== ''),
-    }));
-
     const payload = {
-      lines: payloadLines,
+      cart: lines.map(l => ({
+        key: l.key,
+        serialized_asset_id: l.serialized_asset_id,
+        attach_to_key: l.attachToKey || undefined,
+      })),
       user_id: userId,
       issued_by_id: issuedById,
       date_issued: dateIssued,
@@ -121,84 +108,64 @@ export default function AccountabilityForm({ serializedAssets, initialAssetId, h
 
   return (
     <form onSubmit={handleSubmit}>
-
       {lines.length > 0 && (
         <div className="form-group" style={{ border: '1px solid #eee', borderRadius: '6px', padding: '12px' }}>
-          <label>Assets in This Receipt ({lines.length})</label>
+          <label>Assets in This Delivery ({lines.length})</label>
           {lines.map(line => {
-            const asset = serializedAssets.find(a => a.id === line.serialized_asset_id);
+            const asset = findAsset(line.serialized_asset_id);
             const cost = Number(asset?.unit_cost ?? asset?.item?.unit_cost ?? 0);
+            const attachedToLine = lines.find(l => l.key === line.attachToKey);
+            const attachedToAsset = attachedToLine ? findAsset(attachedToLine.serialized_asset_id) : null;
+
             return (
-              <div key={line.serialized_asset_id} style={{ marginTop: '10px', paddingBottom: '12px', borderBottom: '1px solid #f0f0f0' }}>
+              <div key={line.key} style={{ marginTop: '10px', paddingBottom: '10px', borderBottom: '1px solid #f0f0f0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong>{asset?.item?.name} — SN: {asset?.serial_number} (₱{cost.toLocaleString()})</strong>
-                  <button type="button" onClick={() => removeLine(line.serialized_asset_id)} style={{ color: '#c0392b', background: 'none', border: 'none', cursor: 'pointer' }}>
+                  <strong>
+                    {asset?.item?.name} — SN: {asset?.serial_number} (₱{cost.toLocaleString()})
+                  </strong>
+                  <button type="button" onClick={() => removeLine(line.key)} style={{ color: '#c0392b', background: 'none', border: 'none', cursor: 'pointer' }}>
                     Remove
                   </button>
                 </div>
 
-                {/* Structured accessory rows */}
-                <div style={{ marginTop: '8px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#555', marginBottom: '4px' }}>
-                    Bundled Accessories (optional)
-                  </div>
-
-                  {line.accessories.map((acc, index) => (
-                    <div key={index} style={{ display: 'flex', gap: '6px', marginBottom: '6px', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        placeholder="Accessory name (e.g. Keyboard)"
-                        value={acc.name}
-                        onChange={e => updateAccessory(line.serialized_asset_id, index, 'name', e.target.value)}
-                        className="form-input"
-                        style={{ flex: 2 }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Brand (optional)"
-                        value={acc.brand}
-                        onChange={e => updateAccessory(line.serialized_asset_id, index, 'brand', e.target.value)}
-                        className="form-input"
-                        style={{ flex: 1 }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Serial Number (optional)"
-                        value={acc.serial_number}
-                        onChange={e => updateAccessory(line.serialized_asset_id, index, 'serial_number', e.target.value)}
-                        className="form-input"
-                        style={{ flex: 1 }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeAccessory(line.serialized_asset_id, index)}
-                        style={{ color: '#c0392b', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-
-                  <button
-                    type="button"
-                    onClick={() => addAccessory(line.serialized_asset_id)}
-                    style={{ fontSize: '12px', padding: '4px 10px', border: '1px dashed #ccc', borderRadius: '4px', background: '#fafafa', cursor: 'pointer' }}
+                {attachTargets.filter(t => t.key !== line.key).length > 0 && (
+                  <select
+                    value={line.attachToKey || ''}
+                    onChange={e => updateAttachment(line.key, e.target.value)}
+                    className="form-select"
+                    style={{ marginTop: '6px', width: '100%' }}
                   >
-                    + Add Accessory
-                  </button>
-                </div>
+                    <option value="">Standalone (not attached)</option>
+                    {attachTargets.filter(t => t.key !== line.key).map(t => {
+                      const tAsset = findAsset(t.serialized_asset_id);
+                      return (
+                        <option key={t.key} value={t.key}>
+                          Attach to: {tAsset?.item?.name} — SN: {tAsset?.serial_number}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+
+                {attachedToAsset && (
+                  <small style={{ display: 'block', marginTop: '4px', color: '#555' }}>
+                    Attached to: {attachedToAsset.item?.name} (SN: {attachedToAsset.serial_number})
+                  </small>
+                )}
               </div>
             );
           })}
           <div style={{ marginTop: '8px', fontWeight: 'bold' }}>
             Total: ₱{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            {' — '}{totalCost >= 50000 ? 'Will be issued as PAR' : 'Will be issued as ICS'}
           </div>
+          <small style={{ color: '#666' }}>
+            Each asset's own value decides its document — items ≥ ₱50,000 print on a PAR, the rest on a separate ICS, even within the same delivery.
+          </small>
         </div>
       )}
 
       <div className="form-group">
-        <label>Add Another Asset to This Receipt (Optional)</label><br />
+        <label>Add Another Asset to This Delivery (Optional)</label><br />
         <div style={{ display: 'flex', gap: '8px' }}>
           <select
             value={pendingAssetId}
@@ -221,7 +188,7 @@ export default function AccountabilityForm({ serializedAssets, initialAssetId, h
           </button>
         </div>
         <small style={{ color: '#666' }}>
-          e.g. add a keyboard/mouse bundled with a desktop under the same PAR.
+          e.g. add a keyboard/mouse that arrived attached to this desktop.
         </small>
       </div>
 

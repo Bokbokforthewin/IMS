@@ -14,13 +14,13 @@ export default function Logo({ size = 40 }) {
         className="logo__image"
       />
 
-      <img
+      {/* <img
         src="/Bagong_PilipinasTransparent.png"
         alt="Bagong Pilipinas Logo"
         width={size}
         height={size}
         className="logo__image"
-      />
+      /> */}
 
     </div>
   );

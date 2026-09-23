@@ -64,43 +64,69 @@ class AccountabilityController extends Controller
             try {
                 return DB::transaction(function () use ($validated, $dateIssued, $year) {
                     $resolvedByKey = [];
-                    $lineInputs = [];
 
-                    // Pass 1: lock + validate every asset up front
+                    // Pass 1: Lock, validate, and eager-load item relation
                     foreach ($validated['cart'] as $cartItem) {
-                        $asset = SerializedAsset::where('id', $cartItem['serialized_asset_id'])->lockForUpdate()->first();
+                        $asset = SerializedAsset::with('item')
+                            ->where('id', $cartItem['serialized_asset_id'])
+                            ->lockForUpdate()
+                            ->first();
+
                         if (!$asset || $asset->status !== 'Available' || $asset->current_holder_id) {
                             return response()->json(['error' => "Asset #{$cartItem['serialized_asset_id']} is not available."], 422);
                         }
                         $resolvedByKey[$cartItem['key']] = $asset;
                     }
 
-                    // Pass 2: apply attach_to now that every asset's property_number is known
-                    foreach ($validated['cart'] as $cartItem) {
-                        $asset = $resolvedByKey[$cartItem['key']];
+                    // Pass 2: Link attachments and split lines strictly by unit cost
+                    $parLines = [];
+                    $icsLines = [];
 
+                    foreach ($validated['cart'] as $cartItem) {
+                        $key = $cartItem['key'];
+                        $asset = $resolvedByKey[$key];
+
+                        // Resolve parent attachment property number
                         $attachTo = null;
                         if (!empty($cartItem['attach_to_key']) && isset($resolvedByKey[$cartItem['attach_to_key']])) {
                             $attachTo = $resolvedByKey[$cartItem['attach_to_key']]->property_number;
                         }
 
-                        $asset->update(['status' => 'Assigned', 'attached_to' => $attachTo]);
-                        $lineInputs[] = ['asset' => $asset, 'quantity' => 1];
-                    }
+                        // Update status and parent link
+                        $asset->update([
+                            'status' => 'Assigned',
+                            'attached_to' => $attachTo,
+                        ]);
 
-                    $parLines = array_values(array_filter($lineInputs, fn($li) => (float) $li['asset']->unit_cost >= 50000));
-                    $icsLines = array_values(array_filter($lineInputs, fn($li) => (float) $li['asset']->unit_cost < 50000));
+                        // Extract and sanitize unit cost (handles floats, numeric strings, or formatted currency strings)
+                        $rawCost = $asset->unit_cost ?? $asset->item?->unit_cost ?? 0;
+                        $cleanCost = (float) preg_replace('/[^0-9.]/', '', (string) $rawCost);
+
+                        // Scenario B: Strict Cost Separation (>= 50,000 = PAR, < 50,000 = ICS)
+                        $line = ['asset' => $asset, 'quantity' => 1];
+                        if ($cleanCost >= 50000) {
+                            $parLines[] = $line;
+                        } else {
+                            $icsLines[] = $line;
+                        }
+                    }
 
                     $recipient = User::find($validated['user_id']);
                     $unitHead = $recipient?->findUnitHead();
                     $createdReceipts = [];
 
+                    // Pass 3: Create distinct receipts for PAR and ICS if lines exist
                     foreach ([['type' => 'PAR', 'lines' => $parLines], ['type' => 'ICS', 'lines' => $icsLines]] as $bucket) {
                         if (empty($bucket['lines'])) continue;
 
                         $receiptType = $bucket['type'];
+
+                        // Lock and calculate next sequence number per document type and year
                         $lastReceipt = AccountabilityReceipt::where('receipt_type', $receiptType)
-                            ->whereYear('date_issued', $year)->orderBy('id', 'desc')->lockForUpdate()->first();
+                            ->whereYear('date_issued', $year)
+                            ->orderBy('id', 'desc')
+                            ->lockForUpdate()
+                            ->first();
 
                         $nextSeq = 1;
                         if ($lastReceipt && $lastReceipt->document_number) {
@@ -128,7 +154,12 @@ class AccountabilityController extends Controller
                             ]);
                         }
 
-                        $createdReceipts[] = $receipt->load(['lines.serializedAsset.item', 'user', 'issuedBy', 'receivedMrBy']);
+                        $createdReceipts[] = $receipt->load([
+                            'lines.serializedAsset.item',
+                            'user',
+                            'issuedBy',
+                            'receivedMrBy'
+                        ]);
                     }
 
                     return response()->json([

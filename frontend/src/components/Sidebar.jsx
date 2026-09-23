@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import Logo from "./Logo.jsx";
 import {
   LayoutDashboard,
   Boxes,
@@ -40,26 +41,15 @@ const menuItems = [
     id: "dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
-    subItems: [
-      {
-        id: "dashboard-overview",
-        label: "Overview",
-      },
-    ],
+    subItems: [{ id: "dashboard-overview", label: "Overview" }],
   },
   {
     id: "catalog",
     label: "Catalog",
     icon: Boxes,
     subItems: [
-      {
-        id: "catalog-categories",
-        label: "Categories",
-      },
-      {
-        id: "catalog-items",
-        label: "Items",
-      },
+      { id: "catalog-categories", label: "Categories" },
+      { id: "catalog-items", label: "Items" },
     ],
   },
   {
@@ -67,18 +57,9 @@ const menuItems = [
     label: "Receive Stock",
     icon: PackageCheck,
     subItems: [
-      {
-        id: "receive-single",
-        label: "Single Item",
-      },
-      {
-        id: "receive-bundle",
-        label: "Bundle / Set",
-      },
-      {
-        id: "receive-history",
-        label: "Received History",
-      },
+      { id: "receive-single", label: "Single Item" },
+      { id: "receive-bundle", label: "Bundle / Set" },
+      { id: "receive-history", label: "Received History" },
     ],
   },
   {
@@ -86,14 +67,8 @@ const menuItems = [
     label: "Issue Consumables",
     icon: PackageOpen,
     subItems: [
-      {
-        id: "consumables-issue",
-        label: "Issue Item",
-      },
-      {
-        id: "consumables-history",
-        label: "Issue History",
-      },
+      { id: "consumables-issue", label: "Issue Item" },
+      { id: "consumables-history", label: "Issue History" },
     ],
   },
   {
@@ -101,14 +76,8 @@ const menuItems = [
     label: "Assign Asset",
     icon: ClipboardCheck,
     subItems: [
-      {
-        id: "accountability-assign",
-        label: "Assign Form",
-      },
-      {
-        id: "accountability-list",
-        label: "Assigned List",
-      },
+      { id: "accountability-assign", label: "Assign Form" },
+      { id: "accountability-list", label: "Assigned List" },
     ],
   },
   {
@@ -116,14 +85,8 @@ const menuItems = [
     label: "Transfers & Returns",
     icon: ArrowLeftRight,
     subItems: [
-      {
-        id: "transfer-return-form",
-        label: "Transfer / Return",
-      },
-      {
-        id: "transfer-return-history",
-        label: "Movement Logs",
-      },
+      { id: "transfer-return-form", label: "Transfer / Return" },
+      { id: "transfer-return-history", label: "Movement Logs" },
     ],
   },
 ];
@@ -152,9 +115,31 @@ function SidebarCollapseButton() {
   );
 }
 
-export default function Sidebar({ activeTab, setActiveTab }) {
+export default function Sidebar({ activeTab, setActiveTab, appConfig: propConfig }) {
   const { toggleSidebar } = useSidebar();
   const [openMenus, setOpenMenus] = useState({});
+  const [appConfig, setAppConfig] = useState(propConfig || null);
+
+  useEffect(() => {
+    if (propConfig) {
+      setAppConfig(propConfig);
+      return;
+    }
+
+    const fetchAppConfig = async () => {
+      try {
+        const response = await fetch("/api/app-config");
+        if (response.ok) {
+          const data = await response.json();
+          setAppConfig(data);
+        }
+      } catch (err) {
+        console.error("Failed to load application configuration:", err);
+      }
+    };
+
+    fetchAppConfig();
+  }, [propConfig]);
 
   const toggleMenu = (id) => {
     setOpenMenus((current) => ({
@@ -164,30 +149,26 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   };
 
   return (
-    <ShadcnSidebar
-      collapsible="icon"
-      variant="sidebar"
-      className="border-r text-left"
-    >
-      {/* Header Section */}
-      <SidebarHeader className="border-b p-2 text-left group-data-[collapsible=icon]:px-0">
-        <div className="flex items-center justify-between gap-2 px-2 py-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+    <ShadcnSidebar collapsible="icon" variant="sidebar" className="border-r text-left">
+      {/* Header aligned left when expanded, centered when collapsed as icon */}
+      <SidebarHeader className="flex h-14 items-center justify-between border-b px-3 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+        <div className="flex w-full items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
           <div className="flex items-center gap-2.5 overflow-hidden text-left group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
             <button
               type="button"
               onClick={toggleSidebar}
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity hover:opacity-90"
               title="Toggle Sidebar"
+              className="flex items-center justify-center shrink-0"
             >
-              <Boxes className="size-4" />
+              <Logo size={28} />
             </button>
 
             <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
               <span className="truncate font-semibold text-sidebar-foreground">
-                Inventory System
+                {appConfig?.name || "Inventory System"}
               </span>
               <span className="truncate text-xs text-muted-foreground">
-                DOH NIR CHD · ICT Unit
+                {appConfig?.organization || "DOH NIR CHD"}
               </span>
             </div>
           </div>
@@ -198,10 +179,12 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         </div>
       </SidebarHeader>
 
-      {/* Sidebar Content */}
+      {/* Main Navigation Content */}
       <SidebarContent className="text-left">
         <SidebarGroup className="text-left">
-         
+          <SidebarGroupLabel className="text-left text-xs font-medium text-muted-foreground">
+            Inventory Management
+          </SidebarGroupLabel>
 
           <SidebarGroupContent className="text-left">
             <SidebarMenu className="text-left">
@@ -222,7 +205,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                         <SidebarMenuButton
                           tooltip={item.label}
                           isActive={isParentActive}
-                          className="group/menu h-9 w-full justify-start text-left"
+                          className="h-9 w-full justify-start text-left"
                           onClick={() => {
                             if (item.subItems?.length) {
                               setActiveTab(item.subItems[0].id);
@@ -232,7 +215,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                           }}
                         >
                           <Icon className="size-4 shrink-0" />
-
                           <span className="flex-1 truncate text-left">
                             {item.label}
                           </span>
@@ -250,13 +232,10 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                               const isActive = activeTab === subItem.id;
 
                               return (
-                                <SidebarMenuSubItem
-                                  key={subItem.id}
-                                  className="text-left"
-                                >
+                                <SidebarMenuSubItem key={subItem.id} className="text-left">
                                   <SidebarMenuSubButton
                                     isActive={isActive}
-                                    className="w-full justify-start text-left"
+                                    className="h-8 w-full justify-start text-left"
                                     onClick={() => setActiveTab(subItem.id)}
                                   >
                                     <span className="truncate text-left">
@@ -278,22 +257,22 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Sidebar Footer */}
+      {/* Footer Section */}
       <SidebarFooter className="border-t p-2 text-left">
         <SidebarMenu className="text-left">
           <SidebarMenuItem className="text-left">
             <SidebarMenuButton
-              size="sm"
-              tooltip="DOH NIR CHD ICT Unit"
+              size="lg"
+              tooltip={appConfig?.organization || "Organization"}
               className="w-full justify-start text-left"
             >
-              <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Boxes className="size-3.5" />
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Boxes className="size-4" />
               </div>
 
               <div className="grid flex-1 text-left text-xs leading-tight group-data-[collapsible=icon]:hidden">
-                <span className="truncate font-medium text-sidebar-foreground">
-                  DOH NIR CHD
+                <span className="truncate font-semibold text-sidebar-foreground">
+                  {appConfig?.region || "DOH NIR CHD"}
                 </span>
                 <span className="truncate text-[11px] text-muted-foreground">
                   ICT Unit Systems
