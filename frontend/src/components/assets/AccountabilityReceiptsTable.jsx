@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
-import { Download } from 'lucide-react';
+import { Download, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,9 +11,10 @@ function money(n) {
   return `₱${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 }
 
-// Groups a receipt's lines into: primary lines (their asset has no
-// attached_to), each carrying an array of child lines whose asset's
-// attached_to matches the primary's property_number.
+/**
+ * Groups lines into primary assets and their attached child peripherals.
+ * Accepts lines from both PAR and ICS receipts combined.
+ */
 function groupLines(lines) {
   const byPropertyNumber = {};
   lines.forEach(line => {
@@ -21,11 +22,9 @@ function groupLines(lines) {
     if (pn) byPropertyNumber[pn] = line;
   });
 
-  const childKeys = new Set();
   const primaries = lines.filter(line => {
     const attachedTo = line.serialized_asset?.attached_to;
     if (attachedTo && byPropertyNumber[attachedTo]) {
-      childKeys.add(line.id);
       return false;
     }
     return true;
@@ -40,6 +39,40 @@ function groupLines(lines) {
   }));
 }
 
+/**
+ * Groups individual database receipts (PAR & ICS) created in the same
+ * issuance transaction into a single bundled card object.
+ */
+function groupReceiptsIntoBundles(receipts) {
+  const bundleMap = new Map();
+
+  receipts.forEach((receipt) => {
+    // Unique key identifying a single issuance session
+    const key = `${receipt.user_id}_${receipt.issued_by_id}_${receipt.date_issued}_${receipt.remarks || ''}`;
+
+    if (!bundleMap.has(key)) {
+      bundleMap.set(key, {
+        key,
+        user: receipt.user,
+        issuedBy: receipt.issuedBy,
+        date_issued: receipt.date_issued,
+        remarks: receipt.remarks,
+        receipts: [],
+        allLines: [],
+      });
+    }
+
+    const bundle = bundleMap.get(key);
+    bundle.receipts.push(receipt);
+
+    if (receipt.lines && Array.isArray(receipt.lines)) {
+      bundle.allLines.push(...receipt.lines);
+    }
+  });
+
+  return Array.from(bundleMap.values());
+}
+
 const handleDownload = async (receiptId, documentNumber) => {
   try {
     const response = await axios.get(
@@ -50,7 +83,7 @@ const handleDownload = async (receiptId, documentNumber) => {
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `${documentNumber}.xlsx`); // Update extension to .xlsx
+    link.setAttribute('download', `${documentNumber}.xlsx`);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -78,53 +111,81 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
     fetchReceipts();
   }, [fetchReceipts, refreshKey]);
 
+  // Group receipts into transaction bundles
+  const bundles = useMemo(() => groupReceiptsIntoBundles(receipts), [receipts]);
+
   return (
     <div className="mt-6">
-      <h3 className="text-lg font-semibold mb-4">Issued Accountability Receipts (PAR / ICS)</h3>
+      <h3 className="text-lg font-semibold mb-4">Issued Accountability Receipts</h3>
 
-      {receipts.length === 0 ? (
+      {bundles.length === 0 ? (
         <p className="text-muted-foreground text-sm">No accountability receipts generated yet.</p>
       ) : (
         <div className="space-y-4">
-          {receipts.map((receipt) => {
-            const grouped = groupLines(receipt.lines || []);
+          {bundles.map((bundle) => {
+            const grouped = groupLines(bundle.allLines || []);
 
             return (
-              <Card key={receipt.id}>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-base font-semibold">
-                    {receipt.document_number} — <span className="font-normal">{receipt.user?.name}</span>
-                  </CardTitle>
-                  {/* Added button to trigger Excel download */}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDownload(receipt.id, receipt.document_number)}
-                  >
-                    <Download className="w-4 h-4 mr-2" /> Excel
-                  </Button>
+              <Card key={bundle.key}>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b mb-3">
+                  <div>
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <span>{bundle.user?.name || 'Unassigned User'}</span>
+                      <span className="text-xs text-muted-foreground font-normal">
+                        ({bundle.date_issued})
+                      </span>
+                    </CardTitle>
+                    {bundle.remarks && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Remarks: {bundle.remarks}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Render Excel download buttons for all receipts in this transaction */}
+                  <div className="flex flex-wrap gap-2">
+                    {bundle.receipts.map((rcpt) => (
+                      <Button
+                        key={rcpt.id}
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs gap-1.5"
+                        onClick={() => handleDownload(rcpt.id, rcpt.document_number)}
+                      >
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-green-600" />
+                        <span>{rcpt.document_number}</span>
+                        <Badge variant="secondary" className="px-1 py-0 text-[10px]">
+                          {rcpt.receipt_type}
+                        </Badge>
+                      </Button>
+                    ))}
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-2">
+
+                <CardContent className="space-y-3">
                   {grouped.map(({ primary, children }) => (
-                    <div key={primary.id} className="border rounded-md p-3 space-y-2">
+                    <div key={primary.id} className="border rounded-md p-3 space-y-2 bg-card">
+                      {/* Main Asset Row */}
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="font-medium">
-                            {primary.serialized_asset?.item?.name}
+                          <div className="font-medium flex items-center gap-2">
+                            <span>{primary.serialized_asset?.item?.name}</span>
                             {primary.serialized_asset?.serial_number && (
-                              <span className="text-muted-foreground font-normal">
-                                {" "}— SN: {primary.serialized_asset.serial_number}
+                              <span className="text-muted-foreground text-sm font-normal">
+                                — SN: {primary.serialized_asset.serial_number}
                               </span>
                             )}
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            Qty: {primary.quantity} — {money(primary.serialized_asset?.unit_cost)}
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            Property No: {primary.serialized_asset?.property_number || 'N/A'} | Qty: {primary.quantity} — {money(primary.serialized_asset?.unit_cost)}
                           </div>
                         </div>
+
                         {primary.serialized_asset?.property_number && (
                           <Button
                             size="sm"
                             variant="ghost"
+                            className="h-7 text-xs"
                             onClick={() =>
                               window.open(
                                 `${API_BASE_URL}/accountability/serialized-assets/${primary.serialized_asset.id}/download-tag-pdf`,
@@ -137,14 +198,28 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                         )}
                       </div>
 
-                      {/* Render attached child lines */}
+                      {/* Render attached peripheral lines under the main asset */}
                       {children.map((child) => (
-                        <div key={child.id} className="ml-4 pl-3 border-l-2 flex items-center justify-between text-sm">
-                          <div>
-                            <span>{child.serialized_asset?.item?.name}</span>
-                            <Badge variant="secondary" className="ml-2">Attached</Badge>
+                        <div
+                          key={child.id}
+                          className="ml-4 pl-3 border-l-2 border-primary/30 flex items-center justify-between text-sm py-1 bg-muted/40 rounded-r pr-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-xs">
+                              {child.serialized_asset?.item?.name}
+                            </span>
+                            {child.serialized_asset?.serial_number && (
+                              <span className="text-xs text-muted-foreground">
+                                (SN: {child.serialized_asset.serial_number})
+                              </span>
+                            )}
+                            <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                              Attached
+                            </Badge>
                           </div>
-                          <span className="text-muted-foreground">{money(child.serialized_asset?.unit_cost)}</span>
+                          <span className="text-xs font-semibold text-muted-foreground">
+                            {money(child.serialized_asset?.unit_cost)}
+                          </span>
                         </div>
                       ))}
                     </div>

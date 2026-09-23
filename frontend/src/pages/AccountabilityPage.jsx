@@ -26,22 +26,55 @@ export default function AccountabilityPage({ activeTab, handleApiCall }) {
     fetchCatalog();
   }, [fetchCatalog, refreshKey]);
 
-  const addAssetToCart = (asset, attachToKey) => {
-    const key = `a-${asset.id}`;
-    if (cart.some((c) => c.key === key)) return;
-    setCart([
-      ...cart,
-      {
-        key,
-        serialized_asset_id: asset.id,
-        name: `${asset.item?.name} — SN: ${asset.serial_number}`,
-        unit_cost: Number(asset.unit_cost),
-        propertyNumber: asset.property_number,
-        attachToKey: attachToKey || null,
-        attachToLabel: null,
-      },
-    ]);
-  };
+  // Helper to extract clean numeric unit cost
+function parseCost(asset) {
+  const rawCost = asset.unit_cost ?? asset.item?.unit_cost ?? 0;
+  return Number(String(rawCost).replace(/[^0-9.]/g, '')) || 0;
+}
+
+const addAssetToCart = (asset, children = []) => {
+  const primaryKey = `a-${asset.id}`;
+
+  // Check if primary is already in cart
+  if (cart.some((c) => c.key === primaryKey)) return;
+
+  const itemsToAdd = [];
+
+  // 1. Add Primary Asset
+  itemsToAdd.push({
+    key: primaryKey,
+    id: asset.id,
+    serialized_asset_id: asset.id,
+    name: `${asset.item?.name || asset.item_name || 'Asset'} — SN: ${asset.serial_number || 'N/A'}`,
+    unit_cost: parseCost(asset),
+    property_number: asset.property_number,
+    propertyNumber: asset.property_number,
+    attachToKey: null,
+    attachToLabel: null,
+  });
+
+  // 2. Automatically Add Attached/Bundled Children (if any exist)
+  if (Array.isArray(children) && children.length > 0) {
+    children.forEach((child) => {
+      const childKey = `a-${child.id}`;
+      if (!cart.some((c) => c.key === childKey)) {
+        itemsToAdd.push({
+          key: childKey,
+          id: child.id,
+          serialized_asset_id: child.id,
+          name: `${child.item?.name || child.item_name || 'Peripheral'} — SN: ${child.serial_number || 'N/A'}`,
+          unit_cost: parseCost(child),
+          property_number: child.property_number,
+          propertyNumber: child.property_number,
+          attachToKey: primaryKey, // Automatically attach child to primary asset
+          attachToLabel: asset.item?.name || 'Primary Asset',
+        });
+      }
+    });
+  }
+
+  setCart((prevCart) => [...prevCart, ...itemsToAdd]);
+};
 
   const updateCartQuantity = (key, quantity) => {
     setCart(

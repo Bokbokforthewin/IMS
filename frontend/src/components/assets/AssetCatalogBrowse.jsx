@@ -182,7 +182,7 @@ export default function AssetCatalogBrowse({
                     size="sm"
                     className="flex-1"
                     disabled={inCart}
-                    onClick={() => addAssetToCart(primary)}
+                    onClick={() => addAssetToCart(primary, children)}
                   >
                     {inCart ? (
                       <>
