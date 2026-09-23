@@ -6,7 +6,7 @@ import IssuanceHistoryTable from '../components/consumables/IssuanceHistoryTable
 
 import '../components/consumables/ConsumablesPage.css';
 
-export default function ConsumablesPage({ handleApiCall, refreshData }) {
+export default function ConsumablesPage({ activeTab, handleApiCall, refreshData }) {
   const [stockStatus, setStockStatus] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -26,20 +26,30 @@ export default function ConsumablesPage({ handleApiCall, refreshData }) {
 
   const handleIssueSuccess = () => {
     fetchStockStatus();
-    setRefreshKey(k => k + 1);
+    setRefreshKey((k) => k + 1);
     if (typeof refreshData === 'function') refreshData();
   };
 
   return (
     <div className="consumables-page-container">
-      <StockStatusTable
-        stockStatus={stockStatus}
-        onChanged={fetchStockStatus}
-        handleApiCall={handleApiCall}
-        onIssued={handleIssueSuccess}
-      />
+      {/* 1. Issue Consumables / FIFO Stock Status Table */}
+      {activeTab === 'consumables-issue' && (
+        <div className="consumables-page__section">
+          <StockStatusTable
+            stockStatus={stockStatus}
+            onChanged={fetchStockStatus}
+            handleApiCall={handleApiCall}
+            onIssued={handleIssueSuccess}
+          />
+        </div>
+      )}
 
-      <IssuanceHistoryTable refreshKey={refreshKey} />
+      {/* 2. Issuance Logs & History */}
+      {activeTab === 'consumables-history' && (
+        <div className="consumables-page__section">
+          <IssuanceHistoryTable refreshKey={refreshKey} />
+        </div>
+      )}
     </div>
   );
 }

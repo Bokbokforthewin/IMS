@@ -31,8 +31,13 @@ export default function ReceiveForm({ items, receiveForm, setReceiveForm, handle
     if (!receiveForm.item_id) return;
     if (isAsset && serials.length !== quantity) return;
 
+    // Use !! to strictly cast undefined to false so Laravel's validation doesn't fail
     const payload = isAsset
-      ? { ...receiveForm, has_property_number: receiveForm.has_property_number, serial_numbers: serials }
+      ? { 
+          ...receiveForm, 
+          has_property_number: !!receiveForm.has_property_number, 
+          serial_numbers: serials 
+        }
       : receiveForm;
 
     handleApiCall('/stocks/receive', payload, () => {
@@ -111,7 +116,7 @@ export default function ReceiveForm({ items, receiveForm, setReceiveForm, handle
                   <FieldLabel htmlFor="has_property_number">Assign Property Number</FieldLabel>
                 </Field>
                 <FieldDescription>
-                  Turn on for main units (e.g. PCs). Leave off for peripherals that only need a serial number.
+                  Turn on to automatically assign a property number. Leave off if the asset only requires a serial number.
                 </FieldDescription>
 
                 <Field>

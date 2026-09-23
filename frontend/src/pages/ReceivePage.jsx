@@ -3,13 +3,16 @@ import React, { useState } from 'react';
 import ReceiveForm from '../components/receive/ReceiveForm.jsx';
 import ReceiveBundleForm from '../components/receive/ReceiveBundleForm.jsx';
 import ReceivedStockTable from '../components/receive/ReceivedStockTable.jsx';
-import { Button } from '@/components/ui/button';
 
 import '../components/receive/ReceivePage.css';
 
-export default function ReceivePage({ items, receiveForm, setReceiveForm, handleApiCall }) {
-  // 1. Move hooks INSIDE the component function body
-  const [mode, setMode] = useState('single'); // 'single' | 'bundle'
+export default function ReceivePage({ 
+  activeTab, 
+  items, 
+  receiveForm, 
+  setReceiveForm, 
+  handleApiCall 
+}) {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleSuccess = () => {
@@ -18,41 +21,36 @@ export default function ReceivePage({ items, receiveForm, setReceiveForm, handle
 
   return (
     <div className="receive-page-container">
-      {/* Mode Switcher */}
-      <div className="flex gap-2 mb-4">
-        <Button
-          variant={mode === 'single' ? 'default' : 'outline'}
-          onClick={() => setMode('single')}
-        >
-          Single Item
-        </Button>
-        <Button
-          variant={mode === 'bundle' ? 'default' : 'outline'}
-          onClick={() => setMode('bundle')}
-        >
-          Bundle / Set
-        </Button>
-      </div>
-
-      {/* Conditional Form Rendering */}
-      {mode === 'single' ? (
-        <ReceiveForm
-          items={items}
-          receiveForm={receiveForm}
-          setReceiveForm={setReceiveForm}
-          handleApiCall={handleApiCall}
-          onSuccess={handleSuccess}
-        />
-      ) : (
-        <ReceiveBundleForm
-          items={items}
-          handleApiCall={handleApiCall}
-          onSuccess={handleSuccess}
-        />
+      {/* 1. Receive Single Item Form */}
+      {activeTab === 'receive-single' && (
+        <div className="receive-page__section">
+          <ReceiveForm
+            items={items}
+            receiveForm={receiveForm}
+            setReceiveForm={setReceiveForm}
+            handleApiCall={handleApiCall}
+            onSuccess={handleSuccess}
+          />
+        </div>
       )}
 
-      {/* Received Stock Table */}
-      <ReceivedStockTable refreshKey={refreshKey} />
+      {/* 2. Receive Bundle / Set Form */}
+      {activeTab === 'receive-bundle' && (
+        <div className="receive-page__section">
+          <ReceiveBundleForm
+            items={items}
+            handleApiCall={handleApiCall}
+            onSuccess={handleSuccess}
+          />
+        </div>
+      )}
+
+      {/* 3. Received Stock History Table */}
+      {activeTab === 'receive-history' && (
+        <div className="receive-page__section">
+          <ReceivedStockTable refreshKey={refreshKey} />
+        </div>
+      )}
     </div>
   );
 }

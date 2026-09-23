@@ -20,7 +20,8 @@
   align-items: center;
 
   width: 100%;
-  min-height: 8vh;
+  min-height: 7vh;
+  height: 8vh;
 
   overflow: hidden;
 }

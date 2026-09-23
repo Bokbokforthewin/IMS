@@ -30,17 +30,50 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function CategoryTable({
-  categories,
-  handleSaveCategory, // Function to call when saving edits
-  handleDeleteCategory, 
+  categories = [],
+  handleSaveCategory,
+  handleDeleteCategory,
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Dynamic Pagination Calculations
+  const totalItems = categories.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+  // Keep page within bounds when deleting items or changing page size
+  const validPage = Math.max(1, Math.min(currentPage, totalPages || 1));
+  const startIndex = (validPage - 1) * itemsPerPage;
+  const paginatedCategories = categories.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleRowsPerPageChange = (value) => {
+    setItemsPerPage(Number(value));
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
   return (
     <div className="catalog-table-card">
       <h3 className="text-lg font-semibold mb-4">Categories</h3>
 
-      <div className="catalog-table-wrapper border rounded-md">
+      <div className="catalog-table-wrapper border rounded-md overflow-hidden">
         <Table className="catalog-table">
           <TableHeader>
             <TableRow>
@@ -51,17 +84,18 @@ export default function CategoryTable({
           </TableHeader>
 
           <TableBody>
-            {!categories || categories.length === 0 ? (
+            {paginatedCategories.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={3} className="empty-row text-center h-24 text-muted-foreground">
                   No categories created yet.
                 </TableCell>
               </TableRow>
             ) : (
-              categories.map((cat) => (
-                <CategoryRow 
-                  key={cat.id} 
-                  cat={cat} 
+              paginatedCategories.map((cat, index) => (
+                <CategoryRow
+                  key={cat.id}
+                  cat={cat}
+                  index={index}
                   handleSaveCategory={handleSaveCategory}
                   handleDeleteCategory={handleDeleteCategory}
                 />
@@ -70,12 +104,57 @@ export default function CategoryTable({
           </TableBody>
         </Table>
       </div>
+
+      {/* Footer Controls: Rows Per Page & Icons-Only Pagination */}
+      <div className="flex items-center justify-between gap-4 px-2 py-4">
+        <Field orientation="horizontal" className="w-fit flex items-center gap-2">
+          <FieldLabel htmlFor="select-rows-per-page">Rows per page</FieldLabel>
+          <Select value={String(itemsPerPage)} onValueChange={handleRowsPerPageChange}>
+            <SelectTrigger className="w-20" id="select-rows-per-page">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="start">
+              <SelectGroup>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <div className="flex items-center gap-4">
+          <Pagination className="mx-0 w-auto">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage((prev) => Math.max(prev - 1, 1));
+                  }}
+                  className={validPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+                  }}
+                  className={validPage >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      </div>
     </div>
   );
 }
 
-// Extracted row component to maintain local state for editing each category form
-function CategoryRow({ cat, handleSaveCategory, handleDeleteCategory }) {
+// Extracted Row Component
+function CategoryRow({ cat, index, handleSaveCategory, handleDeleteCategory }) {
   const [name, setName] = useState(cat.name);
   const [description, setDescription] = useState(cat.description || '');
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -96,7 +175,7 @@ function CategoryRow({ cat, handleSaveCategory, handleDeleteCategory }) {
       <TableCell className="action-cell">
         <div className="action-buttons flex items-center justify-end gap-2">
           
-          {/* EDIT BUTTON (Uses Shadcn Dialog) */}
+          {/* EDIT DIALOG */}
           <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
             <DialogTrigger asChild>
               <Button type="button" className="btn-action btn-edit" variant="outline" size="sm">
@@ -154,33 +233,30 @@ function CategoryRow({ cat, handleSaveCategory, handleDeleteCategory }) {
             </DialogContent>
           </Dialog>
 
-          {/* DELETE BUTTON (Uses Shadcn AlertDialog) */}
+          {/* DELETE ALERT DIALOG */}
           <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button className="btn-action btn-delete" variant="destructive" size="sm">
-              Delete
-            </Button>
-          </AlertDialogTrigger>
-          
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the category 
-                <span className="font-bold text-foreground"> "{cat.name}" </span>.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-
-              {/* Directly execute deletion here */}
-              <AlertDialogAction onClick={() => handleDeleteCategory(cat.id)}>
-                Continue
-              </AlertDialogAction>
-
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button className="btn-action btn-delete" variant="destructive" size="sm">
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the category 
+                  <span className="font-bold text-foreground"> "{cat.name}" </span>.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleDeleteCategory(cat.id)}>
+                  Continue
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
         </div>
       </TableCell>

@@ -2,10 +2,18 @@ import React, { useState } from 'react';
 import EditReorderLevelModal from './EditReorderLevelModal.jsx';
 import DeleteItemModal from './DeleteItemModal.jsx';
 import IssueConsumablesModal from './IssueConsumablesModal.jsx';
-import Modal from '../Modal.jsx';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Card,
   CardAction,
@@ -25,13 +33,23 @@ function getStatusVariant(status) {
 }
 
 function money(n) {
-  return n ? `₱${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'N/A';
+  return n
+    ? `₱${Number(n).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+      })}`
+    : 'N/A';
 }
 
-export default function StockStatusGrid({ stockStatus, onChanged, handleApiCall, onIssued }) {
+export default function StockStatusGrid({
+  stockStatus,
+  onChanged,
+  handleApiCall,
+  onIssued,
+}) {
   const safeStock = Array.isArray(stockStatus) ? stockStatus : [];
-
-  const receivedStock = safeStock.filter((stock) => Number(stock.total_stock) > 0);
+  const receivedStock = safeStock.filter(
+    (stock) => Number(stock.total_stock) > 0
+  );
 
   const [editingItem, setEditingItem] = useState(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -73,18 +91,21 @@ export default function StockStatusGrid({ stockStatus, onChanged, handleApiCall,
     if (typeof onIssued === 'function') onIssued();
   };
 
- return (
+  return (
     <div className="sp-consumables-panel">
       <div className="sp-panel-header">
         <h3 className="sp-panel-title">Consumable Stocks</h3>
       </div>
 
       {receivedStock.length === 0 ? (
-        <p className="sp-empty-state">No received consumable stock available.</p>
+        <p className="sp-empty-state">
+          No received consumable stock available.
+        </p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {receivedStock.map((stock) => {
-            const isOutOfStock = !stock.total_stock || stock.total_stock <= 0;
+            const isOutOfStock =
+              !stock.total_stock || stock.total_stock <= 0;
 
             return (
               <Card key={stock.id} className="flex flex-col">
@@ -94,8 +115,11 @@ export default function StockStatusGrid({ stockStatus, onChanged, handleApiCall,
                       {stock.status || 'OK'}
                     </Badge>
                   </CardAction>
+
                   <CardTitle>{stock.name}</CardTitle>
-                  <CardDescription>{stock.item_brand || 'No brand'}</CardDescription>
+                  <CardDescription>
+                    {stock.item_brand || 'No brand'}
+                  </CardDescription>
                 </CardHeader>
 
                 <CardContent className="flex-1">
@@ -105,8 +129,12 @@ export default function StockStatusGrid({ stockStatus, onChanged, handleApiCall,
                       {stock.total_stock} {stock.unit_of_measure}
                     </dd>
 
-                    <dt className="text-muted-foreground font-medium">Price</dt>
-                    <dd className="text-right font-semibold">{money(stock.cost)}</dd>
+                    <dt className="font-medium text-muted-foreground">
+                      Price
+                    </dt>
+                    <dd className="text-right font-semibold">
+                      {money(stock.cost)}
+                    </dd>
                   </dl>
 
                   <Button
@@ -126,11 +154,21 @@ export default function StockStatusGrid({ stockStatus, onChanged, handleApiCall,
                   >
                     {isOutOfStock ? 'Out of Stock' : 'Issue'}
                   </Button>
-                  <div className="flex gap-2 w-full">
-                    <Button variant="outline" className="flex-1" onClick={() => openEdit(stock)}>
+
+                  <div className="flex w-full gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => openEdit(stock)}
+                    >
                       Edit
                     </Button>
-                    <Button variant="destructive" className="flex-1" onClick={() => openDelete(stock)}>
+
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      onClick={() => openDelete(stock)}
+                    >
                       Delete
                     </Button>
                   </div>
@@ -141,47 +179,109 @@ export default function StockStatusGrid({ stockStatus, onChanged, handleApiCall,
         </div>
       )}
 
-      {/* Details modal — shows everything not on the compact card */}
-      <Modal
-        isOpen={isDetailsOpen}
-        title={detailsItem?.name || 'Item Details'}
-        onClose={() => setIsDetailsOpen(false)}
-      >
-        {detailsItem && (
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-            <dt className="text-muted-foreground">Item Code</dt>
-            <dd className="text-right">{detailsItem.item_code || 'N/A'}</dd>
+      {/* Details */}
+      <AlertDialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {detailsItem?.name || 'Item Details'}
+            </AlertDialogTitle>
 
-            <dt className="text-muted-foreground">Brand</dt>
-            <dd className="text-right">{detailsItem.item_brand || 'N/A'}</dd>
+            <AlertDialogDescription>
+              Full item specification and current stock information.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
-            <dt className="text-muted-foreground">Specifications</dt>
-            <dd className="text-right">{detailsItem.item_specifications || 'N/A'}</dd>
+          {detailsItem && (
+            <div className="max-h-[60vh] overflow-y-auto">
+              <div className="rounded-md border p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {detailsItem.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {detailsItem.item_code || 'No item code'}
+                    </p>
+                  </div>
 
-            <dt className="text-muted-foreground">Type</dt>
-            <dd className="text-right">{detailsItem.item_type || 'N/A'}</dd>
+                  <Badge variant={getStatusVariant(detailsItem.status)}>
+                    {detailsItem.status || 'OK'}
+                  </Badge>
+                </div>
 
-            <dt className="text-muted-foreground">Unit of Measure</dt>
-            <dd className="text-right">{detailsItem.unit_of_measure || 'N/A'}</dd>
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                  <dt className="text-muted-foreground">Item Code</dt>
+                  <dd className="text-right font-mono">
+                    {detailsItem.item_code || 'N/A'}
+                  </dd>
 
-            <dt className="text-muted-foreground">Reorder Level</dt>
-            <dd className="text-right">{detailsItem.reorder_level ?? 'N/A'}</dd>
+                  <dt className="text-muted-foreground">Brand</dt>
+                  <dd className="text-right">
+                    {detailsItem.item_brand || 'N/A'}
+                  </dd>
 
-            <dt className="text-muted-foreground">Quantity on Hand</dt>
-            <dd className="text-right">{detailsItem.total_stock} {detailsItem.unit_of_measure}</dd>
+                  <dt className="text-muted-foreground">
+                    Specifications
+                  </dt>
+                  <dd className="text-right">
+                    {detailsItem.item_specifications || 'N/A'}
+                  </dd>
 
-            <dt className="text-muted-foreground">Unit Cost</dt>
-            <dd className="text-right">{money(detailsItem.cost)}</dd>
+                  <dt className="text-muted-foreground">Type</dt>
+                  <dd className="text-right">
+                    {detailsItem.item_type || 'N/A'}
+                  </dd>
 
-            <dt className="text-muted-foreground font-medium">Status</dt>
-            <dd className="text-right">
-              <Badge variant={getStatusVariant(detailsItem.status)}>
-                {detailsItem.status || 'OK'}
-              </Badge>
-            </dd>
-          </dl>
-        )}
-      </Modal>
+                  <dt className="text-muted-foreground">
+                    Unit of Measure
+                  </dt>
+                  <dd className="text-right">
+                    {detailsItem.unit_of_measure || 'N/A'}
+                  </dd>
+
+                  <dt className="text-muted-foreground">
+                    Reorder Level
+                  </dt>
+                  <dd className="text-right">
+                    {detailsItem.reorder_level ?? 'N/A'}
+                  </dd>
+
+                  <dt className="font-medium text-muted-foreground">
+                    Quantity on Hand
+                  </dt>
+                  <dd className="text-right font-semibold">
+                    {detailsItem.total_stock ?? 0}{' '}
+                    {detailsItem.unit_of_measure || ''}
+                  </dd>
+
+                  <dt className="font-medium text-muted-foreground">
+                    Unit Cost
+                  </dt>
+                  <dd className="text-right font-semibold">
+                    {money(detailsItem.cost)}
+                  </dd>
+
+                  <dt className="font-medium text-muted-foreground">
+                    Status
+                  </dt>
+                  <dd className="flex justify-end">
+                    <Badge
+                      variant={getStatusVariant(detailsItem.status)}
+                    >
+                      {detailsItem.status || 'OK'}
+                    </Badge>
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Close</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <IssueConsumablesModal
         isOpen={isIssueOpen}

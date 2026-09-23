@@ -16,6 +16,7 @@ import '../components/catalog/CatalogTables.css';
 import '../components/catalog/CatalogModals.css';
 
 export default function CatalogPage({ 
+  activeTab,
   categories, 
   categoryForm, 
   setCategoryForm, 
@@ -28,7 +29,7 @@ export default function CatalogPage({
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
 
-  // Category Edit State (If managed via modal)
+  // Category Edit State
   const [isEditCategoryModalOpen, setIsEditCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState({ id: '', name: '', description: '' });
 
@@ -46,7 +47,7 @@ export default function CatalogPage({
     is_serialized: false
   });
 
-  // Direct Category Handlers
+  // Handlers
   const handleDeleteCategory = (categoryId) => {
     handleApiCall(`/categories/${categoryId}`, null, null, 'DELETE');
   };
@@ -55,7 +56,6 @@ export default function CatalogPage({
     handleApiCall(`/categories/${updatedCategory.id}`, updatedCategory, null, 'PUT');
   };
 
-  // Direct Item Handlers
   const handleDeleteItem = (itemId) => {
     handleApiCall(`/items/${itemId}`, null, null, 'DELETE');
   };
@@ -64,7 +64,6 @@ export default function CatalogPage({
     handleApiCall(`/items/${updatedItem.id}`, updatedItem, null, 'PUT');
   };
 
-  // Category Edit Handlers
   const handleOpenEditCategoryModal = (cat) => {
     setEditingCategory({ id: cat.id, name: cat.name, description: cat.description || '' });
     setIsEditCategoryModalOpen(true);
@@ -77,7 +76,6 @@ export default function CatalogPage({
     }, 'PUT');
   };
 
-  // Item Edit Handlers
   const handleOpenEditItemModal = (item) => {
     setEditingItem({
       id: item.id,
@@ -102,34 +100,43 @@ export default function CatalogPage({
 
   return (
     <div className="catalog-page-container">
-      {/* Action Buttons Header */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-        <button 
-          onClick={() => setIsAddCategoryModalOpen(true)} 
-          className="btn-modal btn-primary"
-        >
-          + Add Category
-        </button>
-        <button 
-          onClick={() => setIsAddItemModalOpen(true)} 
-          className="btn-modal btn-primary"
-        >
-          + Add Item
-        </button>
+      {/* Header buttons change contextual to active sub-tab */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+        {activeTab === 'catalog-categories' && (
+          <button 
+            onClick={() => setIsAddCategoryModalOpen(true)} 
+            className="btn-modal btn-primary"
+          >
+            + Add Category
+          </button>
+        )}
+
+        {activeTab === 'catalog-items' && (
+          <button 
+            onClick={() => setIsAddItemModalOpen(true)} 
+            className="btn-modal btn-primary"
+          >
+            + Add Item
+          </button>
+        )}
       </div>
 
-      {/* Tables Section */}
-      <CategoryTable 
-        categories={categories} 
-        handleSaveCategory={handleSaveCategory}
-        handleDeleteCategory={handleDeleteCategory}
-      />
+      {/* Render sub-views dynamically based on sidebar sub-menu choice */}
+      {activeTab === 'catalog-categories' && (
+        <CategoryTable 
+          categories={categories} 
+          handleSaveCategory={handleSaveCategory}
+          handleDeleteCategory={handleDeleteCategory}
+        />
+      )}
 
-      <ItemTable 
-        items={items} 
-        handleSaveItem={handleSaveItem}
-        handleDeleteItem={handleDeleteItem} 
-      />
+      {activeTab === 'catalog-items' && (
+        <ItemTable 
+          items={items} 
+          handleSaveItem={handleSaveItem}
+          handleDeleteItem={handleDeleteItem} 
+        />
+      )}
 
       {/* Add Category Modal */}
       <Modal isOpen={isAddCategoryModalOpen} title="Add Category" onClose={() => setIsAddCategoryModalOpen(false)}>
@@ -160,7 +167,7 @@ export default function CatalogPage({
         />
       </Modal>
 
-      {/* Edit Category Modal (If using external modal) */}
+      {/* Edit Modals */}
       <EditCategoryModal 
         isOpen={isEditCategoryModalOpen}
         onClose={() => setIsEditCategoryModalOpen(false)}
@@ -169,7 +176,6 @@ export default function CatalogPage({
         handleUpdateCategory={handleUpdateCategory}
       />
 
-      {/* Edit Item Modal */}
       <EditItemModal 
         isOpen={isEditItemModalOpen}
         onClose={() => setIsEditItemModalOpen(false)}

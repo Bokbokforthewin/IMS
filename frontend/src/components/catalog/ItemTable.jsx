@@ -30,12 +30,46 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function ItemTable({
-  items,
+  items = [],
   handleSaveItem, // Function to call when saving edits
   handleDeleteItem, // Direct function to delete item by ID
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Pagination calculations
+  const safeItems = items || [];
+  const totalItems = safeItems.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+  // Keep page index within bounds when items are deleted or page size changes
+  const validPage = Math.max(1, Math.min(currentPage, totalPages || 1));
+  const startIndex = (validPage - 1) * itemsPerPage;
+  const paginatedItems = safeItems.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleRowsPerPageChange = (value) => {
+    setItemsPerPage(Number(value));
+    setCurrentPage(1); // Reset to first page when page size changes
+  };
+
   return (
     <div className="catalog-table-card">
       <h3 className="text-lg font-semibold mb-4">Items</h3>
@@ -52,24 +86,23 @@ export default function ItemTable({
               <TableHead>Type</TableHead>
               <TableHead>Unit</TableHead>
               <TableHead>Tracking Type</TableHead>
-              <TableHead>Reorder Level</TableHead>
-              <TableHead>Est. Useful Life</TableHead>
               <TableHead className="action-col text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
-            {!items || items.length === 0 ? (
+            {paginatedItems.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={11} className="empty-row text-center h-24 text-muted-foreground">
                   No items created yet.
                 </TableCell>
               </TableRow>
             ) : (
-              items.map((item) => (
+              paginatedItems.map((item, index) => (
                 <ItemRow 
                   key={item.id} 
                   item={item} 
+                  index={index}
                   handleSaveItem={handleSaveItem}
                   handleDeleteItem={handleDeleteItem}
                 />
@@ -78,12 +111,57 @@ export default function ItemTable({
           </TableBody>
         </Table>
       </div>
+
+      {/* Footer Controls: Rows Per Page & Icon-Only Pagination */}
+      <div className="flex items-center justify-between gap-4 px-2 py-4">
+        <Field orientation="horizontal" className="w-fit flex items-center gap-2">
+          <FieldLabel htmlFor="select-rows-per-page">Rows per page</FieldLabel>
+          <Select value={String(itemsPerPage)} onValueChange={handleRowsPerPageChange}>
+            <SelectTrigger className="w-20" id="select-rows-per-page">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="start">
+              <SelectGroup>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <div className="flex items-center gap-4">
+          <Pagination className="mx-0 w-auto">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage((prev) => Math.max(prev - 1, 1));
+                  }}
+                  className={validPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+                  }}
+                  className={validPage >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      </div>
     </div>
   );
 }
 
 // Extracted row component managing both Edit and Delete confirmation state per item
-function ItemRow({ item, handleSaveItem, handleDeleteItem }) {
+function ItemRow({ item, index, handleSaveItem, handleDeleteItem }) {
   const [formData, setFormData] = useState({
     name: item.name || '',
     brand: item.brand || '',
@@ -91,8 +169,6 @@ function ItemRow({ item, handleSaveItem, handleDeleteItem }) {
     type: item.type || '',
     unit_of_measure: item.unit_of_measure || '',
     tracking_type: item.tracking_type || '',
-    reorder_level: item.reorder_level || 0,
-    estimated_useful_life: item.estimated_useful_life || '',
   });
 
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -120,8 +196,6 @@ function ItemRow({ item, handleSaveItem, handleDeleteItem }) {
       <TableCell>{item.type || '—'}</TableCell>
       <TableCell>{item.unit_of_measure}</TableCell>
       <TableCell>{item.tracking_type || '—'}</TableCell>
-      <TableCell>{item.reorder_level}</TableCell>
-      <TableCell>{item.estimated_useful_life || '—'}</TableCell>
 
       <TableCell className="action-cell">
         <div className="action-buttons flex items-center justify-end gap-2">
@@ -208,29 +282,6 @@ function ItemRow({ item, handleSaveItem, handleDeleteItem }) {
                         name="tracking_type"
                         type="text"
                         value={formData.tracking_type}
-                        onChange={handleChange}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium">Reorder Level</label>
-                      <input
-                        name="reorder_level"
-                        type="number"
-                        value={formData.reorder_level}
-                        onChange={handleChange}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium">Est. Useful Life</label>
-                      <input
-                        name="estimated_useful_life"
-                        type="text"
-                        value={formData.estimated_useful_life}
                         onChange={handleChange}
                         className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       />

@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
+import DashboardPage from './pages/DashboardPage';
 import CatalogPage from './pages/CatalogPage';
 import ReceivePage from './pages/ReceivePage';
 import ConsumablesPage from './pages/ConsumablesPage';
 import AccountabilityPage from './pages/AccountabilityPage';
 import TransferReturnPage from './pages/TransferReturnPage';
-import { Toaster } from '@/components/ui/sonner'; // adjust path if your alias differs
+import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 
 const API_BASE_URL = '/api/v1';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('catalog');
+  // Set default activeTab to Dashboard Overview
+  const [activeTab, setActiveTab] = useState('dashboard-overview');
 
   // Shared state variables
   const [categories, setCategories] = useState([]);
@@ -21,15 +23,26 @@ export default function App() {
 
   // Form states
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
-  const [itemForm, setItemForm] = useState({ category_id: '', name: '', unit_of_measure: '', reorder_level: '', is_serialized: false });
+  const [itemForm, setItemForm] = useState({ 
+    category_id: '', 
+    name: '', 
+    unit_of_measure: '', 
+    reorder_level: '', 
+    is_serialized: false 
+  });
   const [receiveForm, setReceiveForm] = useState({
     item_id: '', unit_cost: '', arrival_date: '', tracking_type: '',
     quantity: '', serial_number: '', model: '',
     manufacturer_name: '', country_of_origin: '', estimated_useful_life: ''
   });
-  const [accountabilityForm, setAccountabilityForm] = useState({ serialized_asset_id: '',user_id: '',issued_by_id: '', date_issued: '', remarks: '' });
+  const [accountabilityForm, setAccountabilityForm] = useState({ 
+    serialized_asset_id: '', 
+    user_id: '', 
+    issued_by_id: '', 
+    date_issued: '', 
+    remarks: '' 
+  });
   
-  // Transfer / Return Form State
   const [transferForm, setTransferForm] = useState({
     serialized_asset_id: '',
     transfer_type: 'RETURN',
@@ -40,7 +53,6 @@ export default function App() {
     remarks: ''
   });
 
-  // Helper to extract array safely whether it's direct or wrapped in { data: [...] }
   const parseJsonArray = async (res) => {
     try {
       const json = await res.json();
@@ -52,7 +64,6 @@ export default function App() {
     }
   };
 
-  // Fetch initial master lists
   const fetchData = async () => {
     try {
       const [catRes, itemRes, batchRes, assetRes] = await Promise.all([
@@ -96,64 +107,78 @@ export default function App() {
     }
   };
 
- return (
-  <>
-    <Toaster richColors position="top-right" />
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
-      {activeTab === 'catalog' && (
-        <CatalogPage 
-          categories={categories}
-          categoryForm={categoryForm}
-          setCategoryForm={setCategoryForm}
-          items={items}
-          itemForm={itemForm}
-          setItemForm={setItemForm}
-          handleApiCall={handleApiCall}
-        />
-      )}
+  return (
+    <>
+      <Toaster richColors position="top-right" />
+      <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+        
+        {/* Dashboard Route */}
+        {activeTab.startsWith('dashboard') && (
+          <DashboardPage 
+            items={items}
+            categories={categories}
+            stockBatches={stockBatches}
+            serializedAssets={serializedAssets}
+          />
+        )}
 
-      {activeTab === 'receive' && (
-        <ReceivePage 
-          items={items}
-          receiveForm={receiveForm}
-          setReceiveForm={setReceiveForm}
-          handleApiCall={handleApiCall}
-        />
-      )}
+        {/* Catalog Route */}
+        {activeTab.startsWith('catalog') && (
+          <CatalogPage 
+            activeTab={activeTab}
+            categories={categories}
+            categoryForm={categoryForm}
+            setCategoryForm={setCategoryForm}
+            items={items}
+            itemForm={itemForm}
+            setItemForm={setItemForm}
+            handleApiCall={handleApiCall}
+          />
+        )}
 
-      {activeTab === 'consumables' && (
-        <ConsumablesPage 
-          stockBatches={stockBatches}
-          handleApiCall={handleApiCall}
-          refreshData={fetchData}
-        />
-      )}
+        {/* Receive Stock Route */}
+        {activeTab.startsWith('receive') && (
+          <ReceivePage 
+            activeTab={activeTab}
+            items={items}
+            receiveForm={receiveForm}
+            setReceiveForm={setReceiveForm}
+            handleApiCall={handleApiCall}
+          />
+        )}
 
-      {activeTab === 'accountability' && (
-        <AccountabilityPage 
-          serializedAssets={serializedAssets}
-          accountabilityForm={accountabilityForm}
-          setAccountabilityForm={setAccountabilityForm}
-          handleApiCall={handleApiCall}
-        />
-      )}
+        {/* Consumables Route */}
+        {activeTab.startsWith('consumables') && (
+          <ConsumablesPage 
+            activeTab={activeTab}
+            stockBatches={stockBatches}
+            handleApiCall={handleApiCall}
+            refreshData={fetchData}
+          />
+        )}
 
-      {activeTab === 'transfer-return' && (
-        <TransferReturnPage 
-          serializedAssets={serializedAssets}
-          handleApiCall={handleApiCall}
-          refreshData={fetchData}
-        />
-      )}
+        {/* Accountability Route */}
+        {activeTab.startsWith('accountability') && (
+          <AccountabilityPage 
+            activeTab={activeTab}
+            serializedAssets={serializedAssets}
+            accountabilityForm={accountabilityForm}
+            setAccountabilityForm={setAccountabilityForm}
+            handleApiCall={handleApiCall}
+          />
+        )}
 
-      {activeTab === 'dashboard' && (
-        <DashboardPage
-          serializedAssets={serializedAssets}
-          handleApiCall={handleApiCall}
-          refreshData={fetchData}
-        />
-      )}
-    </Layout>
+        {/* Transfer & Return Route */}
+        {activeTab.startsWith('transfer-return') && (
+          <TransferReturnPage 
+            activeTab={activeTab}
+            serializedAssets={serializedAssets}
+            handleApiCall={handleApiCall}
+            refreshData={fetchData}
+          />
+        )}
+
+      </Layout>
     </>
   );
 }
