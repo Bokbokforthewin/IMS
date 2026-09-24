@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -23,12 +24,44 @@ import {
   Check,
   Plus,
   Eye,
+  Search,
+  X,
 } from 'lucide-react';
 
 function money(value) {
   return `₱${Number(value || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
   })}`;
+}
+
+/**
+ * Helper to check if an asset object matches the search query across any property.
+ */
+function isAssetMatch(asset, query) {
+  if (!asset || !query) return false;
+  const q = query.toLowerCase();
+
+  const cost = Number(asset.unit_cost || 0);
+  const badgeType = cost >= 50000 ? 'par' : 'ics';
+
+  const fields = [
+    asset.property_number,
+    asset.serial_number,
+    asset.model,
+    asset.manufacturer_name,
+    asset.country_of_origin,
+    asset.item_name,
+    asset.item_code,
+    asset.item?.name,
+    asset.item?.item_code,
+    asset.item?.brand,
+    cost.toString(),
+    badgeType,
+  ];
+
+  return fields.some(
+    (field) => field && String(field).toLowerCase().includes(q)
+  );
 }
 
 /**
@@ -93,6 +126,7 @@ export default function AssetCatalogBrowse({
   addAssetToCart,
   onProceed,
 }) {
+  const [searchQuery, setSearchQuery] = useState('');
   const [detailsGroup, setDetailsGroup] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
@@ -102,6 +136,18 @@ export default function AssetCatalogBrowse({
     () => groupAssets(assets),
     [assets]
   );
+
+  // Filters primary assets AND attached peripherals against the search query
+  const filteredGroupedAssets = useMemo(() => {
+    if (!searchQuery.trim()) return groupedAssets;
+    const query = searchQuery.trim();
+
+    return groupedAssets.filter(({ primary, children }) => {
+      const primaryMatches = isAssetMatch(primary, query);
+      const childMatches = children.some((child) => isAssetMatch(child, query));
+      return primaryMatches || childMatches;
+    });
+  }, [groupedAssets, searchQuery]);
 
   const openDetails = (group) => {
     setDetailsGroup(group);
@@ -113,8 +159,8 @@ export default function AssetCatalogBrowse({
   return (
     <div className="space-y-6">
 
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      {/* Header & Search Bar */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Browse Assets</h2>
           <p className="text-sm text-muted-foreground mt-1">
@@ -122,12 +168,35 @@ export default function AssetCatalogBrowse({
           </p>
         </div>
 
-        <Badge variant="secondary">
-          {groupedAssets.length} {groupedAssets.length === 1 ? 'Asset' : 'Assets'}
-        </Badge>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          {/* shadcn Input with Search Icon */}
+          <div className="relative flex-1 sm:w-80">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search assets, serials, codes, specs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 pr-8"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          <Badge variant="secondary" className="whitespace-nowrap">
+            {filteredGroupedAssets.length} {filteredGroupedAssets.length === 1 ? 'Asset' : 'Assets'}
+          </Badge>
+        </div>
       </div>
 
-      {/* Empty State */}
+      {/* Empty States */}
       {groupedAssets.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center">
           <Package className="mx-auto h-10 w-10 text-muted-foreground" />
@@ -135,10 +204,25 @@ export default function AssetCatalogBrowse({
             No available assets to display.
           </p>
         </div>
+      ) : filteredGroupedAssets.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-8 text-center">
+          <Package className="mx-auto h-10 w-10 text-muted-foreground" />
+          <p className="mt-3 text-sm text-muted-foreground">
+            No assets found matching "{searchQuery}".
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2"
+            onClick={() => setSearchQuery('')}
+          >
+            Clear Search
+          </Button>
+        </div>
       ) : (
-        /* Asset Grid mirroring ReceivedStockTable card layout */
+        /* Asset Grid */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {groupedAssets.map(({ primary, children }) => {
+          {filteredGroupedAssets.map(({ primary, children }) => {
             const cartKey = `a-${primary.id}`;
             const inCart = cart.some((c) => c.key === cartKey);
             const cost = Number(primary.unit_cost || 0);
@@ -154,7 +238,7 @@ export default function AssetCatalogBrowse({
                     <div className="flex items-center justify-between gap-1 mb-1">
                       <div className="flex gap-1">
                         <Badge variant="default">Asset</Badge>
-                        {isBundled && <Badge variant="outline">Bundled</Badge>}
+                        {isBundled && <Badge variant="outline">Bundled ({children.length})</Badge>}
                       </div>
                       <Badge variant="outline">
                         {cost >= 50000 ? 'PAR' : 'ICS'}
@@ -164,6 +248,11 @@ export default function AssetCatalogBrowse({
                     <CardTitle className="text-base line-clamp-1">
                       {brandName}{itemName}
                     </CardTitle>
+                    {(primary.property_number || itemCode !== 'N/A') && (
+                      <p className="text-xs font-mono text-muted-foreground mt-1">
+                        {primary.property_number || itemCode}
+                      </p>
+                    )}
                   </CardHeader>
                 </div>
 
@@ -203,7 +292,7 @@ export default function AssetCatalogBrowse({
         </div>
       )}
 
-      {/* View Details Modal (Standardized with ReceivedStockTable) */}
+      {/* View Details Modal */}
       <AlertDialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>

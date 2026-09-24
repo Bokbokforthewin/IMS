@@ -89,6 +89,10 @@ class AccountabilityExcelService
         if (!empty($item->specifications)) {
             $lines[] = $item->specifications;
         }
+        if (!empty($asset->user_id)) {
+            $lines[] = "End User: {$asset->user_id}";
+        }
+
         if (!empty($asset->attached_to)) {
             $lines[] = "Bundled with property no.: {$asset->attached_to}";
         }

@@ -6,6 +6,7 @@ use App\Models\AccountabilityReceipt;
 use App\Models\SerializedAsset;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Services\AccountabilityExcelService;
@@ -13,7 +14,10 @@ use App\Services\PropertyTagPdfService;
 
 class AccountabilityController extends Controller
 {
-    public function index()
+    /**
+     * Display a listing of all serialized assets.
+     */
+    public function index(): JsonResponse
     {
         try {
             $assets = SerializedAsset::with(['item', 'currentHolder'])
@@ -27,31 +31,43 @@ class AccountabilityController extends Controller
         }
     }
 
-    public function getReceipts()
+    /**
+     * Retrieve all issued accountability receipts along with primary/secondary holder details.
+     */
+    public function getReceipts(): JsonResponse
     {
         try {
             $receipts = AccountabilityReceipt::with([
-                    'lines.serializedAsset.item',
-                    'user', 'issuedBy', 'receivedMrBy'
-                ])
-                ->orderBy('created_at', 'desc')
-                ->get();
+                'lines.serializedAsset.item',
+                'lines.serializedAsset.currentHolder',
+                'user',
+                'issuedBy',
+                'receivedMrBy'
+            ])
+            ->orderBy('created_at', 'desc')
+            ->get();
 
             return response()->json($receipts, 200);
         } catch (\Exception $e) {
+            Log::error('Failed to retrieve receipts: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to retrieve receipts.'], 500);
         }
     }
 
-   public function issueAsset(Request $request)
+    /**
+     * Issue serialized assets under PAR or ICS receipts and assign primary/secondary receivers.
+     */
+    public function issueAsset(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'cart' => 'required|array|min:1',
             'cart.*.key' => 'required|string',
             'cart.*.serialized_asset_id' => 'required|exists:serialized_assets,id',
             'cart.*.attach_to_key' => 'nullable|string',
-            'user_id' => 'required|exists:users,id',
-            'issued_by_id' => 'required|exists:users,id',
+            'cart.*.user_id' => 'nullable|exists:users,id',      // Secondary Receiver per item
+            'user_id' => 'nullable|exists:users,id',              // Secondary Receiver default
+            'received_mr_by_id' => 'required|exists:users,id',    // Primary Receiver (PAR/ICS Signatory)
+            'issued_by_id' => 'required|exists:users,id',         // Issuer / Property Officer
             'date_issued' => 'required|date',
             'remarks' => 'nullable|string|max:1000',
         ]);
@@ -65,7 +81,7 @@ class AccountabilityController extends Controller
                 return DB::transaction(function () use ($validated, $dateIssued, $year) {
                     $resolvedByKey = [];
 
-                    // Pass 1: Lock, validate, and eager-load item relation
+                    // Pass 1: Lock and validate availability of each requested asset
                     foreach ($validated['cart'] as $cartItem) {
                         $asset = SerializedAsset::with('item')
                             ->where('id', $cartItem['serialized_asset_id'])
@@ -73,12 +89,15 @@ class AccountabilityController extends Controller
                             ->first();
 
                         if (!$asset || $asset->status !== 'Available' || $asset->current_holder_id) {
-                            return response()->json(['error' => "Asset #{$cartItem['serialized_asset_id']} is not available."], 422);
+                            return response()->json([
+                                'error' => "Asset #{$cartItem['serialized_asset_id']} is no longer available for issuance."
+                            ], 422);
                         }
+
                         $resolvedByKey[$cartItem['key']] = $asset;
                     }
 
-                    // Pass 2: Link attachments and split lines strictly by unit cost
+                    // Pass 2: Link attachments and segregate items into PAR (>= 50k) and ICS (< 50k) buckets
                     $parLines = [];
                     $icsLines = [];
 
@@ -92,18 +111,22 @@ class AccountabilityController extends Controller
                             $attachTo = $resolvedByKey[$cartItem['attach_to_key']]->property_number;
                         }
 
-                        // Update status and parent link
-                        $asset->update([
-                            'status' => 'Assigned',
-                            'attached_to' => $attachTo,
-                        ]);
+                        // Secondary Receiver priority: Item level -> Form default -> Primary Receiver
+                        $secondaryUserId = $cartItem['user_id'] 
+                            ?? $validated['user_id'] 
+                            ?? $validated['received_mr_by_id'];
 
-                        // Extract and sanitize unit cost (handles floats, numeric strings, or formatted currency strings)
+                        // Extract and sanitize unit cost
                         $rawCost = $asset->unit_cost ?? $asset->item?->unit_cost ?? 0;
                         $cleanCost = (float) preg_replace('/[^0-9.]/', '', (string) $rawCost);
 
-                        // Scenario B: Strict Cost Separation (>= 50,000 = PAR, < 50,000 = ICS)
-                        $line = ['asset' => $asset, 'quantity' => 1];
+                        $line = [
+                            'asset' => $asset,
+                            'attach_to' => $attachTo,
+                            'secondary_user_id' => $secondaryUserId,
+                            'quantity' => 1,
+                        ];
+
                         if ($cleanCost >= 50000) {
                             $parLines[] = $line;
                         } else {
@@ -111,17 +134,19 @@ class AccountabilityController extends Controller
                         }
                     }
 
-                    $recipient = User::find($validated['user_id']);
-                    $unitHead = $recipient?->findUnitHead();
                     $createdReceipts = [];
+                    $buckets = [
+                        ['type' => 'PAR', 'lines' => $parLines],
+                        ['type' => 'ICS', 'lines' => $icsLines],
+                    ];
 
-                    // Pass 3: Create distinct receipts for PAR and ICS if lines exist
-                    foreach ([['type' => 'PAR', 'lines' => $parLines], ['type' => 'ICS', 'lines' => $icsLines]] as $bucket) {
+                    // Pass 3: Create distinct accountability receipts (PAR/ICS) and assign assets
+                    foreach ($buckets as $bucket) {
                         if (empty($bucket['lines'])) continue;
 
                         $receiptType = $bucket['type'];
 
-                        // Lock and calculate next sequence number per document type and year
+                        // Lock and generate next sequential document number
                         $lastReceipt = AccountabilityReceipt::where('receipt_type', $receiptType)
                             ->whereYear('date_issued', $year)
                             ->orderBy('id', 'desc')
@@ -138,24 +163,34 @@ class AccountabilityController extends Controller
                         $receipt = AccountabilityReceipt::create([
                             'receipt_type' => $receiptType,
                             'document_number' => $documentNumber,
-                            'user_id' => $validated['user_id'],
+                            'user_id' => $validated['user_id'] ?? $validated['received_mr_by_id'], // Secondary/Default Recipient
                             'issued_by_id' => $validated['issued_by_id'],
-                            'received_mr_by_id' => $unitHead?->id,
+                            'received_mr_by_id' => $validated['received_mr_by_id'],
                             'date_issued' => $dateIssued,
                             'remarks' => $validated['remarks'] ?? null,
                         ]);
 
                         foreach ($bucket['lines'] as $li) {
-                            $li['asset']->update(['current_holder_id' => $validated['user_id']]);
+                            /** @var SerializedAsset $asset */
+                            $asset = $li['asset'];
+
+                            // Update status, parent attachment link, and secondary holder
+                            $asset->update([
+                                'status' => 'Assigned',
+                                'attached_to' => $li['attach_to'],
+                                'current_holder_id' => $li['secondary_user_id'],
+                            ]);
+
                             $receipt->lines()->create([
-                                'serialized_asset_id' => $li['asset']->id,
-                                'item_id' => $li['asset']->item_id,
+                                'serialized_asset_id' => $asset->id,
+                                'item_id' => $asset->item_id,
                                 'quantity' => 1,
                             ]);
                         }
 
                         $createdReceipts[] = $receipt->load([
                             'lines.serializedAsset.item',
+                            'lines.serializedAsset.currentHolder',
                             'user',
                             'issuedBy',
                             'receivedMrBy'
@@ -169,11 +204,13 @@ class AccountabilityController extends Controller
                 });
             } catch (\Illuminate\Database\QueryException $e) {
                 $errorCode = $e->errorInfo[1] ?? null;
-                if ($errorCode == 1062 && $attempt < $maxAttempts) continue;
-                Log::error('Failed to issue asset(s): ' . $e->getMessage());
+                if ($errorCode == 1062 && $attempt < $maxAttempts) {
+                    continue; // Retry on duplicate document number collision
+                }
+                Log::error('Database query failure during asset issuance: ' . $e->getMessage());
                 return response()->json(['error' => 'Failed to issue asset(s): ' . $e->getMessage()], 500);
             } catch (\Exception $e) {
-                Log::error('Failed to issue asset(s): ' . $e->getMessage());
+                Log::error('General failure during asset issuance: ' . $e->getMessage());
                 return response()->json(['error' => 'Failed to issue asset(s): ' . $e->getMessage()], 500);
             }
         }
@@ -181,7 +218,10 @@ class AccountabilityController extends Controller
         return response()->json(['error' => 'Failed to generate a unique document number after several attempts.'], 500);
     }
 
-    public function updateAssetStatus(Request $request, SerializedAsset $serializedAsset)
+    /**
+     * Update asset lifecycle status (Available, Assigned, Under Repair, Condemned).
+     */
+    public function updateAssetStatus(Request $request, SerializedAsset $serializedAsset): JsonResponse
     {
         $validated = $request->validate([
             'status' => 'required|in:Available,Assigned,Under Repair,Condemned',
@@ -191,14 +231,12 @@ class AccountabilityController extends Controller
         $currentStatus = $serializedAsset->status;
         $newStatus = $validated['status'];
 
-        // Condemned is terminal through this endpoint.
         if ($currentStatus === 'Condemned') {
             return response()->json([
-                'error' => 'This asset is condemned and its status cannot be changed here.'
+                'error' => 'This asset is condemned and its status cannot be modified.'
             ], 422);
         }
 
-        // Entering repair: remember exactly what status it came from.
         if ($newStatus === 'Under Repair') {
             if ($currentStatus === 'Under Repair') {
                 return response()->json(['error' => 'Asset is already Under Repair.'], 422);
@@ -206,7 +244,7 @@ class AccountabilityController extends Controller
 
             $serializedAsset->update([
                 'status' => 'Under Repair',
-                'pre_repair_status' => $currentStatus, // 'Available' or 'Assigned'
+                'pre_repair_status' => $currentStatus,
                 'condition_remarks' => $validated['condition_remarks'] ?? null,
             ]);
 
@@ -216,9 +254,6 @@ class AccountabilityController extends Controller
             ], 200);
         }
 
-        // Leaving repair: can ONLY go back to the exact status it came from, or Condemned.
-        // No other transition is permitted from Under Repair — this is what
-        // makes "Under Repair -> Assigned" impossible unless it actually came from Assigned.
         if ($currentStatus === 'Under Repair') {
             $allowedReturn = $serializedAsset->pre_repair_status ?? 'Available';
 
@@ -230,7 +265,7 @@ class AccountabilityController extends Controller
 
             $serializedAsset->update([
                 'status' => $newStatus,
-                'pre_repair_status' => null, // clear once resolved
+                'pre_repair_status' => null,
                 'condition_remarks' => $newStatus === 'Condemned' ? ($validated['condition_remarks'] ?? null) : null,
             ]);
 
@@ -240,7 +275,6 @@ class AccountabilityController extends Controller
             ], 200);
         }
 
-        // From Available or Assigned directly to Condemned (skipping repair entirely).
         if ($newStatus === 'Condemned') {
             $serializedAsset->update([
                 'status' => 'Condemned',
@@ -254,53 +288,56 @@ class AccountabilityController extends Controller
             ], 200);
         }
 
-        // Any other combination (e.g. manually picking "Assigned" or "Available"
-        // without going through repair first) is not a valid manual transition here.
         return response()->json([
-            'error' => "Cannot change status from '{$currentStatus}' to '{$newStatus}' directly. Use Return/Transfer for returning assigned assets."
+            'error' => "Cannot change status from '{$currentStatus}' to '{$newStatus}' directly. Use Return/Transfer for assigned assets."
         ], 422);
     }
 
+    /**
+     * Download receipt as an Excel workbook.
+     */
     public function downloadExcel(int $id, AccountabilityExcelService $excelService)
     {
         $receipt = AccountabilityReceipt::with([
             'user',
             'issuedBy',
             'receivedMrBy',
-            'lines.serializedAsset.item'
+            'lines.serializedAsset.item',
+            'lines.serializedAsset.currentHolder',
         ])->findOrFail($id);
 
         return $excelService->generate($receipt);
     }
 
+    /**
+     * Download property tag PDF for a serialized asset.
+     */
     public function downloadPropertyTagPdf(
         SerializedAsset $serializedAsset,
         Request $request,
         PropertyTagPdfService $pdfService
     ) {
-        $pdf = $pdfService->generate(
-            $serializedAsset,
-            $request
-        );
-
+        $pdf = $pdfService->generate($serializedAsset, $request);
         $filename = "PropertyTag-{$serializedAsset->property_number}.pdf";
 
         return $pdf->download($filename);
     }
 
-    public function availableForCart()
+    /**
+     * Get available assets eligible for selection in the issuance cart.
+     */
+    public function availableForCart(): JsonResponse
     {
         $available = SerializedAsset::with('item')
             ->whereHas('item', fn($q) => $q->where('tracking_type', 'asset'))
             ->where('status', 'Available')
             ->whereNull('current_holder_id')
             ->where(function ($query) {
-                // Only include if it has no parent, OR if its parent is also Available
                 $query->whereNull('attached_to')
                     ->orWhereIn('attached_to', function ($subQuery) {
                         $subQuery->select('property_number')
-                                ->from('serialized_assets')
-                                ->where('status', 'Available');
+                            ->from('serialized_assets')
+                            ->where('status', 'Available');
                     });
             })
             ->orderBy('item_id')
@@ -309,9 +346,12 @@ class AccountabilityController extends Controller
         return response()->json(['assets' => $available], 200);
     }
 
-    public function attachedItems(SerializedAsset $serializedAsset)
+    /**
+     * Get items attached to a specific primary asset.
+     */
+    public function attachedItems(SerializedAsset $serializedAsset): JsonResponse
     {
-        $attached = SerializedAsset::with('item')
+        $attached = SerializedAsset::with(['item', 'currentHolder'])
             ->where('attached_to', $serializedAsset->property_number)
             ->get();
 

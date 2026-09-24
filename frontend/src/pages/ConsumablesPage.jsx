@@ -4,8 +4,6 @@ import axios from 'axios';
 import StockStatusTable from '../components/consumables/StockStatusTable.jsx';
 import IssuanceHistoryTable from '../components/consumables/IssuanceHistoryTable.jsx';
 
-import '../components/consumables/ConsumablesPage.css';
-
 export default function ConsumablesPage({ activeTab, handleApiCall, refreshData }) {
   const [stockStatus, setStockStatus] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
