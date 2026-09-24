@@ -1,68 +1,109 @@
-import React from 'react';
-import { Boxes, PackageCheck, ClipboardCheck, AlertTriangle } from 'lucide-react';
-
-// Fix relative path: step out of 'pages/' into 'components/'
+import React, { useState, useEffect } from 'react';
+import { Boxes, Wallet, PackageX, AlertTriangle, ClipboardList, FileStack } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import StatCard from '../components/dashboard/StatCard.jsx';
-// Alternatively, if path aliases are configured in Vite:
-// import StatCard from '@/components/dashboard/StatCard.jsx';
+import MonthlyTrendChart from '../components/dashboard/MonthlyTrendChart.jsx';
+import AssetStatusChart from '../components/dashboard/AssetStatusChart.jsx';
+import IssuanceActivityChart from '../components/dashboard/IssuanceActivityChart.jsx';
+import LowStockAlerts from '../components/dashboard/LowStockAlerts.jsx';
+import RecentActivity from '../components/dashboard/RecentActivity.jsx';
 
-export default function DashboardPage({
-  items = [],
-  categories = [],
-  stockBatches = [],
-  serializedAssets = [],
-}) {
-  // Dynamic summary calculations with safety checks
-  const totalItemsCount = items.length;
-  const totalCategoriesCount = categories.length;
+const API_BASE_URL = '/api/v1';
 
-  const assignedAssetsCount = serializedAssets.filter(
-    (asset) => asset.status === 'ASSIGNED' || asset.is_assigned
-  ).length;
+export default function DashboardPage() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const lowStockCount = items.filter(
-    (item) => item.reorder_level && item.quantity <= item.reorder_level
-  ).length;
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/dashboard`)
+      .then((res) => res.json())
+      .then((json) => setData(json))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading || !data) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-lg" />)}
+      </div>
+    );
+  }
+
+  const { kpis, monthly_trend, asset_status_distribution, low_stock_items, recent_activity } = data;
 
   return (
-    <div className="dashboard-page">
-      <header className="dashboard-page__header">
-        <h1 className="dashboard-page__title">Dashboard Overview</h1>
-        <p className="dashboard-page__subtitle">
-          Summary metrics for DOH ICT inventory, stock movements, and asset allocations.
-        </p>
-      </header>
+    <div className="space-y-6">
 
-      {/* Grid container holding StatCards */}
-      <div className="dashboard-page__grid">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Total Catalog Items"
-          value={totalItemsCount}
+          title="Total Inventory Value"
+          value={`₱${kpis.total_inventory_value.toLocaleString()}`}
+          icon={Wallet}
+          accent="blue"
+        />
+        <StatCard
+          title="Assets Received (Month)"
+          value={`₱${kpis.asset_value.toLocaleString()}`}
+          changePct={kpis.asset_value_change_pct}
           icon={Boxes}
-          color="bg-blue-50 text-blue-700 border-blue-200"
+          accent="default"
         />
-
         <StatCard
-          title="Assigned Assets"
-          value={assignedAssetsCount}
-          icon={ClipboardCheck}
-          color="bg-emerald-50 text-emerald-700 border-emerald-200"
+          title="Consumables Received (Month)"
+          value={`₱${kpis.consumable_value.toLocaleString()}`}
+          changePct={kpis.consumable_value_change_pct}
+          icon={Boxes}
+          accent="emerald"
         />
-
         <StatCard
-          title="Stock Receives"
-          value={stockBatches.length}
-          icon={PackageCheck}
-          color="bg-purple-50 text-purple-700 border-purple-200"
-        />
-
-        <StatCard
-          title="Low Stock Alerts"
-          value={lowStockCount}
+          title="Low Stock Items"
+          value={kpis.low_stock_count}
           icon={AlertTriangle}
-          color="bg-amber-50 text-amber-700 border-amber-200"
+          accent="amber"
+        />
+        <StatCard
+          title="Consumable Issuances (Month)"
+          value={kpis.issuances_this_month}
+          changePct={kpis.issuances_change_pct}
+          icon={ClipboardList}
+          accent="default"
+        />
+        <StatCard
+          title="Accountability Receipts (Month)"
+          value={kpis.receipts_this_month}
+          changePct={kpis.receipts_change_pct}
+          icon={FileStack}
+          accent="blue"
+        />
+        <StatCard
+          title="Assets Under Repair"
+          value={kpis.assets_repair}
+          icon={PackageX}
+          accent="amber"
+        />
+        <StatCard
+          title="Total Assets"
+          value={kpis.total_assets}
+          icon={Boxes}
+          accent="default"
         />
       </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <MonthlyTrendChart data={monthly_trend} />
+        </div>
+        <AssetStatusChart data={asset_status_distribution} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <IssuanceActivityChart data={monthly_trend} />
+        </div>
+        <LowStockAlerts items={low_stock_items} />
+      </div>
+
+      <RecentActivity activity={recent_activity} />
     </div>
   );
 }

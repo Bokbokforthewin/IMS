@@ -28,6 +28,7 @@ import {
   SidebarMenuSubButton,
   SidebarRail,
   useSidebar,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 import {

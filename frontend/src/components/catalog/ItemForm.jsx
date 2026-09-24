@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Tag, Package, Badge, Ruler, 
-  Layers, TrendingDown, Save, Clock, FileText, Sliders
+  Layers, TrendingDown, Save, Clock, FileText, Sliders, Check, X
 } from 'lucide-react';
 import { 
   Field, FieldLabel, FieldGroup, FieldSet, FieldLegend 
@@ -9,19 +9,133 @@ import {
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Button } from '@/components/ui/button';
-import {
-  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+
+// --- Responsive Auto-Matching Category Search Bar ---
+function CategorySearch({ categories = [], categoryId, onSelectCategory }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  // Sync internal search input state when form value is reset externally
+  useEffect(() => {
+    if (!categoryId) {
+      setSearchTerm('');
+    } else {
+      const match = categories.find((c) => String(c.id) === String(categoryId));
+      if (match && match.name !== searchTerm) {
+        setSearchTerm(match.name);
+      }
+    }
+  }, [categoryId, categories]);
+
+  // Handle clicking outside to close suggestions
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredCategories = (categories || []).filter((c) =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    setIsOpen(true);
+
+    // Auto-match exact category name (case-insensitive)
+    const exactMatch = categories.find(
+      (c) => c.name.trim().toLowerCase() === val.trim().toLowerCase()
+    );
+
+    if (exactMatch) {
+      onSelectCategory(String(exactMatch.id));
+    } else {
+      onSelectCategory('');
+    }
+  };
+
+  const handleSelectOption = (cat) => {
+    setSearchTerm(cat.name);
+    onSelectCategory(String(cat.id));
+    setIsOpen(false);
+  };
+
+  const handleClear = () => {
+    setSearchTerm('');
+    onSelectCategory('');
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative w-full">
+      <div className="relative flex items-center">
+        <Input
+          id="category_id"
+          type="text"
+          required
+          placeholder="Search or type category..."
+          value={searchTerm}
+          onFocus={() => setIsOpen(true)}
+          onChange={handleInputChange}
+          className="pr-8"
+          autoComplete="off"
+        />
+        {searchTerm && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="absolute right-2.5 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Clear search"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Recommendations Dropdown */}
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-56 overflow-y-auto">
+          {filteredCategories.length > 0 ? (
+            <ul className="py-1 text-sm">
+              {filteredCategories.map((cat) => {
+                const isSelected = String(cat.id) === String(categoryId);
+                return (
+                  <li
+                    key={cat.id}
+                    onClick={() => handleSelectOption(cat)}
+                    className={`flex items-center justify-between px-3 py-2 cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-accent text-accent-foreground font-medium'
+                        : 'hover:bg-muted/80'
+                    }`}
+                  >
+                    <span>{cat.name}</span>
+                    {isSelected && <Check className="w-4 h-4 text-primary" />}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="p-3 text-sm text-muted-foreground text-center">
+              No matching category found
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ItemForm({ itemForm, setItemForm, categories, handleApiCall }) {
   const trackingType = itemForm.tracking_type || 'consumable';
   const isAsset = trackingType === 'asset';
   const isConsumable = trackingType === 'consumable';
-
-  const categoryOptions = (categories || []).map((c) => ({
-    value: String(c.id),
-    label: c.name,
-  }));
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -60,22 +174,11 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
             <FieldLabel htmlFor="category_id" className="flex items-center gap-2">
               <Tag className="w-4 h-4 text-muted-foreground" /> Category *
             </FieldLabel>
-            <Select
-              items={categoryOptions}
-              value={itemForm.category_id ? String(itemForm.category_id) : ''}
-              onValueChange={(value) => setItemForm({ ...itemForm, category_id: value })}
-            >
-              <SelectTrigger id="category_id" className="w-full">
-                <SelectValue placeholder="Select Category..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {categoryOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <CategorySearch
+              categories={categories}
+              categoryId={itemForm.category_id}
+              onSelectCategory={(id) => setItemForm({ ...itemForm, category_id: id })}
+            />
           </Field>
 
           <Field>
@@ -205,7 +308,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
       </FieldGroup>
 
       <Button type="submit" className="mt-6 flex items-center gap-2">
-        <Save className="w-4 h-4" /> Save Catalog Item
+        <Save className="w-4 h-4" /> Save
       </Button>
     </form>
   );

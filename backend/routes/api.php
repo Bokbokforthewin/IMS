@@ -35,7 +35,7 @@ Route::prefix('v1')
     Route::get('/users', [UserController::class, 'index']);
 
     // Dashboard Statistics
-    Route::get('/dashboard/statistics', [DashboardController::class, 'statistics']);
+    Route::get('/dashboard', [DashboardController::class, 'index']);
     
     // Categories (Restricted to Admin / Supply Officer)
     Route::get('/categories', [CategoryController::class, 'index']);

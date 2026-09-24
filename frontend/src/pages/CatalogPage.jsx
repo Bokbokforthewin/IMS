@@ -6,7 +6,6 @@ import ItemForm from '../components/catalog/ItemForm.jsx';
 import CategoryTable from '../components/catalog/CategoryTable.jsx';
 import ItemTable from '../components/catalog/ItemTable.jsx';
 
-import Modal from '../components/Modal.jsx';
 import EditCategoryModal from '../components/catalog/EditCategoryModal.jsx';
 import EditItemModal from '../components/catalog/EditItemModal.jsx';
 
@@ -25,10 +24,6 @@ export default function CatalogPage({
   setItemForm, 
   handleApiCall 
 }) {
-  // Add Form Modal States
-  const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
-  const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
-
   // Category Edit State
   const [isEditCategoryModalOpen, setIsEditCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState({ id: '', name: '', description: '' });
@@ -100,74 +95,50 @@ export default function CatalogPage({
 
   return (
     <div className="catalog-page-container">
-      {/* Header buttons change contextual to active sub-tab */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-        {activeTab === 'catalog-categories' && (
-          <button 
-            onClick={() => setIsAddCategoryModalOpen(true)} 
-            className="btn-modal btn-primary"
-          >
-            + Add Category
-          </button>
-        )}
-
-        {activeTab === 'catalog-items' && (
-          <button 
-            onClick={() => setIsAddItemModalOpen(true)} 
-            className="btn-modal btn-primary"
-          >
-            + Add Item
-          </button>
-        )}
-      </div>
-
-      {/* Render sub-views dynamically based on sidebar sub-menu choice */}
+      {/* Sub-view: Categories */}
       {activeTab === 'catalog-categories' && (
-        <CategoryTable 
-          categories={categories} 
-          handleSaveCategory={handleSaveCategory}
-          handleDeleteCategory={handleDeleteCategory}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Inline Add Category Form */}
+          <div className="catalog-form-container" style={{ marginBottom: '10px' }}>
+            <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Add Category</h3>
+            <CategoryForm 
+              categoryForm={categoryForm} 
+              setCategoryForm={setCategoryForm} 
+              handleApiCall={handleApiCall} 
+            />
+          </div>
+
+          <CategoryTable 
+            categories={categories} 
+            handleSaveCategory={handleSaveCategory}
+            handleDeleteCategory={handleDeleteCategory}
+          />
+        </div>
       )}
 
+      {/* Sub-view: Items */}
       {activeTab === 'catalog-items' && (
-        <ItemTable 
-          items={items} 
-          handleSaveItem={handleSaveItem}
-          handleDeleteItem={handleDeleteItem} 
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Inline Add Item Form */}
+          <div className="catalog-form-container" style={{ marginBottom: '10px' }}>
+            <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Add Items</h3>
+            <ItemForm 
+              itemForm={itemForm} 
+              setItemForm={setItemForm} 
+              categories={categories} 
+              handleApiCall={handleApiCall} 
+            />
+          </div>
+
+          <ItemTable 
+            items={items} 
+            handleSaveItem={handleSaveItem}
+            handleDeleteItem={handleDeleteItem} 
+          />
+        </div>
       )}
 
-      {/* Add Category Modal */}
-      <Modal isOpen={isAddCategoryModalOpen} title="Add Category" onClose={() => setIsAddCategoryModalOpen(false)}>
-        <CategoryForm 
-          categoryForm={categoryForm} 
-          setCategoryForm={setCategoryForm} 
-          handleApiCall={(url, data, onSuccess) => {
-            handleApiCall(url, data, () => {
-              if (onSuccess) onSuccess();
-              setIsAddCategoryModalOpen(false);
-            });
-          }} 
-        />
-      </Modal>
-
-      {/* Add Item Modal */}
-      <Modal isOpen={isAddItemModalOpen} title="Add Catalog Item" onClose={() => setIsAddItemModalOpen(false)}>
-        <ItemForm 
-          itemForm={itemForm} 
-          setItemForm={setItemForm} 
-          categories={categories} 
-          handleApiCall={(url, data, onSuccess) => {
-            handleApiCall(url, data, () => {
-              if (onSuccess) onSuccess();
-              setIsAddItemModalOpen(false);
-            });
-          }} 
-        />
-      </Modal>
-
-      {/* Edit Modals */}
+      {/* Edit Modals remain available for row modifications */}
       <EditCategoryModal 
         isOpen={isEditCategoryModalOpen}
         onClose={() => setIsEditCategoryModalOpen(false)}

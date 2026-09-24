@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import Logo from "./Logo.jsx";
 import { User, LogOut, ChevronDown } from "lucide-react";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 import {
   DropdownMenu,
@@ -36,15 +37,11 @@ export default function Header() {
     fetchAppConfig();
   }, []);
 
-  const handleLogout = () => {
-    console.log("Logging out user...");
-    alert("Logged out successfully");
-  };
-
   if (error) {
     return (
       <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:px-6">
         <div className="flex items-center gap-3">
+          <SidebarTrigger />
           <Logo size={28} />
           <span className="h-4 w-px bg-border" aria-hidden="true" />
           <div className="flex flex-col">
@@ -56,10 +53,13 @@ export default function Header() {
     );
   }
 
-  if (!appConfig) return null;
-
   return (
     <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:px-6">
+      {/* Left Side: Mobile Sidebar Trigger */}
+      <div className="flex items-center gap-2">
+        <SidebarTrigger className="-ml-1 md:hidden" />
+      </div>
+
       {/* Right Side: User Dropdown Menu */}
       <DropdownMenu>
         <DropdownMenuTrigger className="flex h-9 items-center gap-2 rounded-lg border border-border px-2.5 text-left transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring">
@@ -90,7 +90,7 @@ export default function Header() {
           <DropdownMenuSeparator />
 
           <DropdownMenuItem
-            onClick={handleLogout}
+            onClick={() => alert("Logged out successfully")}
             className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
           >
             <LogOut className="mr-2 size-4" />
