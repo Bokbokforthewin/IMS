@@ -38,39 +38,66 @@ export default function CartReview({
 }) {
   const [submitting, setSubmitting] = useState(false);
 
-  // Use the updated cart with secondary receivers if available
+  // Use updated cart with secondary receivers if available
   const activeCart = deliveryDetails?.updatedCart || cart;
 
   const total = activeCart.reduce((sum, c) => sum + getCost(c), 0);
   const parItems = activeCart.filter((c) => getCost(c) >= 50000);
   const icsItems = activeCart.filter((c) => getCost(c) < 50000);
 
-  const findAttached = (key) => activeCart.find((c) => c.key === key);
+  const findAttached = (key) => activeCart.find((c) => String(c.key) === String(key));
 
   const handleConfirm = () => {
     setSubmitting(true);
 
+    // Primary Receiver ID resolution across potential key formats
     const primaryReceiverId =
-      deliveryDetails?.receivedMrById ||
       deliveryDetails?.received_mr_by_id ||
-      deliveryDetails?.userId;
+      deliveryDetails?.receivedMrById ||
+      deliveryDetails?.primaryReceiverUser?.id ||
+      deliveryDetails?.recipientUser?.id ||
+      deliveryDetails?.user_id ||
+      deliveryDetails?.userId ||
+      null;
+
+    // Issuer ID resolution across potential key formats
+    const issuerId =
+      deliveryDetails?.issued_by_id ||
+      deliveryDetails?.issuedById ||
+      deliveryDetails?.issuerUser?.id ||
+      null;
+
+    // Fallback secondary receiver ID
+    const defaultSecondaryUserId =
+      deliveryDetails?.user_id ||
+      deliveryDetails?.userId ||
+      primaryReceiverId;
 
     const payload = {
-      cart: activeCart.map((c) => ({
-        key: c.key,
-        serialized_asset_id: c.serialized_asset_id || c.id,
-        attach_to_key: c.attachToKey || undefined,
-        user_id: c.user_id || primaryReceiverId, // Secondary Receiver for this item
-      })),
-      received_mr_by_id: primaryReceiverId, // Primary Receiver (PAR/ICS Signatory)
-      issued_by_id: deliveryDetails?.issuedById || deliveryDetails?.issued_by_id, // Sender
-      user_id: deliveryDetails?.userId || primaryReceiverId, // Default secondary receiver fallback
-      date_issued: deliveryDetails?.dateIssued,
+      cart: activeCart.map((c, index) => {
+        const itemKey = c.key !== undefined && c.key !== null ? String(c.key) : String(index);
+        const assetId = c.serialized_asset_id || c.id;
+        const attachKey = c.attachToKey || c.attach_to_key ? String(c.attachToKey || c.attach_to_key) : null;
+        const secondaryUserId = c.user_id || c.userId || c.secondary_user_id || defaultSecondaryUserId;
+
+        return {
+          key: itemKey,
+          serialized_asset_id: Number(assetId),
+          attach_to_key: attachKey,
+          user_id: secondaryUserId ? Number(secondaryUserId) : null,
+        };
+      }),
+      received_mr_by_id: primaryReceiverId ? Number(primaryReceiverId) : null,
+      issued_by_id: issuerId ? Number(issuerId) : null,
+      user_id: defaultSecondaryUserId ? Number(defaultSecondaryUserId) : null,
+      date_issued: deliveryDetails?.dateIssued || new Date().toISOString().split('T')[0],
       remarks: deliveryDetails?.remarks || null,
     };
 
     handleApiCall('/accountability/issue-asset', payload, (response) => {
-      onSuccess(response?.receipts || []);
+      if (onSuccess) {
+        onSuccess(response?.receipts || []);
+      }
     }).finally(() => setSubmitting(false));
   };
 
@@ -84,22 +111,24 @@ export default function CartReview({
             {items.length} item(s) — printed on receipt
           </span>
         </div>
-        {items.map((item) => {
-          const attached = findAttached(item.attachToKey);
+        {items.map((item, idx) => {
+          const itemKey = item.key !== undefined && item.key !== null ? String(item.key) : String(idx);
+          const attached = findAttached(item.attachToKey || item.attach_to_key);
           const secondaryReceiver =
             item.secondary_receiver_user?.name ||
+            item.secondaryUser?.name ||
             deliveryDetails?.primaryReceiverUser?.name ||
             deliveryDetails?.recipientUser?.name ||
             'Assigned Recipient';
 
           return (
             <div
-              key={item.key}
+              key={itemKey}
               className="flex flex-col sm:flex-row sm:items-center justify-between rounded-md border p-3 text-sm gap-3 bg-card"
             >
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{item.name}</span>
+                  <span className="font-medium">{item.name || item.item?.name || 'Serialized Asset'}</span>
                   {item.property_number && (
                     <span className="text-xs text-muted-foreground font-mono">
                       ({item.property_number})
@@ -120,7 +149,7 @@ export default function CartReview({
                   {attached && (
                     <span className="text-muted-foreground flex items-center gap-1">
                       <Paperclip className="h-3 w-3 shrink-0" />
-                      Attached to: {attached.name}
+                      Attached to: {attached.name || attached.item?.name || 'Primary Asset'}
                     </span>
                   )}
                 </div>
@@ -203,7 +232,7 @@ export default function CartReview({
             <CalendarIcon className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <div>
               <p className="text-xs text-muted-foreground">Date Issued</p>
-              <p className="font-medium text-foreground">{deliveryDetails?.dateIssued}</p>
+              <p className="font-medium text-foreground">{deliveryDetails?.dateIssued || 'N/A'}</p>
             </div>
           </div>
 

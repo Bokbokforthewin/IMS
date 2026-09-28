@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, NotebookPen, CheckCircle2, ShoppingCart } from 'lucide-react';
 
 import AssetCatalogBrowse from '../components/assets/AssetCatalogBrowse.jsx';
 import DeliveryForm from '../components/assets/DeliveryForm.jsx';
@@ -137,61 +136,8 @@ export default function AccountabilityPage({ activeTab, handleApiCall }) {
     setRefreshKey((k) => k + 1);
   };
 
-  // Helper for Stepper UI
-  const stepsMap = [
-    { id: 'browse', label: '1. Select Assets', icon: Package },
-    { id: 'delivery', label: '2. Asset Info', icon: NotebookPen },
-    { id: 'review', label: '3. Review & Issue', icon: CheckCircle2 },
-  ];
-
-  const currentStepIdx = stepsMap.findIndex((s) => s.id === step);
-
   const renderWizardContent = () => (
     <div className="space-y-6">
-      {/* Visual Stepper Header */}
-      <div className="bg-card border rounded-lg p-4 shadow-2xs">
-        <div className="flex items-center justify-between max-w-2xl mx-auto">
-          {stepsMap.map((s, idx) => {
-            const Icon = s.icon;
-            const isActive = step === s.id;
-            const isDone = idx < currentStepIdx;
-
-            return (
-              <React.Fragment key={s.id}>
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                      isActive
-                        ? 'bg-primary text-primary-foreground shadow-xs'
-                        : isDone
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <span
-                    className={`text-xs font-medium hidden sm:inline ${
-                      isActive ? 'text-foreground font-semibold' : 'text-muted-foreground'
-                    }`}
-                  >
-                    {s.label}
-                  </span>
-                </div>
-
-                {idx < stepsMap.length - 1 && (
-                  <div
-                    className={`flex-1 h-0.5 mx-2 sm:mx-4 transition-colors ${
-                      idx < currentStepIdx ? 'bg-emerald-600' : 'bg-muted'
-                    }`}
-                  />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Step 1: Browse Catalog */}
       {step === 'browse' && (
         <AssetCatalogBrowse

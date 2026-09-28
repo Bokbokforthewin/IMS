@@ -322,7 +322,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                   className="text-[11px] font-normal gap-1 bg-primary/10 text-primary border-primary/20"
                                 >
                                   <UserCheck className="h-3 w-3 shrink-0" />
-                                  Secondary Receiver:
+                                  End User:
                                   <strong className="font-semibold text-foreground">
                                     {primarySecondaryHolder}
                                   </strong>

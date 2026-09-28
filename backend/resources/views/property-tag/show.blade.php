@@ -52,12 +52,15 @@
 <body class="bg-slate-50/50 text-slate-900 font-sans antialiased min-h-screen p-4 sm:p-8">
 
     @php
-        // Safely extract the latest receipt line if the controller only passed the $asset
+        // Extract latest receipt line if needed
         $line = $line ?? $asset->lines()->latest()->first() ?? null;
         $attached = $attached ?? collect();
+
+        // Exact End User / Secondary User logic as used in XLSX export
+        $secondaryUser = $asset->currentHolder ?? $asset->secondaryUser ?? null;
     @endphp
 
-    <!-- Container Card (shadcn Card equivalent) -->
+    <!-- Container Card -->
     <div class="max-w-2xl mx-auto bg-white rounded-xl border border-slate-200/80 shadow-sm print-shadow-none overflow-hidden">
         
         <!-- Header / Banner -->
@@ -188,19 +191,22 @@
                             </td>
                         </tr>
 
-                        <!-- Current User Row -->
+                        <!-- End User / Current User Row -->
                         <tr class="hover:bg-slate-50/50 transition-colors">
-                            <th class="px-4 py-3 text-left font-medium text-slate-500 bg-slate-50/50 text-xs uppercase tracking-wider">Current User</th>
+                            <th class="px-4 py-3 text-left font-medium text-slate-500 bg-slate-50/50 text-xs uppercase tracking-wider">End User</th>
                             <td class="px-4 py-3">
-                                @if($asset->currentUser)
-                                    <div class="font-semibold text-slate-900">{{ $asset->currentUser->name }}</div>
-                                    <div class="text-xs text-slate-500">{{ $asset->currentUser->designation }}</div>
+                                @if($secondaryUser && !empty($secondaryUser->name))
+                                    <div class="font-semibold text-slate-900">{{ $secondaryUser->name }}</div>
+                                    @if(!empty($secondaryUser->designation))
+                                        <div class="text-xs text-slate-500">{{ $secondaryUser->designation }}</div>
+                                    @endif
                                 @else
-                                    <span class="text-xs text-slate-400 italic">Not Assigned / Stock</span>
+                                    <span class="text-xs text-slate-400 italic">No End User Assigned</span>
                                 @endif
                             </td>
                         </tr>
 
+                        <!-- Issued To Row (Accountable Officer / Primary) -->
                         @if($line && $line->receipt)
                             <tr class="hover:bg-slate-50/50 transition-colors">
                                 <th class="px-4 py-3 text-left font-medium text-slate-500 bg-slate-50/50 text-xs uppercase tracking-wider">Issued To</th>
@@ -272,7 +278,7 @@
             @endif
         </div>
 
-        <!-- Footer / Actions (shadcn CardFooter style) -->
+        <!-- Footer / Actions -->
         <div class="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
             <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
                 {{ config('app.name') }}
@@ -280,7 +286,7 @@
             
             <button 
                 onclick="window.print()" 
-                class="no-print inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-xs font-medium text-slate-50 shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 disabled:pointer-events-none disabled:opacity-50">
+                class="no-print inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-xs font-medium text-slate-50 shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950">
                 <svg class="mr-2 h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231a1.125 1.125 0 0 1-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.656" />
                 </svg>

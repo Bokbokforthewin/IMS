@@ -61,13 +61,13 @@ class AccountabilityController extends Controller
     {
         $validated = $request->validate([
             'cart' => 'required|array|min:1',
-            'cart.*.key' => 'required|string',
+            'cart.*.key' => 'required',
             'cart.*.serialized_asset_id' => 'required|exists:serialized_assets,id',
-            'cart.*.attach_to_key' => 'nullable|string',
-            'cart.*.user_id' => 'nullable|exists:users,id',      // Secondary Receiver per item
-            'user_id' => 'nullable|exists:users,id',              // Secondary Receiver default
-            'received_mr_by_id' => 'required|exists:users,id',    // Primary Receiver (PAR/ICS Signatory)
-            'issued_by_id' => 'required|exists:users,id',         // Issuer / Property Officer
+            'cart.*.attach_to_key' => 'nullable',
+            'cart.*.user_id' => 'nullable|exists:users,id',
+            'user_id' => 'nullable|exists:users,id',
+            'received_mr_by_id' => 'required|exists:users,id',
+            'issued_by_id' => 'required|exists:users,id',
             'date_issued' => 'required|date',
             'remarks' => 'nullable|string|max:1000',
         ]);
@@ -89,12 +89,11 @@ class AccountabilityController extends Controller
                             ->first();
 
                         if (!$asset || $asset->status !== 'Available' || $asset->current_holder_id) {
-                            return response()->json([
-                                'error' => "Asset #{$cartItem['serialized_asset_id']} is no longer available for issuance."
-                            ], 422);
+                            throw new \Exception("Asset #{$cartItem['serialized_asset_id']} is no longer available for issuance.");
                         }
 
-                        $resolvedByKey[$cartItem['key']] = $asset;
+                        $cartKey = (string) $cartItem['key'];
+                        $resolvedByKey[$cartKey] = $asset;
                     }
 
                     // Pass 2: Link attachments and segregate items into PAR (>= 50k) and ICS (< 50k) buckets
@@ -102,13 +101,14 @@ class AccountabilityController extends Controller
                     $icsLines = [];
 
                     foreach ($validated['cart'] as $cartItem) {
-                        $key = $cartItem['key'];
+                        $key = (string) $cartItem['key'];
                         $asset = $resolvedByKey[$key];
 
                         // Resolve parent attachment property number
                         $attachTo = null;
-                        if (!empty($cartItem['attach_to_key']) && isset($resolvedByKey[$cartItem['attach_to_key']])) {
-                            $attachTo = $resolvedByKey[$cartItem['attach_to_key']]->property_number;
+                        $attachKey = isset($cartItem['attach_to_key']) ? (string) $cartItem['attach_to_key'] : null;
+                        if (!empty($attachKey) && isset($resolvedByKey[$attachKey])) {
+                            $attachTo = $resolvedByKey[$attachKey]->property_number;
                         }
 
                         // Secondary Receiver priority: Item level -> Form default -> Primary Receiver
@@ -163,7 +163,7 @@ class AccountabilityController extends Controller
                         $receipt = AccountabilityReceipt::create([
                             'receipt_type' => $receiptType,
                             'document_number' => $documentNumber,
-                            'user_id' => $validated['user_id'] ?? $validated['received_mr_by_id'], // Secondary/Default Recipient
+                            'user_id' => $validated['user_id'] ?? $validated['received_mr_by_id'],
                             'issued_by_id' => $validated['issued_by_id'],
                             'received_mr_by_id' => $validated['received_mr_by_id'],
                             'date_issued' => $dateIssued,
@@ -211,7 +211,7 @@ class AccountabilityController extends Controller
                 return response()->json(['error' => 'Failed to issue asset(s): ' . $e->getMessage()], 500);
             } catch (\Exception $e) {
                 Log::error('General failure during asset issuance: ' . $e->getMessage());
-                return response()->json(['error' => 'Failed to issue asset(s): ' . $e->getMessage()], 500);
+                return response()->json(['error' => $e->getMessage()], 422);
             }
         }
 

@@ -7,10 +7,34 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AccountabilityExcelService
 {
+    // Page geometry, used ONLY to estimate how many item rows fit on a page.
+    // Letter portrait is the smallest common paper, so the estimate stays safe for A4/Legal too.
+    protected const PAPER_WIDTH_IN = 8.5;
+    protected const PAPER_HEIGHT_IN = 11.0;
+    protected const MARGIN_LEFT_IN = 0.4;
+    protected const MARGIN_RIGHT_IN = 0.4;
+    protected const MARGIN_TOP_IN = 0.5;
+    protected const MARGIN_BOTTOM_IN = 0.6;
+    protected const FOOTER_MARGIN_IN = 0.25;
+
+    // Only fill this fraction of the estimated page. The cushion stops Excel from
+    // inserting its own automatic break just ahead of ours (which would leave a near-empty page).
+    protected const PAGE_FILL_RATIO = 0.92;
+
+    // Fixed row heights in points, so the page estimate is exact rather than guessed.
+    protected const PAR_TOP_BLOCK_HEIGHT = 130;  // rows 1-8: appendix, title, entity, fund cluster, description
+    protected const PAR_HEADER_HEIGHT = 24;      // column heading row (repeats on every page)
+    protected const PAR_TAIL_HEIGHT = 150;       // total row + signature block
+
+    protected const ICS_TOP_BLOCK_HEIGHT = 100;  // rows 1-6
+    protected const ICS_HEADER_HEIGHT = 40;      // two merged heading rows (repeat on every page)
+    protected const ICS_TAIL_HEIGHT = 165;       // total row + signature block
+
     protected array $thinBorder = [
         'borders' => [
             'allBorders' => [
@@ -48,18 +72,110 @@ class AccountabilityExcelService
         return $totalLines;
     }
 
-    protected function setRowHeightForText($sheet, int $row, string $text, int $columnCharWidth = 45): void
+    protected function calculateRowHeight(string $text, int $columnCharWidth): float
     {
         $lineCount = $this->calculateWrappedLines($text, $columnCharWidth);
-        $sheet->getRowDimension($row)->setRowHeight(max(30, ($lineCount * 15) + 10));
+        return (float) max(30, ($lineCount * 15) + 10);
     }
 
     /**
-     * Builds the multi-line description cell for a single receipt line.
-     * If this asset is bundled with something on a DIFFERENT document
-     * (e.g. a mouse on the ICS attached to a PC on the PAR), that's noted
-     * as a cross-reference only — the bundled item is never nested here.
+     * Estimates how many points of sheet content fit on one printed page, based on
+     * the actual column widths. Because the sheet is fit-to-width, wider columns shrink
+     * the print scale, which lets MORE rows fit vertically, so this adapts if you tweak widths.
      */
+    protected function calculatePageBudget(array $columnWidths): float
+    {
+        // Excel column width (characters) -> pixels -> points
+        $contentWidthPt = array_sum(array_map(fn ($w) => (7 * $w + 5) * 0.75, $columnWidths));
+        $printableWidthPt = (self::PAPER_WIDTH_IN - self::MARGIN_LEFT_IN - self::MARGIN_RIGHT_IN) * 72;
+        $scale = min(1.0, $printableWidthPt / $contentWidthPt);
+
+        $printableHeightPt = (self::PAPER_HEIGHT_IN - self::MARGIN_TOP_IN - self::MARGIN_BOTTOM_IN) * 72;
+
+        return floor(($printableHeightPt / $scale) * self::PAGE_FILL_RATIO);
+    }
+
+    /**
+     * Splits item rows into pages.
+     *
+     * @param float[] $rowHeights  height of each item row, in order
+     * @return int[][]             list of pages; each page is a list of item indexes
+     */
+    protected function planPages(
+        array $rowHeights,
+        float $budget,
+        float $firstPageOverhead,
+        float $otherPageOverhead,
+        float $tailHeight
+    ): array {
+        $pages = [];
+        $current = [];
+        $used = 0.0;
+        $capacity = $budget - $firstPageOverhead;
+
+        foreach ($rowHeights as $i => $height) {
+            if (!empty($current) && $used + $height > $capacity) {
+                $pages[] = $current;
+                $current = [];
+                $used = 0.0;
+                $capacity = $budget - $otherPageOverhead;
+            }
+            $current[] = $i;
+            $used += $height;
+        }
+        if (!empty($current)) {
+            $pages[] = $current;
+        }
+        if (empty($pages)) {
+            return [[]];
+        }
+
+        // The total row + signature block must never be split from the items or stranded alone.
+        // If they don't fit under the last item row, move that last item onto a fresh page with them.
+        $lastKey = array_key_last($pages);
+        $lastPage = $pages[$lastKey];
+        $lastCapacity = ($lastKey === 0) ? $budget - $firstPageOverhead : $budget - $otherPageOverhead;
+        $lastUsed = array_sum(array_map(fn ($i) => $rowHeights[$i], $lastPage));
+
+        if ($lastUsed + $tailHeight > $lastCapacity && count($lastPage) > 1) {
+            $moved = array_pop($lastPage);
+            $pages[$lastKey] = $lastPage;
+            $pages[] = [$moved];
+        }
+
+        return $pages;
+    }
+
+    /**
+     * Applies manual page breaks, repeating column headings, and the page-number footer.
+     * The footer and repeated headings only apply when the document spans more than one page.
+     */
+    protected function applyPrintLayout(
+        Worksheet $sheet,
+        array $pages,
+        array $lineRows,
+        int $repeatFromRow,
+        int $repeatToRow,
+        string $documentNumber
+    ): void {
+        $pageCount = count($pages);
+
+        // Break AFTER the last item row of every page except the final one.
+        for ($p = 0; $p < $pageCount - 1; $p++) {
+            $page = $pages[$p];
+            $lastIndexOnPage = $page[array_key_last($page)];
+            $sheet->setBreak('A' . $lineRows[$lastIndexOnPage], Worksheet::BREAK_ROW);
+        }
+
+        if ($pageCount > 1) {
+            $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd($repeatFromRow, $repeatToRow);
+
+            // '&' is a control character in header/footer strings, so literal ampersands are doubled.
+            $doc = str_replace('&', '&&', $documentNumber);
+            $sheet->getHeaderFooter()->setOddFooter('&L' . $doc . '&CPage &P of &N');
+        }
+    }
+
     protected function buildLineDescription($line, $index, $totalLines): string
     {
         $asset = $line->serializedAsset;
@@ -89,8 +205,10 @@ class AccountabilityExcelService
         if (!empty($item->specifications)) {
             $lines[] = $item->specifications;
         }
-        if (!empty($asset->user_id)) {
-            $lines[] = "End User: {$asset->user_id}";
+
+        $secondaryUser = $asset->currentHolder ?? $asset->secondaryUser ?? null;
+        if ($secondaryUser && !empty($secondaryUser->name)) {
+            $lines[] = "End User: {$secondaryUser->name}";
         }
 
         if (!empty($asset->attached_to)) {
@@ -105,14 +223,16 @@ class AccountabilityExcelService
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->getPageSetup()->setOrientation(PageSetup::ORIENTATION_PORTRAIT);
-        $sheet->getPageMargins()->setLeft(0.4)->setRight(0.4)->setTop(0.5)->setBottom(0.5);
+        $sheet->getPageMargins()
+            ->setLeft(self::MARGIN_LEFT_IN)->setRight(self::MARGIN_RIGHT_IN)
+            ->setTop(self::MARGIN_TOP_IN)->setBottom(self::MARGIN_BOTTOM_IN)
+            ->setFooter(self::FOOTER_MARGIN_IN);
 
-        $sheet->getColumnDimension('A')->setWidth(14);
-        $sheet->getColumnDimension('B')->setWidth(14);
-        $sheet->getColumnDimension('C')->setWidth(45);
-        $sheet->getColumnDimension('D')->setWidth(20);
-        $sheet->getColumnDimension('E')->setWidth(14);
-        $sheet->getColumnDimension('F')->setWidth(16);
+        // Change column widths here — the page estimate below follows automatically.
+        $widths = ['A' => 14, 'B' => 14, 'C' => 45, 'D' => 20, 'E' => 14, 'F' => 16];
+        foreach ($widths as $col => $w) {
+            $sheet->getColumnDimension($col)->setWidth($w);
+        }
 
         $sheet->setCellValue('F1', 'Appendix 71');
         $sheet->getStyle('F1')->getFont()->setItalic(true);
@@ -143,27 +263,45 @@ class AccountabilityExcelService
         foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $i => $col) {
             $sheet->setCellValue("{$col}{$headerRow}", $headers[$i]);
         }
+        $sheet->getRowDimension($headerRow)->setRowHeight(self::PAR_HEADER_HEIGHT);
         $sheet->getStyle("A{$headerRow}:F{$headerRow}")->getFont()->setBold(true);
         $sheet->getStyle("A{$headerRow}:F{$headerRow}")->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setVertical(Alignment::VERTICAL_CENTER);
         $sheet->getStyle("A{$headerRow}:F{$headerRow}")->applyFromArray($this->thinBorder);
 
+        // --- Plan the pages before writing rows, so every row height is known up front ---
+        $lines = $receipt->lines->values();
+        $totalLines = $lines->count();
+
+        $descriptions = [];
+        $rowHeights = [];
+        foreach ($lines as $index => $line) {
+            $descriptions[$index] = $this->buildLineDescription($line, $index, $totalLines);
+            $rowHeights[$index] = $this->calculateRowHeight($descriptions[$index], $widths['C']);
+        }
+
+        $pages = $this->planPages(
+            $rowHeights,
+            $this->calculatePageBudget($widths),
+            self::PAR_TOP_BLOCK_HEIGHT + self::PAR_HEADER_HEIGHT,
+            self::PAR_HEADER_HEIGHT,
+            self::PAR_TAIL_HEIGHT
+        );
+
         $row = $headerRow + 1;
         $grandTotal = 0;
-        $lines = $receipt->lines;
-        $totalLines = $lines->count();
+        $lineRows = [];
 
         foreach ($lines as $index => $line) {
             $asset = $line->serializedAsset;
             $unitCost = (float) $asset->unit_cost * $line->quantity;
             $grandTotal += $unitCost;
-
-            $description = $this->buildLineDescription($line, $index, $totalLines);
+            $lineRows[$index] = $row;
 
             $sheet->setCellValue("A{$row}", $line->quantity);
             $sheet->setCellValue("B{$row}", $asset->item->unit_of_measure ?? 'Unit');
-            $sheet->setCellValue("C{$row}", $description);
+            $sheet->setCellValue("C{$row}", $descriptions[$index]);
             $sheet->setCellValue("D{$row}", $asset->property_number ?? 'N/A');
             $sheet->setCellValue("E{$row}", $asset->created_at?->format('n/j/Y'));
             $sheet->setCellValue("F{$row}", $unitCost);
@@ -177,7 +315,7 @@ class AccountabilityExcelService
             }
 
             $sheet->getStyle("A{$row}:F{$row}")->applyFromArray($this->thinBorder);
-            $this->setRowHeightForText($sheet, $row, $description, 45);
+            $sheet->getRowDimension($row)->setRowHeight($rowHeights[$index]);
 
             $row++;
         }
@@ -243,6 +381,8 @@ class AccountabilityExcelService
         $sheet->getPageSetup()->setFitToWidth(1);
         $sheet->getPageSetup()->setFitToHeight(0);
 
+        $this->applyPrintLayout($sheet, $pages, $lineRows, $headerRow, $headerRow, $receipt->document_number);
+
         return $spreadsheet;
     }
 
@@ -251,15 +391,16 @@ class AccountabilityExcelService
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->getPageSetup()->setOrientation(PageSetup::ORIENTATION_PORTRAIT);
-        $sheet->getPageMargins()->setLeft(0.4)->setRight(0.4)->setTop(0.5)->setBottom(0.5);
+        $sheet->getPageMargins()
+            ->setLeft(self::MARGIN_LEFT_IN)->setRight(self::MARGIN_RIGHT_IN)
+            ->setTop(self::MARGIN_TOP_IN)->setBottom(self::MARGIN_BOTTOM_IN)
+            ->setFooter(self::FOOTER_MARGIN_IN);
 
-        $sheet->getColumnDimension('A')->setWidth(14);
-        $sheet->getColumnDimension('B')->setWidth(14);
-        $sheet->getColumnDimension('C')->setWidth(12);
-        $sheet->getColumnDimension('D')->setWidth(12);
-        $sheet->getColumnDimension('E')->setWidth(38);
-        $sheet->getColumnDimension('F')->setWidth(16);
-        $sheet->getColumnDimension('G')->setWidth(14);
+        // Change column widths here — the page estimate below follows automatically.
+        $widths = ['A' => 14, 'B' => 14, 'C' => 12, 'D' => 12, 'E' => 38, 'F' => 16, 'G' => 14];
+        foreach ($widths as $col => $w) {
+            $sheet->getColumnDimension($col)->setWidth($w);
+        }
 
         $sheet->setCellValue('G1', 'Appendix 59');
         $sheet->getStyle('G1')->getFont()->setItalic(true);
@@ -283,6 +424,8 @@ class AccountabilityExcelService
 
         $headerTop = 7;
         $headerSub = 8;
+        $sheet->getRowDimension($headerTop)->setRowHeight(self::ICS_HEADER_HEIGHT / 2);
+        $sheet->getRowDimension($headerSub)->setRowHeight(self::ICS_HEADER_HEIGHT / 2);
 
         $sheet->mergeCells("A{$headerTop}:A{$headerSub}");
         $sheet->setCellValue("A{$headerTop}", 'Quantity');
@@ -311,10 +454,28 @@ class AccountabilityExcelService
             ->setWrapText(true);
         $sheet->getStyle("A{$headerTop}:G{$headerSub}")->applyFromArray($this->thinBorder);
 
+        // --- Plan the pages before writing rows, so every row height is known up front ---
+        $lines = $receipt->lines->values();
+        $totalLines = $lines->count();
+
+        $descriptions = [];
+        $rowHeights = [];
+        foreach ($lines as $index => $line) {
+            $descriptions[$index] = $this->buildLineDescription($line, $index, $totalLines);
+            $rowHeights[$index] = $this->calculateRowHeight($descriptions[$index], $widths['E']);
+        }
+
+        $pages = $this->planPages(
+            $rowHeights,
+            $this->calculatePageBudget($widths),
+            self::ICS_TOP_BLOCK_HEIGHT + self::ICS_HEADER_HEIGHT,
+            self::ICS_HEADER_HEIGHT,
+            self::ICS_TAIL_HEIGHT
+        );
+
         $row = $headerSub + 1;
         $grandTotal = 0;
-        $lines = $receipt->lines;
-        $totalLines = $lines->count();
+        $lineRows = [];
 
         foreach ($lines as $index => $line) {
             $asset = $line->serializedAsset;
@@ -322,14 +483,13 @@ class AccountabilityExcelService
             $unitCost = (float) $asset->unit_cost;
             $totalCost = $unitCost * $line->quantity;
             $grandTotal += $totalCost;
-
-            $description = $this->buildLineDescription($line, $index, $totalLines);
+            $lineRows[$index] = $row;
 
             $sheet->setCellValue("A{$row}", $line->quantity);
             $sheet->setCellValue("B{$row}", $item->unit_of_measure ?? 'Unit');
             $sheet->setCellValue("C{$row}", $unitCost);
             $sheet->setCellValue("D{$row}", $totalCost);
-            $sheet->setCellValue("E{$row}", $description);
+            $sheet->setCellValue("E{$row}", $descriptions[$index]);
             $sheet->setCellValue("F{$row}", $item->item_code ?? '');
             $sheet->setCellValue("G{$row}", $item->estimated_useful_life ?? 'N/A');
 
@@ -343,7 +503,7 @@ class AccountabilityExcelService
             }
 
             $sheet->getStyle("A{$row}:G{$row}")->applyFromArray($this->thinBorder);
-            $this->setRowHeightForText($sheet, $row, $description, 38);
+            $sheet->getRowDimension($row)->setRowHeight($rowHeights[$index]);
 
             $row++;
         }
@@ -416,6 +576,8 @@ class AccountabilityExcelService
         $sheet->getPageSetup()->setPrintArea("A1:G{$row}");
         $sheet->getPageSetup()->setFitToWidth(1);
         $sheet->getPageSetup()->setFitToHeight(0);
+
+        $this->applyPrintLayout($sheet, $pages, $lineRows, $headerTop, $headerSub, $receipt->document_number);
 
         return $spreadsheet;
     }
