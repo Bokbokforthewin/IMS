@@ -40,10 +40,36 @@ function money(n) {
     : 'N/A';
 }
 
+// Fallback API handler if handleApiCall is not supplied by parent
+const defaultApiCall = async (url, options = {}) => {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const headers = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `Request failed with status ${response.status}`);
+  }
+
+  return response.json();
+};
+
 export default function StockStatusGrid({
   stockStatus,
   onChanged,
-  handleApiCall,
+  handleApiCall = defaultApiCall,
   onIssued,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -143,50 +169,69 @@ export default function StockStatusGrid({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-4">
             {filteredStock.map((stock) => {
               const isOutOfStock =
-                !stock.total_stock || stock.total_stock <= 0;
+                !stock.total_stock || Number(stock.total_stock) <= 0;
 
               return (
-                <Card key={stock.id} className="flex flex-col justify-between">
-                  {/* Item Header: Name & Status Badge side-by-side */}
-                  <CardHeader className="space-y-0 pb-3">
+                <Card key={stock.id} className="flex flex-col justify-between shadow-xs">
+                  {/* Item Header: Name & Status Badge */}
+                  <CardHeader className="space-y-0 pb-2">
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-base font-semibold leading-snug">
+                      <CardTitle className="text-base font-semibold leading-snug line-clamp-2">
                         {stock.name}
                       </CardTitle>
                       <Badge
                         variant={getStatusVariant(stock.status)}
-                        className="shrink-0"
+                        className="shrink-0 text-[10px]"
                       >
                         {stock.status || 'OK'}
                       </Badge>
                     </div>
                   </CardHeader>
 
-                  {/* Item Body: Details Link */}
-                  <CardContent className="flex-1 pb-4">
-                    <Button
-                      variant="link"
-                      className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => openDetails(stock)}
-                    >
-                      View Details
-                    </Button>
+                  {/* Item Details Summary */}
+                  <CardContent className="py-2 space-y-1.5 text-xs text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Code:</span>
+                      <span className="font-mono text-foreground">{stock.item_code || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>In Stock:</span>
+                      <span className="font-semibold text-foreground">
+                        {stock.total_stock ?? 0} {stock.unit_of_measure || ''}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Unit Cost:</span>
+                      <span className="font-medium text-foreground">{money(stock.cost)}</span>
+                    </div>
                   </CardContent>
 
                   {/* Item Actions */}
-                  <CardFooter className="flex flex-col gap-2 pt-0">
-                    <Button
-                      className="w-full"
-                      onClick={() => openIssue(stock)}
-                      disabled={isOutOfStock}
-                    >
-                      {isOutOfStock ? 'Out of Stock' : 'Issue'}
-                    </Button>
+                  <CardFooter className="flex flex-col gap-2 pt-2 border-t">
+                    <div className="flex w-full gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1 text-xs"
+                        onClick={() => openDetails(stock)}
+                      >
+                        Details
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 text-xs"
+                        onClick={() => openIssue(stock)}
+                        disabled={isOutOfStock}
+                      >
+                        {isOutOfStock ? 'Out of Stock' : 'Issue'}
+                      </Button>
+                    </div>
 
                     <div className="flex w-full gap-2">
                       <Button
                         variant="outline"
-                        className="flex-1"
+                        size="sm"
+                        className="flex-1 text-xs"
                         onClick={() => openEdit(stock)}
                       >
                         Edit
@@ -194,7 +239,8 @@ export default function StockStatusGrid({
 
                       <Button
                         variant="destructive"
-                        className="flex-1"
+                        size="sm"
+                        className="flex-1 text-xs"
                         onClick={() => openDelete(stock)}
                       >
                         Delete
@@ -222,8 +268,8 @@ export default function StockStatusGrid({
 
             {detailsItem && (
               <div className="max-h-[60vh] overflow-y-auto">
-                <div className="rounded-md border p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="rounded-md border p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3 border-b pb-3">
                     <div>
                       <p className="text-sm font-medium">
                         {detailsItem.name}
@@ -305,6 +351,7 @@ export default function StockStatusGrid({
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Issue Consumables Modal */}
         <IssueConsumablesModal
           isOpen={isIssueOpen}
           onClose={() => setIsIssueOpen(false)}
@@ -313,17 +360,21 @@ export default function StockStatusGrid({
           onSuccess={handleIssued}
         />
 
+        {/* Edit Reorder Level Modal */}
         <EditReorderLevelModal
           isOpen={isEditOpen}
           onClose={() => setIsEditOpen(false)}
           item={editingItem}
+          handleApiCall={handleApiCall}
           onSaved={handleChanged}
         />
 
+        {/* Delete Item Modal */}
         <DeleteItemModal
           isOpen={isDeleteOpen}
           onClose={() => setIsDeleteOpen(false)}
           item={deletingItem}
+          handleApiCall={handleApiCall}
           onDeleted={handleChanged}
         />
       </CardContent>

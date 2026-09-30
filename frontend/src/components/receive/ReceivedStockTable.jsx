@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import api from '@/api/client'; // Import your centralized Axios client
 import EditReceivedItemModal from './EditReceivedItemModal.jsx';
 import DeleteReceivedItemModal from './DeleteReceivedItemModal.jsx';
 
@@ -6,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -23,17 +23,12 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 
-const API_BASE_URL = '/api/v1';
-
 function money(n) {
   return `₱${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 }
 
 /**
- * Groups received-history rows into: primary rows (their asset has no
- * attached_to, or points to nothing in this list) and, for each, the
- * child rows whose attached_to matches the primary's property number —
- * same mechanism as the accountability receipts grouping.
+ * Groups received-history rows into primary rows and child rows
  */
 function groupHistory(history) {
   const byReference = {};
@@ -76,9 +71,18 @@ export default function ReceivedStockTable({ refreshKey }) {
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/inventory/received-history?per_page=50`);
-      const json = await res.json();
-      setHistory(Array.isArray(json.data) ? json.data : []);
+      // Using centralized Axios client (api base is '/api', so path is '/v1/inventory/...')
+      const res = await api.get('/v1/inventory/received-history?per_page=50');
+      
+      // Handles both paginated (res.data.data) and non-paginated (res.data) responses
+      const payload = res.data;
+      const dataList = Array.isArray(payload) 
+        ? payload 
+        : Array.isArray(payload?.data) 
+          ? payload.data 
+          : [];
+
+      setHistory(dataList);
     } catch (err) {
       console.error('Failed to fetch received history:', err);
       setHistory([]);
@@ -111,12 +115,12 @@ export default function ReceivedStockTable({ refreshKey }) {
 
   return (
     <div className="receive-panel">
-      <h2 className="receive-panel__title">Received Stocks & Assets</h2>
+      <h2 className="receive-panel__title text-xl font-bold mb-4">Received Stocks & Assets</h2>
 
-      {loadingHistory && <p className="receive-table__loading">Loading...</p>}
+      {loadingHistory && <p className="receive-table__loading text-muted-foreground">Loading...</p>}
 
       {!loadingHistory && grouped.length === 0 && (
-        <p className="receive-table__empty">No received records found.</p>
+        <p className="receive-table__empty text-muted-foreground">No received records found.</p>
       )}
 
       {!loadingHistory && grouped.length > 0 && (
@@ -125,15 +129,15 @@ export default function ReceivedStockTable({ refreshKey }) {
             const isBundled = children.length > 0;
 
             return (
-              <Card key={`${primary.type}-${primary.id}`}>
+              <Card key={`${primary.type}-${primary.id}`} className="flex flex-col justify-between">
                 <CardHeader>
-                  <CardAction className="flex gap-1">
+                  <div className="flex items-center gap-1.5 mb-2">
                     <Badge variant={primary.type === 'Asset' ? 'default' : 'secondary'}>
                       {primary.type}
                     </Badge>
                     {isBundled && <Badge variant="outline">Bundled</Badge>}
-                  </CardAction>
-                  <CardTitle>{primary.item_name}</CardTitle>
+                  </div>
+                  <CardTitle className="text-base">{primary.item_name}</CardTitle>
                   <CardDescription>
                     {primary.item_code} &middot; Ref: {primary.reference_no || 'N/A'}
                   </CardDescription>
@@ -185,7 +189,7 @@ export default function ReceivedStockTable({ refreshKey }) {
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
             {allDetailRows.map(row => (
               <div key={`${row.type}-${row.id}`} className="border rounded-md p-3">
                 <div className="flex items-center justify-between mb-2">

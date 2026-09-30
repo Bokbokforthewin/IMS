@@ -1,34 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+
+// Auth & API Client
+import { useAuth } from './context/AuthContext';
+import api from './api/client';
+
+// Route Guards
+import ProtectedRoute from './auth/ProtectedRoute';
+import GuestRoute from './auth/GuestRoute';
+
+// Layout & Core Pages
 import Layout from './components/Layout';
+import LoginPage from './auth/LoginPage';
+import RegisterPage from './auth/RegisterPage';
+
+// Feature Pages
 import DashboardPage from './pages/DashboardPage';
 import CatalogPage from './pages/CatalogPage';
 import ReceivePage from './pages/ReceivePage';
 import ConsumablesPage from './pages/ConsumablesPage';
 import AccountabilityPage from './pages/AccountabilityPage';
 import TransferReturnPage from './pages/TransferReturnPage';
+import UserManagementPage from './pages/UserManagementPage';
+
+// UI Notifications
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 
-const API_BASE_URL = '/api/v1';
-
 export default function App() {
-  // Set default activeTab to Dashboard Overview
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard-overview');
 
-  // Shared state variables
+  // Shared System Data States
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
   const [stockBatches, setStockBatches] = useState([]);
   const [serializedAssets, setSerializedAssets] = useState([]);
 
-  // Form states
+  // Form States
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
   const [itemForm, setItemForm] = useState({ 
-    category_id: '', 
-    name: '', 
-    unit_of_measure: '', 
-    reorder_level: '', 
-    is_serialized: false 
+    category_id: '', name: '', unit_of_measure: '', reorder_level: '', is_serialized: false 
   });
   const [receiveForm, setReceiveForm] = useState({
     item_id: '', unit_cost: '', arrival_date: '', tracking_type: '',
@@ -36,149 +48,160 @@ export default function App() {
     manufacturer_name: '', country_of_origin: '', estimated_useful_life: ''
   });
   const [accountabilityForm, setAccountabilityForm] = useState({ 
-    serialized_asset_id: '', 
-    user_id: '', 
-    issued_by_id: '', 
-    date_issued: '', 
-    remarks: '' 
-  });
-  
-  const [transferForm, setTransferForm] = useState({
-    serialized_asset_id: '',
-    transfer_type: 'RETURN',
-    from_office: '',
-    to_office: '',
-    reason: '',
-    transfer_date: '',
-    remarks: ''
+    serialized_asset_id: '', user_id: '', issued_by_id: '', date_issued: '', remarks: '' 
   });
 
-  const parseJsonArray = async (res) => {
-    try {
-      const json = await res.json();
-      if (Array.isArray(json)) return json;
-      if (json && Array.isArray(json.data)) return json.data;
-      return [];
-    } catch {
-      return [];
-    }
-  };
+  // Centralized System Data Fetching
+  const fetchData = useCallback(async () => {
+    if (!user) return; // Skip if unauthenticated
 
-  const fetchData = async () => {
     try {
       const [catRes, itemRes, batchRes, assetRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/categories`).catch(() => ({ ok: false })),
-        fetch(`${API_BASE_URL}/items`).catch(() => ({ ok: false })),
-        fetch(`${API_BASE_URL}/stock-batches`).catch(() => ({ ok: false })),
-        fetch(`${API_BASE_URL}/serialized-assets`).catch(() => ({ ok: false }))
+        api.get('/v1/categories').catch(() => null),
+        api.get('/v1/items').catch(() => null),
+        api.get('/v1/stock-batches').catch(() => null),
+        api.get('/v1/serialized-assets').catch(() => null),
       ]);
 
-      if (catRes.ok) setCategories(await parseJsonArray(catRes));
-      if (itemRes.ok) setItems(await parseJsonArray(itemRes));
-      if (batchRes.ok) setStockBatches(await parseJsonArray(batchRes));
-      if (assetRes.ok) setSerializedAssets(await parseJsonArray(assetRes));
+      if (catRes?.data) setCategories(Array.isArray(catRes.data) ? catRes.data : catRes.data.data || []);
+      if (itemRes?.data) setItems(Array.isArray(itemRes.data) ? itemRes.data : itemRes.data.data || []);
+      if (batchRes?.data) setStockBatches(Array.isArray(batchRes.data) ? batchRes.data : batchRes.data.data || []);
+      if (assetRes?.data) setSerializedAssets(Array.isArray(assetRes.data) ? assetRes.data : assetRes.data.data || []);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching system data:', error);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
+  // Centralized API Handler for Form Submissions & Actions
   const handleApiCall = async (endpoint, payload, onSuccess, method = 'POST') => {
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      // Clean endpoint string to avoid endpoint duplication issues
+      const cleanEndpoint = endpoint.replace(/^\/?(api\/)?(v1\/)?/, '');
+
+      const response = await api({
+        url: `/v1/${cleanEndpoint}`,
         method: method,
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(payload)
+        data: payload,
       });
-      const data = await response.json();
-      if (response.ok) {
-        toast.success(data.message || 'Success!');
-        if (onSuccess) onSuccess();
-        fetchData();
-      } else {
-        toast.error(data.error || (data.errors ? Object.values(data.errors).flat().join(' ') : 'An error occurred.'));
-      }
+
+      toast.success(response.data?.message || 'Action completed successfully!');
+      if (onSuccess) onSuccess();
+      fetchData(); // Refresh global states after mutation
+      return response.data;
     } catch (error) {  
       console.error('API Error:', error);
-      toast.error('An unexpected network error occurred.');
+      const data = error.response?.data;
+      toast.error(
+        data?.error || 
+        (data?.errors ? Object.values(data.errors).flat().join(' ') : 'An unexpected error occurred.')
+      );
+      throw error;
     }
   };
 
   return (
     <>
       <Toaster richColors position="top-right" />
-      <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
-        
-        {/* Dashboard Route */}
-        {activeTab.startsWith('dashboard') && (
-          <DashboardPage 
-            items={items}
-            categories={categories}
-            stockBatches={stockBatches}
-            serializedAssets={serializedAssets}
-          />
-        )}
 
-        {/* Catalog Route */}
-        {activeTab.startsWith('catalog') && (
-          <CatalogPage 
-            activeTab={activeTab}
-            categories={categories}
-            categoryForm={categoryForm}
-            setCategoryForm={setCategoryForm}
-            items={items}
-            itemForm={itemForm}
-            setItemForm={setItemForm}
-            handleApiCall={handleApiCall}
-          />
-        )}
+      <Routes>
+        {/* Unauthenticated Guest Routes */}
+        <Route element={<GuestRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
 
-        {/* Receive Stock Route */}
-        {activeTab.startsWith('receive') && (
-          <ReceivePage 
-            activeTab={activeTab}
-            items={items}
-            receiveForm={receiveForm}
-            setReceiveForm={setReceiveForm}
-            handleApiCall={handleApiCall}
-          />
-        )}
+        {/* Authenticated Protected System Routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route
+            path="/*"
+            element={
+              <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+                {/* Dashboard Tab */}
+                {activeTab.startsWith('dashboard') && (
+                  <DashboardPage 
+                    items={items}
+                    categories={categories}
+                    stockBatches={stockBatches}
+                    serializedAssets={serializedAssets}
+                  />
+                )}
 
-        {/* Consumables Route */}
-        {activeTab.startsWith('consumables') && (
-          <ConsumablesPage 
-            activeTab={activeTab}
-            stockBatches={stockBatches}
-            handleApiCall={handleApiCall}
-            refreshData={fetchData}
-          />
-        )}
+                {/* Catalog Tab */}
+                {activeTab.startsWith('catalog') && (
+                  <CatalogPage 
+                    activeTab={activeTab}
+                    categories={categories}
+                    categoryForm={categoryForm}
+                    setCategoryForm={setCategoryForm}
+                    items={items}
+                    itemForm={itemForm}
+                    setItemForm={setItemForm}
+                    handleApiCall={handleApiCall}
+                  />
+                )}
 
-        {/* Accountability Route */}
-        {activeTab.startsWith('accountability') && (
-          <AccountabilityPage 
-            activeTab={activeTab}
-            serializedAssets={serializedAssets}
-            accountabilityForm={accountabilityForm}
-            setAccountabilityForm={setAccountabilityForm}
-            handleApiCall={handleApiCall}
-          />
-        )}
+                {/* Receive Stock Tab */}
+                {activeTab.startsWith('receive') && (
+                  <ReceivePage 
+                    activeTab={activeTab}
+                    items={items}
+                    receiveForm={receiveForm}
+                    setReceiveForm={setReceiveForm}
+                    handleApiCall={handleApiCall}
+                  />
+                )}
 
-        {/* Transfer & Return Route */}
-        {activeTab.startsWith('transfer-return') && (
-          <TransferReturnPage 
-            activeTab={activeTab}
-            serializedAssets={serializedAssets}
-            handleApiCall={handleApiCall}
-            refreshData={fetchData}
-          />
-        )}
+                {/* Consumables Tab */}
+                {activeTab.startsWith('consumables') && (
+                  <ConsumablesPage 
+                    activeTab={activeTab}
+                    stockBatches={stockBatches}
+                    handleApiCall={handleApiCall}
+                    refreshData={fetchData}
+                  />
+                )}
 
-      </Layout>
+                {/* Asset Accountability Tab */}
+                {activeTab.startsWith('accountability') && (
+                  <AccountabilityPage 
+                    activeTab={activeTab}
+                    serializedAssets={serializedAssets}
+                    accountabilityForm={accountabilityForm}
+                    setAccountabilityForm={setAccountabilityForm}
+                    handleApiCall={handleApiCall}
+                  />
+                )}
+
+                {/* Transfers & Movement Logs Tab */}
+                {activeTab.startsWith('transfer-return') && (
+                  <TransferReturnPage 
+                    activeTab={activeTab}
+                    serializedAssets={serializedAssets}
+                    handleApiCall={handleApiCall}
+                    refreshData={fetchData}
+                  />
+                )}
+
+                {/* Admin Management Panel */}
+                {activeTab.startsWith('admin') && (
+                  <UserManagementPage 
+                    activeTab={activeTab}
+                    handleApiCall={handleApiCall}
+                    refreshData={fetchData}
+                  />
+                )}
+              </Layout>
+            }
+          />
+        </Route>
+
+        {/* Fallback Redirect */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
     </>
   );
 }

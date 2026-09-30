@@ -1,11 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import {
   Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -69,6 +67,8 @@ function isAssetMatch(asset, query) {
  * Supports matching attached_to by either parent ID or property_number.
  */
 function groupAssets(assets) {
+  if (!Array.isArray(assets)) return [];
+
   const byPropertyNumber = {};
   const byId = {};
 
@@ -86,7 +86,6 @@ function groupAssets(assets) {
   assets.forEach((asset) => {
     const attachedTo = asset.attached_to;
     if (attachedTo) {
-      // Resolve whether attached_to points to property_number or primary ID
       let parentKey = null;
       if (byPropertyNumber[attachedTo]) {
         parentKey = byPropertyNumber[attachedTo].id;
@@ -105,7 +104,6 @@ function groupAssets(assets) {
 
   return assets
     .filter((asset) => {
-      // Exclude children from top-level rendering
       if (
         asset.attached_to &&
         (byPropertyNumber[asset.attached_to] || byId[asset.attached_to])
@@ -130,7 +128,9 @@ export default function AssetCatalogBrowse({
   const [detailsGroup, setDetailsGroup] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-  const assets = catalog.serialized || catalog.assets || [];
+  // Safely ensure rawAssets resolves to an array regardless of API payload structure
+  const rawAssets = catalog?.serialized || catalog?.assets || (Array.isArray(catalog) ? catalog : []);
+  const assets = Array.isArray(rawAssets) ? rawAssets : [];
 
   const groupedAssets = useMemo(
     () => groupAssets(assets),
@@ -169,7 +169,6 @@ export default function AssetCatalogBrowse({
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          {/* shadcn Input with Search Icon */}
           <div className="relative flex-1 sm:w-80">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -194,6 +193,22 @@ export default function AssetCatalogBrowse({
             {filteredGroupedAssets.length} {filteredGroupedAssets.length === 1 ? 'Asset' : 'Assets'}
           </Badge>
         </div>
+      </div>
+
+       {/* Proceed Section */}
+      <div className="flex justify-end border-t pt-4">
+        <Button
+          size="lg"
+          disabled={cart.length === 0}
+          onClick={onProceed}
+        >
+          Proceed
+          {cart.length > 0 && (
+            <Badge variant="secondary" className="ml-2">
+              {cart.length}
+            </Badge>
+          )}
+        </Button>
       </div>
 
       {/* Empty States */}
@@ -229,7 +244,7 @@ export default function AssetCatalogBrowse({
             const isBundled = children.length > 0;
             const itemName = primary.item?.name || primary.item_name || 'Asset Item';
             const itemCode = primary.item?.item_code || primary.item_code || 'N/A';
-            const brandName = primary.item?.brand ? `${primary.item.brand} - ` : '';
+            const brandName = primary.item?.brand ? `${primary.item.brand} ` : '';
 
             return (
               <Card key={primary.id} className="flex flex-col justify-between">
@@ -368,22 +383,6 @@ export default function AssetCatalogBrowse({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Proceed Section */}
-      <div className="flex justify-end border-t pt-4">
-        <Button
-          size="lg"
-          disabled={cart.length === 0}
-          onClick={onProceed}
-        >
-          Proceed
-          {cart.length > 0 && (
-            <Badge variant="secondary" className="ml-2">
-              {cart.length}
-            </Badge>
-          )}
-        </Button>
-      </div>
 
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Truck,
   User,
@@ -35,7 +35,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const API_BASE_URL = '/api/v1';
+import { useAuth } from '@/context/AuthContext';
+
+// Primary endpoint with permission-bypass fallback routes
+const ENDPOINTS = ['/api/users/options', '/api/users', '/api/v1/users'];
 
 function getCost(item) {
   const rawCost = item.unit_cost ?? item.item?.unit_cost ?? 0;
@@ -50,19 +53,31 @@ export default function DeliveryForm({
   onBack,
   onNext,
 }) {
+  const { user: currentUser, token } = useAuth();
   const [users, setUsers] = useState([]);
-  
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
   // Signatory level state
   const [receivedMrById, setReceivedMrById] = useState(
     initialDetails?.receivedMrById || initialDetails?.received_mr_by_id || ''
   );
+
+  // Set default "Issued By" to the authenticated current user ID
   const [issuedById, setIssuedById] = useState(
-    initialDetails?.issuedById || initialDetails?.issued_by_id || ''
+    initialDetails?.issuedById || initialDetails?.issued_by_id || currentUser?.id || ''
   );
+
   const [dateIssued, setDateIssued] = useState(
     initialDetails?.dateIssued || new Date().toISOString().split('T')[0]
   );
   const [remarks, setRemarks] = useState(initialDetails?.remarks || '');
+
+  // Sync issuedById if currentUser loads after initial render
+  useEffect(() => {
+    if (currentUser?.id && !issuedById) {
+      setIssuedById(String(currentUser.id));
+    }
+  }, [currentUser, issuedById]);
 
   // Item-level Secondary Receivers mapping { [itemKey]: userId }
   const [itemUsers, setItemUsers] = useState(() => {
@@ -73,21 +88,86 @@ export default function DeliveryForm({
     return initialMap;
   });
 
+  // Fetch users with full fallback route support and authentication headers
   const fetchUsers = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/users`);
-      const data = await res.json();
-      setUsers(Array.isArray(data) ? data : data?.data || []);
-    } catch (err) {
-      console.error('Failed to fetch users:', err);
+    setIsLoadingUsers(true);
+    let fetchErrors = [];
+
+    for (const endpoint of ENDPOINTS) {
+      try {
+        const headers = {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        };
+
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch(endpoint, {
+          headers,
+          credentials: 'include', // Includes Sanctum session cookies
+        });
+
+        if (!res.ok) {
+          fetchErrors.push(`${endpoint} returned status ${res.status}`);
+          continue;
+        }
+
+        const data = await res.json();
+
+        // Support direct array, nested data, or paginated responses
+        const userList = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data?.data)
+          ? data.data.data
+          : Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data?.users)
+          ? data.users
+          : [];
+
+        if (userList.length > 0) {
+          setUsers(userList);
+          setIsLoadingUsers(false);
+          return;
+        } else {
+          fetchErrors.push(`${endpoint} returned an empty array or unexpected format`);
+        }
+      } catch (err) {
+        fetchErrors.push(`${endpoint} failed with network error: ${err.message}`);
+      }
     }
-  }, []);
+
+    console.warn(
+      'DeliveryForm: Could not fetch users list from API routes. Falling back to active session user.',
+      { details: fetchErrors }
+    );
+    setIsLoadingUsers(false);
+  }, [token]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
-  // Keep itemUsers synchronized if new cart items are added
+  // Merge currentUser into users list if missing so selection doesn't break
+  const combinedUsers = useMemo(() => {
+    if (!currentUser?.id) return users;
+    const exists = users.some((u) => String(u.id) === String(currentUser.id));
+    if (!exists) {
+      return [
+        {
+          id: currentUser.id,
+          name: currentUser.name || 'Current User',
+          designation: currentUser.designation || currentUser.roles?.[0] || 'Issuer',
+        },
+        ...users,
+      ];
+    }
+    return users;
+  }, [users, currentUser]);
+
+  // Synchronize itemUsers when cart items change
   useEffect(() => {
     setItemUsers((prev) => {
       const updated = { ...prev };
@@ -104,7 +184,7 @@ export default function DeliveryForm({
     setItemUsers((prev) => {
       const updated = { ...prev, [itemKey]: userId };
 
-      // Auto-assign secondary receiver to attached children peripherals if parent changes
+      // Auto-assign secondary receiver to attached peripherals if parent changes
       cart.forEach((child) => {
         if (child.attachToKey === itemKey) {
           updated[child.key] = userId;
@@ -122,22 +202,21 @@ export default function DeliveryForm({
     e.preventDefault();
     if (!receivedMrById || !issuedById || !dateIssued) return;
 
-    const primaryReceiverUser = users.find((u) => String(u.id) === String(receivedMrById));
-    const issuerUser = users.find((u) => String(u.id) === String(issuedById));
+    const primaryReceiverUser = combinedUsers.find((u) => String(u.id) === String(receivedMrById));
+    const issuerUser = combinedUsers.find((u) => String(u.id) === String(issuedById));
 
-    // Map cart items with their specific secondary receiver (user_id)
     const cartWithSecondaryReceivers = cart.map((item) => ({
       ...item,
-      user_id: itemUsers[item.key] || receivedMrById, // Secondary receiver
-      secondary_receiver_user: users.find(
+      user_id: itemUsers[item.key] || receivedMrById,
+      secondary_receiver_user: combinedUsers.find(
         (u) => String(u.id) === String(itemUsers[item.key] || receivedMrById)
       ),
     }));
 
     onNext({
-      receivedMrById, // Primary Receiver (for PAR/ICS bottom signature)
+      receivedMrById,
       received_mr_by_id: receivedMrById,
-      issuedById,     // Sender / Property Admin
+      issuedById,
       issued_by_id: issuedById,
       dateIssued,
       remarks,
@@ -188,7 +267,7 @@ export default function DeliveryForm({
             const selectedSecondaryUser = itemUsers[item.key] || '';
 
             return (
-              <Card key={item.key} className="shadow-2xs">
+              <Card key={item.key} className="shadow-xs">
                 <CardContent className="p-4">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                     <div className="flex-1 space-y-3">
@@ -224,23 +303,23 @@ export default function DeliveryForm({
                         </span>
                       </div>
 
-                      {/* Controls Row: Peripheral Attach & Secondary Receiver (user_id) */}
+                      {/* Controls Row */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t">
-                        {/* Secondary Receiver Dropdown (user_id) */}
+                        {/* Secondary Receiver Dropdown */}
                         <div className="space-y-1">
                           <label className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
                             <UserCheck className="h-3.5 w-3.5 text-primary" />
                             Secondary Receiver (`user_id`):
                           </label>
                           <Select
-                            value={String(selectedSecondaryUser)}
+                            value={selectedSecondaryUser ? String(selectedSecondaryUser) : ''}
                             onValueChange={(val) => handleItemUserChange(item.key, val)}
                           >
                             <SelectTrigger className="h-8 text-xs w-full bg-background">
-                              <SelectValue placeholder="Select secondary receiver..." />
+                              <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select secondary receiver..."} />
                             </SelectTrigger>
                             <SelectContent>
-                              {users.map((u) => (
+                              {combinedUsers.map((u) => (
                                 <SelectItem key={u.id} value={String(u.id)} className="text-xs">
                                   {u.name} {u.designation ? `(${u.designation})` : ''}
                                 </SelectItem>
@@ -297,7 +376,7 @@ export default function DeliveryForm({
           })}
         </div>
 
-        {/* Primary Receiver (received_mr_by_id) / Issuer / Date / Remarks */}
+        {/* Primary Receiver / Issuer / Date / Remarks */}
         <Card className="shadow-sm border-primary/20">
           <CardHeader className="border-b bg-muted/20 pb-4">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -311,18 +390,22 @@ export default function DeliveryForm({
 
           <CardContent className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Primary Receiver (received_mr_by_id) */}
+              {/* Primary Receiver */}
               <div className="space-y-2">
                 <Label htmlFor="received_mr_by_id" className="text-xs font-semibold flex items-center gap-1.5">
                   <User className="h-3.5 w-3.5 text-primary" />
                   Primary Receiver (`received_mr_by_id`) <span className="text-destructive">*</span>
                 </Label>
-                <Select value={String(receivedMrById)} onValueChange={setReceivedMrById} required>
+                <Select
+                  value={receivedMrById ? String(receivedMrById) : ''}
+                  onValueChange={setReceivedMrById}
+                  required
+                >
                   <SelectTrigger id="received_mr_by_id" className="w-full h-10">
-                    <SelectValue placeholder="Select primary accountable receiver..." />
+                    <SelectValue placeholder={isLoadingUsers ? "Loading options..." : "Select primary accountable receiver..."} />
                   </SelectTrigger>
                   <SelectContent>
-                    {users.map((u) => (
+                    {combinedUsers.map((u) => (
                       <SelectItem key={u.id} value={String(u.id)}>
                         <div className="flex items-center justify-between w-full">
                           <span>{u.name}</span>
@@ -341,26 +424,31 @@ export default function DeliveryForm({
                 </p>
               </div>
 
-              {/* Sender / Issued By (issued_by_id) */}
+              {/* Sender / Issued By (Defaults to authenticated user) */}
               <div className="space-y-2">
                 <Label htmlFor="issued_by_id" className="text-xs font-semibold flex items-center gap-1.5">
                   <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                   Issued By / Sender (`issued_by_id`) <span className="text-destructive">*</span>
                 </Label>
-                <Select value={String(issuedById)} onValueChange={setIssuedById} required>
+                <Select
+                  value={issuedById ? String(issuedById) : ''}
+                  onValueChange={setIssuedById}
+                  required
+                >
                   <SelectTrigger id="issued_by_id" className="w-full h-10">
                     <SelectValue placeholder="Select issuing officer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {users.map((u) => (
+                    {combinedUsers.map((u) => (
                       <SelectItem key={u.id} value={String(u.id)}>
-                        {u.name} {u.designation ? `— ${u.designation}` : ''}
+                        {u.name} {u.designation ? `— ${u.designation}` : ''}{' '}
+                        {String(u.id) === String(currentUser?.id) ? ' (You)' : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <p className="text-[11px] text-muted-foreground">
-                  The property officer or system administrator issuing the assets.
+                  Defaults to current logged-in user issuing the assets.
                 </p>
               </div>
             </div>

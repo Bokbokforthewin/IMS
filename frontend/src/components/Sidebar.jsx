@@ -10,6 +10,7 @@ import {
   ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
+  ShieldCheck,
 } from "lucide-react";
 
 import {
@@ -28,7 +29,6 @@ import {
   SidebarMenuSubButton,
   SidebarRail,
   useSidebar,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 import {
@@ -88,6 +88,16 @@ const menuItems = [
     subItems: [
       { id: "transfer-return-form", label: "Transfer / Return" },
       { id: "transfer-return-history", label: "Movement Logs" },
+    ],
+  },
+  {
+    id: "admin",
+    label: "Admin Panel",
+    icon: ShieldCheck,
+    subItems: [
+      { id: "admin-users", label: "User Management" },
+      { id: "admin-settings", label: "System Settings" },
+      { id: "admin-logs", label: "Audit Logs" },
     ],
   },
 ];

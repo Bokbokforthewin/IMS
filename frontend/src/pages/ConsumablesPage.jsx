@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../api/client';
 
 import StockStatusTable from '../components/consumables/StockStatusTable.jsx';
 import IssuanceHistoryTable from '../components/consumables/IssuanceHistoryTable.jsx';
@@ -10,8 +10,12 @@ export default function ConsumablesPage({ activeTab, handleApiCall, refreshData 
 
   const fetchStockStatus = useCallback(async () => {
     try {
-      const response = await axios.get('/api/v1/consumables/stock-status');
-      setStockStatus(Array.isArray(response.data) ? response.data : []);
+      // Use the authenticated Axios instance directly for GET requests
+      const response = await api.get('/v1/consumables/stock-status');
+      const data = response.data;
+      
+      const resultList = Array.isArray(data) ? data : data?.data || [];
+      setStockStatus(resultList);
     } catch (err) {
       console.error('Failed to load stock status:', err);
       setStockStatus([]);
@@ -45,7 +49,10 @@ export default function ConsumablesPage({ activeTab, handleApiCall, refreshData 
       {/* 2. Issuance Logs & History */}
       {activeTab === 'consumables-history' && (
         <div className="consumables-page__section">
-          <IssuanceHistoryTable refreshKey={refreshKey} />
+          <IssuanceHistoryTable 
+            refreshKey={refreshKey} 
+            handleApiCall={handleApiCall}
+          />
         </div>
       )}
     </div>

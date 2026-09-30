@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import api from '../../api/client';
+
 import {
   Field,
   FieldGroup,
   FieldLabel,
   FieldDescription,
-  FieldError,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,10 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-
-const API_BASE_URL = '/api/v1';
 
 export default function IssueConsumablesForm({ item, handleApiCall, onSuccess }) {
   const [form, setForm] = useState({
@@ -37,10 +35,11 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
   const [successMessage, setSuccessMessage] = useState(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
+  // Fetch users using the authenticated Axios client
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/users`);
-      const json = await res.json();
+      const response = await api.get('/v1/users');
+      const json = response.data;
 
       let userList = [];
       if (Array.isArray(json)) {
@@ -60,7 +59,7 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
     fetchUsers();
   }, [fetchUsers]);
 
-  // Keep item_id in sync
+  // Keep item_id in sync when prop changes
   useEffect(() => {
     setForm((f) => ({ ...f, item_id: item?.id || '' }));
   }, [item]);
@@ -96,21 +95,20 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
 
     setLoading(true);
     try {
-      await handleApiCall('/consumables/issue', form, (res) => {
-        if (res?.message) {
-          setSuccessMessage(res.message);
-        }
-        setForm({
-          item_id: item?.id || '',
-          quantity_requested: '',
-          issued_to_id: '',
-          issuance_date: '',
-          purpose: '',
-        });
-        if (typeof onSuccess === 'function') onSuccess();
+      const res = await handleApiCall('/consumables/issue', form);
+      if (res?.message) {
+        setSuccessMessage(res.message);
+      }
+      setForm({
+        item_id: item?.id || '',
+        quantity_requested: '',
+        issued_to_id: '',
+        issuance_date: '',
+        purpose: '',
       });
+      if (typeof onSuccess === 'function') onSuccess();
     } catch (err) {
-      setErrorMessage(err.response?.data?.error || 'Failed to process issuance.');
+      setErrorMessage(err.response?.data?.error || err.message || 'Failed to process issuance.');
     } finally {
       setLoading(false);
     }
@@ -173,7 +171,7 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
               <option value="" disabled>Select employee...</option>
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
-                  {u.name} &mdash; {u.designation}, {u.unit} / {u.division}
+                  {u.name} {u.designation ? `— ${u.designation}` : ''} {u.unit || u.division ? `(${[u.unit, u.division].filter(Boolean).join(' / ')})` : ''}
                 </option>
               ))}
             </select>
@@ -204,31 +202,31 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
           </Field>
         </FieldGroup>
 
-        {/* Action Button & Confirmation Modal */}
+        {/* Action Button */}
         <div className="mt-6 flex justify-end">
-          <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-            <AlertDialogTrigger render={
-              <Button type="submit" disabled={loading} className="w-full sm:w-auto">
-                {loading ? 'Processing...' : 'Issue Consumables & Generate RIS'}
-              </Button>
-            } />
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Confirm Consumable Issuance</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to issue <strong>{form.quantity_requested} {item.unit_of_measure}</strong> of <strong>{item.name}</strong> to <strong>{selectedUser?.name || 'the selected employee'}</strong>? This action will decrement inventory stock and generate a Requisition and Issue Slip (RIS).
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={executeSubmit}>
-                  Confirm & Issue
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button type="submit" disabled={loading} className="w-full sm:w-auto">
+            {loading ? 'Processing...' : 'Issue Consumables & Generate RIS'}
+          </Button>
         </div>
       </form>
+
+      {/* Confirmation Modal */}
+      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Consumable Issuance</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to issue <strong>{form.quantity_requested} {item.unit_of_measure}</strong> of <strong>{item.name}</strong> to <strong>{selectedUser?.name || 'the selected employee'}</strong>? This action will decrement inventory stock and generate a Requisition and Issue Slip (RIS).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={executeSubmit}>
+              Confirm & Issue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

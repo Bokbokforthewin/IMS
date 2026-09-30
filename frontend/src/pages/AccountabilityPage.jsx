@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import api from '@/api/client'; // Uses standard path alias (same as '@/components/ui/badge')
 
 import AssetCatalogBrowse from '../components/assets/AssetCatalogBrowse.jsx';
 import DeliveryForm from '../components/assets/DeliveryForm.jsx';
 import CartReview from '../components/assets/CartReview.jsx';
 import AccountabilityReceiptsTable from '../components/assets/AccountabilityReceiptsTable.jsx';
 import { Badge } from '@/components/ui/badge';
-
-const API_BASE_URL = '/api/v1';
 
 // Helper to extract clean numeric unit cost
 function parseCost(asset) {
@@ -22,17 +21,18 @@ export default function AccountabilityPage({ activeTab, handleApiCall }) {
   const [deliveryDetails, setDeliveryDetails] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Fetch available asset catalog
+  // Fetch available asset catalog directly using Axios client
   const fetchCatalog = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/accountability/available-for-cart`);
-      if (!res.ok) throw new Error('Failed to fetch catalog');
-      const data = await res.json();
-      setCatalog(data);
+      const response = await api.get('/v1/accountability/available-for-cart');
+      const data = response.data?.data || response.data;
+      if (data) {
+        setCatalog(data);
+      }
     } catch (err) {
       console.error('Failed to load accountability catalog:', err);
     }
-  }, []);
+  }, []); // No unstable dependencies
 
   useEffect(() => {
     fetchCatalog();

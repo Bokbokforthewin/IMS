@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../../api/client';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,8 +39,17 @@ export default function IssuanceHistoryTable({ refreshKey }) {
 
   const fetchIssuances = useCallback(async () => {
     try {
-      const response = await axios.get('/api/v1/consumables/issuances');
-      setIssuances(Array.isArray(response.data) ? response.data : []);
+      const response = await api.get('/v1/consumables/issuances');
+      const data = response.data;
+
+      let list = [];
+      if (Array.isArray(data)) {
+        list = data;
+      } else if (data && Array.isArray(data.data)) {
+        list = data.data;
+      }
+
+      setIssuances(list);
     } catch (err) {
       console.error('Failed to load issuance logs:', err);
       setIssuances([]);
@@ -133,16 +142,17 @@ export default function IssuanceHistoryTable({ refreshKey }) {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredRows.map(({ line, issuance, isFirstLineOfDoc, lineCountInDoc }) => {
+                filteredRows.map(({ line, issuance, isFirstLineOfDoc, lineCountInDoc }, index) => {
                   const allocations = Array.isArray(line?.batch_allocations)
                     ? line.batch_allocations
                     : [];
-                  const isExpanded = expandedLineId === line.id;
+                  const lineKey = line?.id || `${issuance?.id || 'issuance'}-${index}`;
+                  const isExpanded = expandedLineId === lineKey;
                   const isMultiBatch = allocations.length > 1;
                   const isMultiLineDoc = lineCountInDoc > 1;
 
                   return (
-                    <React.Fragment key={line.id}>
+                    <React.Fragment key={lineKey}>
                       <TableRow
                         className={`${
                           isMultiLineDoc && !isFirstLineOfDoc ? 'bg-muted/10' : ''
@@ -155,7 +165,7 @@ export default function IssuanceHistoryTable({ refreshKey }) {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                              onClick={() => toggleExpand(line.id)}
+                              onClick={() => toggleExpand(lineKey)}
                               aria-label={
                                 isExpanded
                                   ? 'Collapse batch details'
@@ -178,7 +188,7 @@ export default function IssuanceHistoryTable({ refreshKey }) {
                               <span>{issuance?.document_number || 'N/A'}</span>
                               {isMultiLineDoc && (
                                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                                  {lineCountInDoc} recipients
+                                  {lineCountInDoc} items
                                 </Badge>
                               )}
                             </div>
@@ -259,8 +269,8 @@ export default function IssuanceHistoryTable({ refreshKey }) {
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {allocations.map((a) => (
-                                    <TableRow key={a.id} className="hover:bg-muted/40">
+                                  {allocations.map((a, aIdx) => (
+                                    <TableRow key={a.id || aIdx} className="hover:bg-muted/40">
                                       <TableCell className="font-mono py-2">
                                         {a?.stock_batch?.iar_number || 'N/A'}
                                       </TableCell>
@@ -271,7 +281,7 @@ export default function IssuanceHistoryTable({ refreshKey }) {
                                         {money(a.unit_cost_at_issuance)}
                                       </TableCell>
                                       <TableCell className="text-right font-semibold py-2">
-                                        {money(a.unit_cost_at_issuance * a.quantity_deducted)}
+                                        {money((a.unit_cost_at_issuance || 0) * (a.quantity_deducted || 0))}
                                       </TableCell>
                                     </TableRow>
                                   ))}

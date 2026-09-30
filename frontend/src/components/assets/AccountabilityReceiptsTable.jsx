@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import axios from 'axios';
+import api from '../../api/client'; // Import configured Axios client with auth headers
 import {
   Download,
   FileSpreadsheet,
@@ -14,8 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-const API_BASE_URL = '/api/v1';
 
 function money(n) {
   return `₱${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
@@ -36,7 +34,6 @@ function getSecondaryReceiver(line, defaultPrimaryUser) {
 
 /**
  * Groups lines into primary assets and their attached child peripherals.
- * Accepts lines from both PAR and ICS receipts combined.
  */
 function groupLines(lines) {
   const byPropertyNumber = {};
@@ -71,14 +68,13 @@ function groupReceiptsIntoBundles(receipts) {
   const bundleMap = new Map();
 
   receipts.forEach((receipt) => {
-    // Unique key identifying a single issuance session
     const primaryUser = receipt.receivedMrBy || receipt.user;
     const key = `${primaryUser?.id || receipt.user_id}_${receipt.issued_by_id}_${receipt.date_issued}_${receipt.remarks || ''}`;
 
     if (!bundleMap.has(key)) {
       bundleMap.set(key, {
         key,
-        user: primaryUser, // Primary Receiver (PAR/ICS Signatory)
+        user: primaryUser,
         issuedBy: receipt.issuedBy,
         date_issued: receipt.date_issued,
         remarks: receipt.remarks,
@@ -98,33 +94,14 @@ function groupReceiptsIntoBundles(receipts) {
   return Array.from(bundleMap.values());
 }
 
-const handleDownload = async (receiptId, documentNumber) => {
-  try {
-    const response = await axios.get(
-      `${API_BASE_URL}/accountability/receipts/${receiptId}/download-excel`,
-      { responseType: 'blob' }
-    );
-
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `${documentNumber}.xlsx`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error('Failed to download receipt:', err);
-  }
-};
-
 export default function AccountabilityReceiptsTable({ refreshKey }) {
   const [receipts, setReceipts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Fetch receipts using the authenticated api instance
   const fetchReceipts = useCallback(async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/accountability/receipts`);
+      const response = await api.get('/v1/accountability/receipts');
       const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
       setReceipts(data);
     } catch (err) {
@@ -136,6 +113,43 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
   useEffect(() => {
     fetchReceipts();
   }, [fetchReceipts, refreshKey]);
+
+  // Authenticated Excel Download
+  const handleDownload = async (receiptId, documentNumber) => {
+    try {
+      const response = await api.get(
+        `/v1/accountability/receipts/${receiptId}/download-excel`,
+        { responseType: 'blob' }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${documentNumber}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download receipt:', err);
+    }
+  };
+
+  // Authenticated PDF Tag Download
+  const handleDownloadTagPdf = async (assetId) => {
+    try {
+      const response = await api.get(
+        `/v1/accountability/serialized-assets/${assetId}/download-tag-pdf`,
+        { responseType: 'blob' }
+      );
+
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error('Failed to download asset tag PDF:', err);
+    }
+  };
 
   // Group receipts into transaction bundles
   const bundles = useMemo(() => groupReceiptsIntoBundles(receipts), [receipts]);
@@ -330,18 +344,13 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                               </div>
                             </div>
 
-                            {/* Tag PDF Button */}
-                            {primary.serialized_asset?.property_number && (
+                            {/* Tag PDF Button using authenticated API handler */}
+                            {primary.serialized_asset?.id && (
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 className="h-7 text-xs self-start sm:self-center"
-                                onClick={() =>
-                                  window.open(
-                                    `${API_BASE_URL}/accountability/serialized-assets/${primary.serialized_asset.id}/download-tag-pdf`,
-                                    '_blank'
-                                  )
-                                }
+                                onClick={() => handleDownloadTagPdf(primary.serialized_asset.id)}
                               >
                                 Tag PDF
                               </Button>
