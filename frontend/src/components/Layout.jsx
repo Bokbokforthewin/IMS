@@ -17,27 +17,27 @@ const NAV_ITEMS = [
   {
     key: "catalog",
     label: "Catalog",
-    permission: "manage items",
+    permission: "view catalog",
   },
   {
     key: "receive",
     label: "Receive Stock",
-    permission: "receive stock",
+    permission: "view receiving",
   },
   {
     key: "consumables",
     label: "Consumables",
-    permission: "issue consumables",
+    permission: "view consumables",
   },
   {
     key: "accountability",
     label: "Accountability",
-    permission: "issue assets",
+    permission: "view assets",
   },
   {
     key: "transfer-return",
     label: "Transfer/Return",
-    permission: "transfer assets",
+    permission: "view assets",
   },
   {
     key: "admin",
@@ -53,19 +53,9 @@ export default function Layout({
 }) {
   const { hasPermission } = useAuth();
 
-  /*
-   * Only expose navigation sections that the
-   * currently authenticated user is allowed to access.
-   */
   const visibleTabs = NAV_ITEMS.filter((item) =>
     hasPermission(item.permission)
   );
-
-  /*
-   * Prevent rendering the application shell while
-   * permissions are not yet available, if your
-   * AuthContext exposes a loading state later.
-   */
 
   return (
     <SidebarProvider>
@@ -76,16 +66,10 @@ export default function Layout({
       />
 
       <SidebarInset className="flex h-svh min-h-0 flex-col overflow-hidden">
-        {/* =========================================================
-            FIXED / STICKY HEADER
-        ========================================================= */}
         <div className="z-10 shrink-0 border-b bg-background">
           <Header />
         </div>
 
-        {/* =========================================================
-            SCROLLABLE CONTENT
-        ========================================================= */}
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-muted/20 p-4 md:p-6">
           {children}
         </main>

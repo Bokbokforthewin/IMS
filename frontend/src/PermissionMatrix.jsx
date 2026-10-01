@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from "./api/client";
 
 export default function PermissionMatrix() {
   const [roles, setRoles] = useState([]);
@@ -11,7 +11,7 @@ export default function PermissionMatrix() {
 
   // 1. Fetch roles and permissions on mount
   useEffect(() => {
-    axios.get('/api/v1/permissions-matrix') // Adjust route prefix as needed
+    api.get('/api/v1/permissions-matrix') // Adjust route prefix as needed
       .then(response => {
         const fetchedRoles = response.data.roles;
         const fetchedPermissions = response.data.allPermissions;
@@ -66,7 +66,7 @@ export default function PermissionMatrix() {
       }))
     };
 
-    axios.put('/api/v1/permissions-matrix', payload)
+    api.put('/api/v1/permissions-matrix', payload)
       .then(response => {
         setMessage('Permissions updated successfully!');
         setSaving(false);

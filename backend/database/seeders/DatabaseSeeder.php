@@ -28,5 +28,8 @@ class DatabaseSeeder extends Seeder
             'division' => 'Management Support Division',
             'designation' => 'Computer Programmer I'
         ]);
+
+        $testUser = User::where('email', 'test@example.com')->first();
+        $testUser->assignRole('end_user');
     }
 }

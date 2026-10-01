@@ -40,7 +40,7 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
-        $user->assignRole('employee');
+        $user->assignRole('end_user');
 
         $token = $user->createToken('auth_token')->plainTextToken;
 

@@ -1,20 +1,16 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
-// Auth & API Client
 import { useAuth } from "./context/AuthContext";
 import api from "./api/client";
 
-// Route Guards
 import ProtectedRoute from "./auth/ProtectedRoute";
 import GuestRoute from "./auth/GuestRoute";
 
-// Layout & Core Pages
 import Layout from "./components/Layout";
 import LoginPage from "./auth/LoginPage";
 import RegisterPage from "./auth/RegisterPage";
 
-// Feature Pages
 import DashboardPage from "./pages/DashboardPage";
 import CatalogPage from "./pages/CatalogPage";
 import ReceivePage from "./pages/ReceivePage";
@@ -23,7 +19,6 @@ import AccountabilityPage from "./pages/AccountabilityPage";
 import TransferReturnPage from "./pages/TransferReturnPage";
 import UserManagementPage from "./pages/UserManagementPage";
 
-// UI Notifications
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 
@@ -32,18 +27,10 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState("dashboard-overview");
 
-  // ============================================================
-  // SHARED SYSTEM DATA
-  // ============================================================
-
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
   const [stockBatches, setStockBatches] = useState([]);
   const [serializedAssets, setSerializedAssets] = useState([]);
-
-  // ============================================================
-  // FORM STATES
-  // ============================================================
 
   const [categoryForm, setCategoryForm] = useState({
     name: "",
@@ -79,10 +66,6 @@ export default function App() {
     remarks: "",
   });
 
-  // ============================================================
-  // CENTRALIZED DATA FETCHING
-  // ============================================================
-
   const fetchData = useCallback(async () => {
     if (!user) return;
 
@@ -96,33 +79,25 @@ export default function App() {
 
       if (catRes?.data) {
         setCategories(
-          Array.isArray(catRes.data)
-            ? catRes.data
-            : catRes.data.data || []
+          Array.isArray(catRes.data) ? catRes.data : catRes.data.data || []
         );
       }
 
       if (itemRes?.data) {
         setItems(
-          Array.isArray(itemRes.data)
-            ? itemRes.data
-            : itemRes.data.data || []
+          Array.isArray(itemRes.data) ? itemRes.data : itemRes.data.data || []
         );
       }
 
       if (batchRes?.data) {
         setStockBatches(
-          Array.isArray(batchRes.data)
-            ? batchRes.data
-            : batchRes.data.data || []
+          Array.isArray(batchRes.data) ? batchRes.data : batchRes.data.data || []
         );
       }
 
       if (assetRes?.data) {
         setSerializedAssets(
-          Array.isArray(assetRes.data)
-            ? assetRes.data
-            : assetRes.data.data || []
+          Array.isArray(assetRes.data) ? assetRes.data : assetRes.data.data || []
         );
       }
     } catch (error) {
@@ -133,10 +108,6 @@ export default function App() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  // ============================================================
-  // CENTRALIZED API HANDLER
-  // ============================================================
 
   const handleApiCall = async (
     endpoint,
@@ -183,19 +154,9 @@ export default function App() {
     }
   };
 
-  // ============================================================
-  // PAGE CONTENT
-  // ============================================================
-
   const renderActivePage = () => {
-    // ----------------------------------------------------------
-    // DASHBOARD
-    // ----------------------------------------------------------
-
     if (activeTab.startsWith("dashboard")) {
-      if (!hasPermission("view dashboard")) {
-        return <AccessDenied />;
-      }
+      if (!hasPermission("view dashboard")) return <AccessDenied />;
 
       return (
         <DashboardPage
@@ -207,14 +168,8 @@ export default function App() {
       );
     }
 
-    // ----------------------------------------------------------
-    // CATALOG
-    // ----------------------------------------------------------
-
     if (activeTab.startsWith("catalog")) {
-      if (!hasPermission("manage items")) {
-        return <AccessDenied />;
-      }
+      if (!hasPermission("view catalog")) return <AccessDenied />;
 
       return (
         <CatalogPage
@@ -230,14 +185,8 @@ export default function App() {
       );
     }
 
-    // ----------------------------------------------------------
-    // RECEIVE STOCK
-    // ----------------------------------------------------------
-
     if (activeTab.startsWith("receive")) {
-      if (!hasPermission("receive stock")) {
-        return <AccessDenied />;
-      }
+      if (!hasPermission("view receiving")) return <AccessDenied />;
 
       return (
         <ReceivePage
@@ -250,14 +199,8 @@ export default function App() {
       );
     }
 
-    // ----------------------------------------------------------
-    // CONSUMABLES
-    // ----------------------------------------------------------
-
     if (activeTab.startsWith("consumables")) {
-      if (!hasPermission("issue consumables")) {
-        return <AccessDenied />;
-      }
+      if (!hasPermission("view consumables")) return <AccessDenied />;
 
       return (
         <ConsumablesPage
@@ -269,14 +212,8 @@ export default function App() {
       );
     }
 
-    // ----------------------------------------------------------
-    // ACCOUNTABILITY
-    // ----------------------------------------------------------
-
     if (activeTab.startsWith("accountability")) {
-      if (!hasPermission("issue assets")) {
-        return <AccessDenied />;
-      }
+      if (!hasPermission("view assets")) return <AccessDenied />;
 
       return (
         <AccountabilityPage
@@ -289,14 +226,8 @@ export default function App() {
       );
     }
 
-    // ----------------------------------------------------------
-    // TRANSFERS & RETURNS
-    // ----------------------------------------------------------
-
     if (activeTab.startsWith("transfer-return")) {
-      if (!hasPermission("transfer assets")) {
-        return <AccessDenied />;
-      }
+      if (!hasPermission("view assets")) return <AccessDenied />;
 
       return (
         <TransferReturnPage
@@ -308,25 +239,17 @@ export default function App() {
       );
     }
 
-    // ----------------------------------------------------------
-    // ADMINISTRATION
-    // ----------------------------------------------------------
-
     if (activeTab.startsWith("admin")) {
-      return hasPermission("manage users") ? (
+      if (!hasPermission("manage users")) return <AccessDenied />;
+
+      return (
         <UserManagementPage
           activeTab={activeTab}
           handleApiCall={handleApiCall}
           refreshData={fetchData}
         />
-      ) : (
-        <AccessDenied />
       );
     }
-
-    // ----------------------------------------------------------
-    // UNKNOWN TAB
-    // ----------------------------------------------------------
 
     return <AccessDenied />;
   };
@@ -336,18 +259,10 @@ export default function App() {
       <Toaster richColors position="top-right" />
 
       <Routes>
-        {/* ======================================================
-            GUEST ROUTES
-        ====================================================== */}
-
         <Route element={<GuestRoute />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
         </Route>
-
-        {/* ======================================================
-            PROTECTED SYSTEM ROUTES
-        ====================================================== */}
 
         <Route element={<ProtectedRoute />}>
           <Route
@@ -363,10 +278,6 @@ export default function App() {
           />
         </Route>
 
-        {/* ======================================================
-            FALLBACK
-        ====================================================== */}
-
         <Route
           path="*"
           element={<Navigate to="/login" replace />}
@@ -376,17 +287,11 @@ export default function App() {
   );
 }
 
-// ============================================================
-// ACCESS DENIED COMPONENT
-// ============================================================
-
 function AccessDenied() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
       <div className="max-w-md text-center">
-        <h2 className="text-lg font-semibold">
-          Access Denied
-        </h2>
+        <h2 className="text-lg font-semibold">Access Denied</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           You don't have permission to access this section.
         </p>

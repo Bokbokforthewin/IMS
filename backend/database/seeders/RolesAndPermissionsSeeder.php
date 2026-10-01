@@ -6,30 +6,26 @@ use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use App\Models\User;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
     public function run(): void
     {
         // Reset cached roles and permissions
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // Define target guard for API / Sanctum routes
         $guard = 'sanctum';
 
+        // Page-level permissions
         $permissions = [
-            'manage categories',
-            'manage items',
-            'receive stock',
-            'edit stock records',
-            'delete stock records',
-            'issue consumables',
-            'issue assets',
-            'edit asset status',
-            'transfer assets',
-            'return assets',
-            'view reports',
             'view dashboard',
+            'view catalog',
+            'view receiving',
+            'view assets',
+            'view consumables',
+            'view reports',
             'manage users',
             'manage roles',
         ];
@@ -41,32 +37,69 @@ class RolesAndPermissionsSeeder extends Seeder
             ]);
         }
 
-        // Create Admin Role & assign all permissions
-        $admin = Role::firstOrCreate([
-            'name' => 'admin',
+        // 1. Super Admin: Access to EVERYTHING
+        $superAdmin = Role::firstOrCreate([
+            'name' => 'super_admin',
             'guard_name' => $guard,
         ]);
-        $admin->syncPermissions(Permission::where('guard_name', $guard)->get());
+        $superAdmin->syncPermissions(Permission::where('guard_name', $guard)->get());
 
-        // Create Supply Officer Role
+        // 2. Supply Officer: Dashboard, Catalog, Receiving, Assets, Consumables
         $supplyOfficer = Role::firstOrCreate([
             'name' => 'supply_officer',
             'guard_name' => $guard,
         ]);
         $supplyOfficer->syncPermissions([
-            'manage categories', 'manage items', 'receive stock', 'edit stock records',
-            'delete stock records', 'issue consumables', 'issue assets', 'edit asset status',
-            'transfer assets', 'return assets', 'view reports', 'view dashboard',
+            'view dashboard',
+            'view catalog',
+            'view receiving',
+            'view assets',
+            'view consumables',
         ]);
 
-        // Create Employee Role
-        $employee = Role::firstOrCreate([
-            'name' => 'employee',
+        // 3. Unit Head: Dashboard, Consumables, Assets
+        $unitHead = Role::firstOrCreate([
+            'name' => 'unit_head',
             'guard_name' => $guard,
         ]);
-        $employee->syncPermissions(['view dashboard']);
+        $unitHead->syncPermissions([
+            'view dashboard',
+            'view consumables',
+            'view assets',
+        ]);
 
-        // Create Default Admin User
+        // 4. Division Chief: Dashboard, Consumables, Assets
+        $divisionChief = Role::firstOrCreate([
+            'name' => 'division_chief',
+            'guard_name' => $guard,
+        ]);
+        $divisionChief->syncPermissions([
+            'view dashboard',
+            'view consumables',
+            'view assets',
+        ]);
+
+        // 5. Property Custodian: Dashboard, Consumables, Assets
+        $propertyCustodian = Role::firstOrCreate([
+            'name' => 'property_custodian',
+            'guard_name' => $guard,
+        ]);
+        $propertyCustodian->syncPermissions([
+            'view dashboard',
+            'view consumables',
+            'view assets',
+        ]);
+
+        // 6. End-User: Dashboard only
+        $endUser = Role::firstOrCreate([
+            'name' => 'end_user',
+            'guard_name' => $guard,
+        ]);
+        $endUser->syncPermissions([
+            'view dashboard',
+        ]);
+
+        // Default Super Admin User
         $adminUser = User::firstOrCreate(
             ['email' => 'admin@doh.gov.ph'],
             [
@@ -78,6 +111,6 @@ class RolesAndPermissionsSeeder extends Seeder
             ]
         );
 
-        $adminUser->assignRole($admin);
+        $adminUser->assignRole($superAdmin);
     }
 }
