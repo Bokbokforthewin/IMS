@@ -1,14 +1,19 @@
 import React, { useState } from "react";
 import { Users, ShieldCheck, Plus } from "lucide-react";
+import { useAuth } from '../context/AuthContext.jsx';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import UserDirectoryTable from "../components/admin/UserDirectoryTable.jsx";
-import RoleManagementModal from "../components/admin/RolePermissionModal.jsx";
+import RolePermissionModal from "../components/admin/RolePermissionModal.jsx";
 import AddRolePermission from "../components/admin/AddRolePermission.jsx";
 
 export default function UserManagementPage() {
+  const { hasPermission } = useAuth();
+  if (!hasPermission('manage users')) {
+    return <div className="p-10 text-center text-muted-foreground">Access denied.</div>;
+  }
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isAddRolePermissionOpen, setIsAddRolePermissionOpen] = useState(false);
 
@@ -69,7 +74,7 @@ export default function UserManagementPage() {
       </Card>
 
       {/* Global Role Matrix Modal */}
-      <RoleManagementModal
+      <RolePermissionModal
         isOpen={isRoleModalOpen}
         onClose={() => setIsRoleModalOpen(false)}
       />

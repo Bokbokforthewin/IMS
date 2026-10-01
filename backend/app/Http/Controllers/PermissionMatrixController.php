@@ -113,29 +113,34 @@ class PermissionMatrixController extends Controller
     public function storeRole(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|unique:roles,name',
+            'name' => [
+                'required', 'string',
+                \Illuminate\Validation\Rule::unique('roles')->where('guard_name', $this->guard),
+            ],
         ]);
 
-        $role = Role::create(['name' => $validated['name']]);
+        $role = Role::create([
+            'name' => $validated['name'],
+            'guard_name' => $this->guard, // <-- the missing piece
+        ]);
 
-        return response()->json([
-            'message' => 'Role created successfully.',
-            'data' => $role,
-        ], 201);
+        return response()->json(['message' => 'Role created successfully.', 'data' => $role], 201);
     }
 
-    // POST /v1/permissions
     public function storePermission(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|unique:permissions,name',
+            'name' => [
+                'required', 'string',
+                \Illuminate\Validation\Rule::unique('permissions')->where('guard_name', $this->guard),
+            ],
         ]);
 
-        $permission = Permission::create(['name' => $validated['name']]);
+        $permission = Permission::create([
+            'name' => $validated['name'],
+            'guard_name' => $this->guard, // <-- same fix
+        ]);
 
-        return response()->json([
-            'message' => 'Permission created successfully.',
-            'data' => $permission,
-        ], 201);
+        return response()->json(['message' => 'Permission created successfully.', 'data' => $permission], 201);
     }
 }

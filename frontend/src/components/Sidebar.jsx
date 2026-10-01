@@ -126,10 +126,19 @@ function SidebarCollapseButton() {
   );
 }
 
-export default function Sidebar({ activeTab, setActiveTab, appConfig: propConfig }) {
+export default function Sidebar({ 
+  activeTab, 
+  setActiveTab, 
+  visibleTabs = [], // 1. Recieve visibleTabs as a prop
+  appConfig: propConfig 
+}) {
   const { toggleSidebar } = useSidebar();
   const [openMenus, setOpenMenus] = useState({});
   const [appConfig, setAppConfig] = useState(propConfig || null);
+
+  // 2. Filter menuItems based on allowed keys in visibleTabs
+  const allowedKeys = new Set(visibleTabs.map((tab) => tab.key));
+  const filteredMenuItems = menuItems.filter((item) => allowedKeys.has(item.id));
 
   useEffect(() => {
     if (propConfig) {
@@ -191,7 +200,7 @@ export default function Sidebar({ activeTab, setActiveTab, appConfig: propConfig
       </SidebarHeader>
 
       {/* Main Navigation Content */}
-      <SidebarContent className="text-left">
+     <SidebarContent className="text-left">
         <SidebarGroup className="text-left">
           <SidebarGroupLabel className="text-left text-xs font-medium text-muted-foreground">
             Inventory Management
@@ -199,7 +208,8 @@ export default function Sidebar({ activeTab, setActiveTab, appConfig: propConfig
 
           <SidebarGroupContent className="text-left">
             <SidebarMenu className="text-left">
-              {menuItems.map((item) => {
+              {/* 3. Map over filteredMenuItems instead of menuItems */}
+              {filteredMenuItems.map((item) => {
                 const Icon = item.icon;
                 const isParentActive = activeTab.startsWith(item.id);
                 const isOpen = openMenus[item.id] ?? isParentActive;
@@ -210,7 +220,7 @@ export default function Sidebar({ activeTab, setActiveTab, appConfig: propConfig
                     open={isOpen}
                     onOpenChange={() => toggleMenu(item.id)}
                     className="group/collapsible w-full text-left"
-                  >
+                    >
                     <SidebarMenuItem className="text-left">
                       <CollapsibleTrigger asChild>
                         <SidebarMenuButton
