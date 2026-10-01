@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
+use App\Services\AuditLogger;
 
 class AuthController extends Controller
 {
@@ -62,6 +63,7 @@ class AuthController extends Controller
 
         if (!$user || !Hash::check($validated['password'], $user->password)) {
             return response()->json(['error' => 'Invalid email or password.'], 401);
+            AuditLogger::log('failed_login'); // Log the failed login attempt
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -70,6 +72,7 @@ class AuthController extends Controller
             'message' => 'Logged in successfully.',
             'user' => $this->formatUser($user),
             'token' => $token,
+            AuditLogger::log('login'), // Log the login event
         ], 200);
     }
 
@@ -78,6 +81,7 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out successfully.'], 200);
+        AuditLogger::log('logout'); // Log the logout event
     }
 
     public function me(Request $request)

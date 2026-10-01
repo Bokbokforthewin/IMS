@@ -5,9 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Traits\Auditable;
 
 class SerializedAsset extends Model
 {
+    use Auditable;
+
     protected $fillable = [
         'item_id',
         'serial_number',

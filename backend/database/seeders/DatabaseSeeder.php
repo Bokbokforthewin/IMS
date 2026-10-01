@@ -20,16 +20,5 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolesAndPermissionsSeeder::class,
         ]);
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'unit' => 'Information and Communications Technology Unit',
-            'division' => 'Management Support Division',
-            'designation' => 'Computer Programmer I'
-        ]);
-
-        $testUser = User::where('email', 'test@example.com')->first();
-        $testUser->assignRole('end_user');
     }
 }

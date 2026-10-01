@@ -44,6 +44,11 @@ const NAV_ITEMS = [
     label: "Admin Panel",
     permission: "manage users",
   },
+  {
+    key: "audit",
+    label: "Audit Trail",
+    permission: "view audit trail",
+  },
 ];
 
 export default function Layout({

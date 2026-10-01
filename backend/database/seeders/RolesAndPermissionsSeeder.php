@@ -28,6 +28,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view reports',
             'manage users',
             'manage roles',
+            'view audit trail',
         ];
 
         foreach ($permissions as $permission) {
@@ -55,6 +56,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view receiving',
             'view assets',
             'view consumables',
+            'view audit trail',
         ]);
 
         // 3. Unit Head: Dashboard, Consumables, Assets
@@ -66,6 +68,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view dashboard',
             'view consumables',
             'view assets',
+            'view audit trail',
         ]);
 
         // 4. Division Chief: Dashboard, Consumables, Assets
@@ -77,6 +80,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view dashboard',
             'view consumables',
             'view assets',
+            'view audit trail',
         ]);
 
         // 5. Property Custodian: Dashboard, Consumables, Assets

@@ -18,6 +18,7 @@ import ConsumablesPage from "./pages/ConsumablesPage";
 import AccountabilityPage from "./pages/AccountabilityPage";
 import TransferReturnPage from "./pages/TransferReturnPage";
 import UserManagementPage from "./pages/UserManagementPage";
+import AuditPage from "./pages/AuditPage";
 
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
@@ -245,6 +246,22 @@ export default function App() {
       return (
         <UserManagementPage
           activeTab={activeTab}
+          handleApiCall={handleApiCall}
+          refreshData={fetchData}
+        />
+      );
+    }
+
+    if (activeTab.startsWith("audit")) {
+      const canViewAudit =
+        hasPermission("view audit trail");
+
+      if (!canViewAudit) return <AccessDenied />;
+
+      return (
+        <AuditPage
+          activeTab={activeTab}
+          api={api}
           handleApiCall={handleApiCall}
           refreshData={fetchData}
         />

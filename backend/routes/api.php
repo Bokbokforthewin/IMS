@@ -56,6 +56,7 @@ Route::prefix('v1')
             Route::get('/users/{user}', [UserController::class, 'show']);
             Route::put('/users/{user}', [UserController::class, 'update']);
             Route::delete('/users/{user}', [UserController::class, 'destroy']);
+            Route::get('/audit-logs', [\App\Http\Controllers\AuditLogController::class, 'index']);
 
             Route::get('/roles', [UserController::class, 'getRoles']);
             Route::patch('/users/{user}/roles', [UserController::class, 'updateRoles']);

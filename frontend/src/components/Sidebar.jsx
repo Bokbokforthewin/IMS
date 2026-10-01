@@ -96,10 +96,16 @@ const menuItems = [
     icon: ShieldCheck,
     subItems: [
       { id: "admin-users", label: "User Management" },
-      { id: "admin-settings", label: "System Settings" },
-      { id: "admin-logs", label: "Audit Logs" },
     ],
   },
+  {
+    id: "audit",
+    label: "Audit Trail",
+    icon: ShieldCheck,
+    subItems: [
+      { id: "audit-logs", label: "Audit Logs" },
+    ],
+  }
 ];
 
 function SidebarCollapseButton() {
