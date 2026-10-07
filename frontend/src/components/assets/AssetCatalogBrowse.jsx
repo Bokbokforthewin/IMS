@@ -3,6 +3,8 @@ import {
   Card,
   CardHeader,
   CardTitle,
+  CardDescription,
+  CardContent,
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +15,6 @@ import {
   AlertDialogContent,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
@@ -24,6 +25,7 @@ import {
   Eye,
   Search,
   X,
+  Layers,
 } from 'lucide-react';
 
 function money(value) {
@@ -44,6 +46,7 @@ function isAssetMatch(asset, query) {
 
   const fields = [
     asset.property_number,
+    asset.reference_no,
     asset.serial_number,
     asset.model,
     asset.manufacturer_name,
@@ -64,33 +67,45 @@ function isAssetMatch(asset, query) {
 
 /**
  * Groups serialized assets into primary items and attached child peripherals.
- * Supports matching attached_to by either parent ID or property_number.
+ * Coerces IDs, property numbers, and reference numbers to strings for matching.
  */
 function groupAssets(assets) {
   if (!Array.isArray(assets)) return [];
 
   const byPropertyNumber = {};
+  const byReferenceNo = {};
   const byId = {};
 
+  // Build lookup maps for parent lookup
   assets.forEach((asset) => {
-    if (asset.property_number) {
-      byPropertyNumber[asset.property_number] = asset;
+    if (asset.id != null) {
+      byId[String(asset.id).trim()] = asset;
     }
-    if (asset.id) {
-      byId[asset.id] = asset;
+    if (asset.property_number != null) {
+      byPropertyNumber[String(asset.property_number).trim()] = asset;
+    }
+    if (asset.reference_no != null) {
+      byReferenceNo[String(asset.reference_no).trim()] = asset;
     }
   });
 
   const childrenByParentKey = {};
 
   assets.forEach((asset) => {
-    const attachedTo = asset.attached_to;
-    if (attachedTo) {
+    // Check multiple possible key names from backend API payloads
+    const rawAttachedTo =
+      asset.attached_to ?? asset.attached_to_id ?? asset.parent_id ?? asset.attachedTo;
+
+    if (rawAttachedTo != null) {
+      const attachedTo = String(rawAttachedTo).trim();
       let parentKey = null;
-      if (byPropertyNumber[attachedTo]) {
-        parentKey = byPropertyNumber[attachedTo].id;
-      } else if (byId[attachedTo]) {
-        parentKey = attachedTo;
+
+      if (byId[attachedTo]) {
+        parentKey = String(byId[attachedTo].id);
+      } else if (byPropertyNumber[attachedTo]) {
+        parentKey = String(byPropertyNumber[attachedTo].id);
+      } else if (byReferenceNo[attachedTo]) {
+        parentKey = String(byReferenceNo[attachedTo].id);
       }
 
       if (parentKey) {
@@ -104,17 +119,19 @@ function groupAssets(assets) {
 
   return assets
     .filter((asset) => {
-      if (
-        asset.attached_to &&
-        (byPropertyNumber[asset.attached_to] || byId[asset.attached_to])
-      ) {
-        return false;
+      const rawAttachedTo =
+        asset.attached_to ?? asset.attached_to_id ?? asset.parent_id ?? asset.attachedTo;
+      if (rawAttachedTo != null) {
+        const attachedTo = String(rawAttachedTo).trim();
+        if (byId[attachedTo] || byPropertyNumber[attachedTo] || byReferenceNo[attachedTo]) {
+          return false; // Hide attached child assets from the top-level grid
+        }
       }
       return true;
     })
     .map((primary) => ({
       primary,
-      children: childrenByParentKey[primary.id] || [],
+      children: childrenByParentKey[String(primary.id)] || [],
     }));
 }
 
@@ -129,13 +146,11 @@ export default function AssetCatalogBrowse({
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   // Safely ensure rawAssets resolves to an array regardless of API payload structure
-  const rawAssets = catalog?.serialized || catalog?.assets || (Array.isArray(catalog) ? catalog : []);
+  const rawAssets =
+    catalog?.serialized || catalog?.assets || (Array.isArray(catalog) ? catalog : []);
   const assets = Array.isArray(rawAssets) ? rawAssets : [];
 
-  const groupedAssets = useMemo(
-    () => groupAssets(assets),
-    [assets]
-  );
+  const groupedAssets = useMemo(() => groupAssets(assets), [assets]);
 
   // Filters primary assets AND attached peripherals against the search query
   const filteredGroupedAssets = useMemo(() => {
@@ -158,14 +173,10 @@ export default function AssetCatalogBrowse({
 
   return (
     <div className="space-y-6">
-
       {/* Header & Search Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Browse Assets</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Select an available asset for accountability issuance.
-          </p>
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -173,7 +184,7 @@ export default function AssetCatalogBrowse({
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search assets, serials, codes, specs..."
+              placeholder="Search property no, serial, model..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 pr-8"
@@ -195,13 +206,9 @@ export default function AssetCatalogBrowse({
         </div>
       </div>
 
-       {/* Proceed Section */}
+      {/* Proceed Section */}
       <div className="flex justify-end border-t pt-4">
-        <Button
-          size="lg"
-          disabled={cart.length === 0}
-          onClick={onProceed}
-        >
+        <Button size="lg" disabled={cart.length === 0} onClick={onProceed}>
           Proceed
           {cart.length > 0 && (
             <Badge variant="secondary" className="ml-2">
@@ -249,11 +256,19 @@ export default function AssetCatalogBrowse({
             return (
               <Card key={primary.id} className="flex flex-col justify-between">
                 <div>
-                  <CardHeader>
-                    <div className="flex items-center justify-between gap-1 mb-1">
-                      <div className="flex gap-1">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <div className="flex items-center gap-1.5">
                         <Badge variant="default">Asset</Badge>
-                        {isBundled && <Badge variant="outline">Bundled ({children.length})</Badge>}
+                        {isBundled && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 gap-1"
+                          >
+                            <Package className="h-3 w-3" />
+                            Bundled ({children.length})
+                          </Badge>
+                        )}
                       </div>
                       <Badge variant="outline">
                         {cost >= 50000 ? 'PAR' : 'ICS'}
@@ -263,15 +278,30 @@ export default function AssetCatalogBrowse({
                     <CardTitle className="text-base line-clamp-1">
                       {brandName}{itemName}
                     </CardTitle>
-                    {(primary.property_number || itemCode !== 'N/A') && (
-                      <p className="text-xs font-mono text-muted-foreground mt-1">
-                        {primary.property_number || itemCode}
-                      </p>
-                    )}
+                    <CardDescription className="text-xs font-mono text-muted-foreground truncate">
+                      {primary.property_number || primary.reference_no || itemCode}
+                    </CardDescription>
                   </CardHeader>
+
+                  <CardContent className="pt-0 pb-3 text-sm">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground">Unit Cost</span>
+                      <span className="font-semibold text-foreground">{money(cost)}</span>
+                    </div>
+
+                    {/* Bundled peripherals summary preview */}
+                    {isBundled && (
+                      <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">Includes: </span>
+                        {children
+                          .map((c) => c.item?.name || c.item_name || 'Peripheral')
+                          .join(', ')}
+                      </div>
+                    )}
+                  </CardContent>
                 </div>
 
-                <CardFooter className="flex gap-2 pt-2">
+                <CardFooter className="flex gap-2 pt-2 border-t">
                   <Button
                     variant="outline"
                     size="sm"
@@ -311,41 +341,61 @@ export default function AssetCatalogBrowse({
       <AlertDialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {detailsGroup?.primary?.item?.name || detailsGroup?.primary?.item_name || 'Asset Details'}
-              {detailsGroup?.children.length > 0 && ` + ${detailsGroup.children.length} bundled item(s)`}
+            <AlertDialogTitle className="flex items-center gap-2">
+              <span>
+                {detailsGroup?.primary?.item?.name ||
+                  detailsGroup?.primary?.item_name ||
+                  'Asset Details'}
+              </span>
+              {detailsGroup?.children.length > 0 && (
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                  <Layers className="mr-1 h-3.5 w-3.5" />
+                  + {detailsGroup.children.length} bundled peripheral(s)
+                </Badge>
+              )}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Full asset specification and attached peripherals.
-            </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
             {allDetailRows.map((row, idx) => {
               const rowName = row.item?.name || row.item_name || 'Asset Item';
               const rowCode = row.item?.item_code || row.item_code || 'N/A';
               const isMain = idx === 0;
 
               return (
-                <div key={row.id || idx} className="border rounded-md p-3">
+                <div
+                  key={row.id || idx}
+                  className={`border rounded-md p-3.5 ${
+                    isMain ? 'bg-muted/30 border-muted-foreground/20' : ''
+                  }`}
+                >
                   <div className="flex items-center justify-between mb-2">
                     <div className="font-medium text-sm">{rowName}</div>
                     <Badge variant={isMain ? 'default' : 'secondary'}>
-                      {isMain ? 'Main Asset' : 'Peripheral'}
+                      {isMain ? 'Main Asset' : 'Peripheral / Bundled Item'}
                     </Badge>
                   </div>
 
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                     <dt className="text-muted-foreground">Item Code</dt>
-                    <dd className="text-right">{rowCode}</dd>
+                    <dd className="text-right font-mono text-xs">{rowCode}</dd>
 
                     <dt className="text-muted-foreground">Property No.</dt>
-                    <dd className="text-right">{row.property_number || 'N/A'}</dd>
+                    <dd className="text-right font-mono text-xs">
+                      {row.property_number || 'N/A'}
+                    </dd>
+
+                    {row.reference_no && (
+                      <>
+                        <dt className="text-muted-foreground">Reference No.</dt>
+                        <dd className="text-right font-mono text-xs">{row.reference_no}</dd>
+                      </>
+                    )}
 
                     {row.serial_number && (
                       <>
                         <dt className="text-muted-foreground">Serial Number</dt>
-                        <dd className="text-right font-mono">{row.serial_number}</dd>
+                        <dd className="text-right font-mono text-xs">{row.serial_number}</dd>
                       </>
                     )}
 
@@ -383,7 +433,6 @@ export default function AssetCatalogBrowse({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </div>
   );
 }

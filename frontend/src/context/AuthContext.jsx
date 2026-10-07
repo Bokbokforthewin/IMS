@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('auth_token'));
   const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState({ simplified_encoding_workflow: true });
 
   const fetchMe = async () => {
     try {
@@ -21,9 +22,18 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const fetchSettings = async () => {
+    try {
+      const res = await api.get('/v1/settings');
+      setSettings(res.data);
+    } catch {
+      // leave default if it fails — don't block the app over this
+    }
+  };
+
   useEffect(() => {
     if (token) {
-      fetchMe();
+      fetchMe().then(fetchSettings);
     } else {
       setLoading(false);
     }
@@ -37,6 +47,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem('auth_token', newToken);
       setToken(newToken);
       setUser(userData);
+      await fetchSettings(); // Fetch settings on successful login
       return res.data;
     } catch (err) {
       throw new Error(err.response?.data?.error || err.response?.data?.message || 'Login failed');
@@ -51,6 +62,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem('auth_token', newToken);
       setToken(newToken);
       setUser(userData);
+      await fetchSettings(); // Fetch settings on successful registration
       return res.data;
     } catch (err) {
       const serverMessage = err.response?.data?.error || err.response?.data?.message;
@@ -72,7 +84,20 @@ export function AuthProvider({ children }) {
   const hasPermission = (perm) => user?.permissions?.some((p) => p.name === perm) ?? false;
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, hasRole, hasPermission }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        settings,
+        refetchSettings: fetchSettings,
+        login,
+        register,
+        logout,
+        hasRole,
+        hasPermission,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

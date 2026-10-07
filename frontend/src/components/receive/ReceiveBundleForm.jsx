@@ -359,7 +359,7 @@ function ComponentFields({ label, items, value, onChange, sets }) {
   return (
     <FieldGroup>
       <Field data-invalid={!value.item_id ? undefined : false}>
-        <FieldLabel>{label} *</FieldLabel>
+        <FieldLabel>{label} <span className="text-destructive">*</span></FieldLabel>
         <ItemSearch
           items={assetItems}
           itemId={value.item_id}
@@ -369,7 +369,7 @@ function ComponentFields({ label, items, value, onChange, sets }) {
 
       <div className="grid grid-cols-2 gap-4">
         <Field>
-          <FieldLabel>Unit Cost (₱) *</FieldLabel>
+          <FieldLabel>Unit Cost (₱) <span className="text-destructive">*</span></FieldLabel>
           <Input
             type="number"
             step="0.01"
@@ -398,14 +398,14 @@ function ComponentFields({ label, items, value, onChange, sets }) {
 
       <div className="grid grid-cols-3 gap-4">
         <Field>
-          <FieldLabel>Model (Optional)</FieldLabel>
+          <FieldLabel>Model</FieldLabel>
           <Input
             value={value.model}
             onChange={(e) => onChange({ ...value, model: e.target.value })}
           />
         </Field>
         <Field>
-          <FieldLabel>Manufacturer (Optional)</FieldLabel>
+          <FieldLabel>Manufacturer</FieldLabel>
           <Input
             value={value.manufacturer_name}
             onChange={(e) =>
@@ -414,7 +414,7 @@ function ComponentFields({ label, items, value, onChange, sets }) {
           />
         </Field>
         <Field>
-          <FieldLabel>Country of Origin (Optional)</FieldLabel>
+          <FieldLabel>Country of Origin</FieldLabel>
           <Input
             value={value.country_of_origin}
             onChange={(e) =>
@@ -495,7 +495,7 @@ export default function ReceiveBundleForm({ items, handleApiCall, onSuccess }) {
         <FieldGroup>
           <div className="grid grid-cols-2 gap-4">
             <Field>
-              <FieldLabel htmlFor="sets">Number of Bundles (Sets) *</FieldLabel>
+              <FieldLabel htmlFor="sets">Number of Bundles (Sets) <span className="text-destructive">*</span></FieldLabel>
               <Input
                 id="sets"
                 type="number"
@@ -507,7 +507,7 @@ export default function ReceiveBundleForm({ items, handleApiCall, onSuccess }) {
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="arrival_date">Arrival Date *</FieldLabel>
+              <FieldLabel htmlFor="arrival_date">Arrival Date <span className="text-destructive">*</span></FieldLabel>
               <ArrivalDatePicker
                 value={arrivalDate}
                 onChange={setArrivalDate}
@@ -517,7 +517,7 @@ export default function ReceiveBundleForm({ items, handleApiCall, onSuccess }) {
 
           <Card>
             <CardHeader>
-              <CardTitle>Main Unit (e.g., Desktop PC)</CardTitle>
+              <CardTitle>Main Unit</CardTitle>
             </CardHeader>
             <CardContent>
               <ComponentFields

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Search, Shield, RefreshCw, MoreVertical, UserCog } from "lucide-react";
+import { Search, Shield, RefreshCw, MoreVertical, UserCog, Pencil } from "lucide-react";
 
 import api from "../../api/client";
 
@@ -16,14 +16,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import UserAccessModal from "./UserAccessModal.jsx";
+import EditUserInfo from "./EditUserInfo.jsx";
 
 export default function UserDirectoryTable() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [selectedUser, setSelectedUser] = useState(null);
+  // Manage User Access Modal state
+  const [selectedAccessUser, setSelectedAccessUser] = useState(null);
   const [isUserAccessOpen, setIsUserAccessOpen] = useState(false);
+
+  // Edit User Info Modal state
+  const [selectedEditUser, setSelectedEditUser] = useState(null);
+  const [isEditUserOpen, setIsEditUserOpen] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -47,14 +53,26 @@ export default function UserDirectoryTable() {
     fetchUsers();
   }, [fetchUsers]);
 
+  // Handlers for User Access Modal
   const openUserAccess = (user) => {
-    setSelectedUser(user);
+    setSelectedAccessUser(user);
     setIsUserAccessOpen(true);
   };
 
   const closeUserAccess = () => {
     setIsUserAccessOpen(false);
-    setSelectedUser(null);
+    setSelectedAccessUser(null);
+  };
+
+  // Handlers for Edit User Info Modal
+  const openEditUser = (user) => {
+    setSelectedEditUser(user);
+    setIsEditUserOpen(true);
+  };
+
+  const closeEditUser = () => {
+    setIsEditUserOpen(false);
+    setSelectedEditUser(null);
   };
 
   const filteredUsers = users.filter((user) => {
@@ -188,17 +206,19 @@ export default function UserDirectoryTable() {
                         {/* ACTIONS */}
                         <TableCell className="text-right">
                           <DropdownMenu>
-                            <DropdownMenuTrigger
-                              render={
-                                <Button variant="ghost" size="icon" className="size-8">
-                                  <MoreVertical className="size-4" />
-                                  <span className="sr-only">Open actions</span>
-                                </Button>
-                              }
-                            />
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-8">
+                                <MoreVertical className="size-4" />
+                                <span className="sr-only">Open actions</span>
+                              </Button>
+                            </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuGroup>
-                                <DropdownMenuLabel>User Access</DropdownMenuLabel>
+                                <DropdownMenuLabel>Account Options</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => openEditUser(user)}>
+                                  <Pencil className="mr-2 size-4" />
+                                  Edit User Info
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => openUserAccess(user)}>
                                   <UserCog className="mr-2 size-4" />
                                   Manage User Access
@@ -217,10 +237,23 @@ export default function UserDirectoryTable() {
         </CardContent>
       </Card>
 
+      {/* EDIT USER INFO MODAL */}
+      {selectedEditUser && (
+        <EditUserInfo
+          user={selectedEditUser}
+          open={isEditUserOpen}
+          onOpenChange={(open) => {
+            setIsEditUserOpen(open);
+            if (!open) setSelectedEditUser(null);
+          }}
+          onUserUpdated={fetchUsers}
+        />
+      )}
+
       {/* USER ACCESS MODAL */}
-      {selectedUser && (
+      {selectedAccessUser && (
         <UserAccessModal
-          user={selectedUser}
+          user={selectedAccessUser}
           isOpen={isUserAccessOpen}
           onClose={closeUserAccess}
           onSaveSuccess={fetchUsers}

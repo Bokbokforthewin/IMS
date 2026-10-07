@@ -24,6 +24,7 @@ class AuditLog extends Model
     protected $casts = [
         'old_values' => 'array',
         'new_values' => 'array',
+        'created_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

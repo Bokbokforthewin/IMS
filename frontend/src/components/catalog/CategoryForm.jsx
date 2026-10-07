@@ -17,7 +17,7 @@ export default function CategoryForm({ categoryForm, setCategoryForm, handleApiC
         <Field>
           <FieldLabel htmlFor="category_name" className="flex items-center gap-2">
             <Tag className="w-4 h-4 text-muted-foreground" />
-            Category Name *
+            Category Name <span className="text-destructive">*</span>
           </FieldLabel>
           <Input
             id="category_name"

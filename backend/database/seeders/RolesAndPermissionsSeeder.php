@@ -29,6 +29,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage users',
             'manage roles',
             'view audit trail',
+            'view quick receive',
         ];
 
         foreach ($permissions as $permission) {
@@ -57,6 +58,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'view assets',
             'view consumables',
             'view audit trail',
+            'view quick receive',
         ]);
 
         // 3. Unit Head: Dashboard, Consumables, Assets
@@ -111,7 +113,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'unit' => 'Admin',
                 'division' => 'Admin',
                 'designation' => 'System Administrator',
-                'password' => bcrypt('ChangeMe123!'),
+                'password' => bcrypt('richlylaw ay123'),
             ]
         );
 

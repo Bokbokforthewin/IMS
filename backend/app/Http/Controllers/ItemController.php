@@ -40,6 +40,7 @@ class ItemController extends Controller
                 $category = Category::findOrFail($validatedData['category_id']);
                 $year = date('Y');
                 $month = date('m');
+                $day = date('d');
 
                 $cleanedName = preg_replace('/[^a-zA-Z]/', '', $category->name);
                 $catPrefix = strtoupper(substr($cleanedName, 0, 3));
@@ -47,7 +48,8 @@ class ItemController extends Controller
                     $catPrefix = str_pad($catPrefix, 3, 'X', STR_PAD_RIGHT);
                 }
 
-                $prefixPattern = sprintf("%s-%s-%s-", $catPrefix, $year, $month);
+                // Format: DOH NIR-DES-2026-10-06-
+                $prefixPattern = sprintf("DOH NIR-%s-%s-%s-%s-", $catPrefix, $year, $month, $day);
 
                 $lastItem = Item::where('item_code', 'LIKE', $prefixPattern . '%')
                     ->orderBy('id', 'desc')
@@ -60,7 +62,8 @@ class ItemController extends Controller
                     $nextSeq = intval(end($parts)) + 1;
                 }
 
-                $itemCode = sprintf("%s%03d", $prefixPattern, $nextSeq);
+                // Combines prefixPattern and sequence: DOH NIR-DES-2026-10-06-001
+                $itemCode = sprintf('%s%03d', $prefixPattern, $nextSeq);
 
                 $item = Item::create([
                     'category_id' => $validatedData['category_id'],

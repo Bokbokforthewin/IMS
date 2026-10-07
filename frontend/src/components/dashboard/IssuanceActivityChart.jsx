@@ -3,10 +3,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
 
-// Theme-aware, low-contrast enterprise palette
 const chartConfig = {
-  issuances: { label: 'Consumable (RIS)', color: 'hsl(var(--primary))' },
-  receipts: { label: 'Asset (PAR/ICS)', color: 'hsl(var(--muted-foreground))' },
+  receipts: { label: 'Asset', color: '#2563eb' },
+  issuances: { label: 'Consumable', color: '#eab308' },
 };
 
 export default function IssuanceActivityChart({ data }) {
@@ -26,6 +25,17 @@ export default function IssuanceActivityChart({ data }) {
       <CardContent className="p-3.5 pt-1">
         <ChartContainer config={chartConfig} className="h-[180px] w-full">
           <BarChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }} barGap={2}>
+            <defs>
+              <linearGradient id="fillIssuances" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-issuances)" stopOpacity={0.95} />
+                <stop offset="95%" stopColor="var(--color-issuances)" stopOpacity={0.01} />
+              </linearGradient>
+              <linearGradient id="fillReceipts" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-receipts)" stopOpacity={0.95} />
+                <stop offset="95%" stopColor="var(--color-receipts)" stopOpacity={0.01} />
+              </linearGradient>
+            </defs>
+
             {/* Micro Gridlines */}
             <CartesianGrid vertical={false} strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.6} />
 
@@ -47,16 +57,16 @@ export default function IssuanceActivityChart({ data }) {
             <ChartTooltip content={<ChartTooltipContent />} />
             <ChartLegend content={<ChartLegendContent className="text-[11px] gap-3 pt-2" />} />
 
-            {/* Clean, high-density bar proportions */}
+            {/* Clean, high-density bar proportions with matched linear gradients */}
             <Bar 
               dataKey="issuances" 
-              fill="var(--color-issuances)" 
+              fill="url(#fillIssuances)" 
               radius={[2, 2, 0, 0]} 
               maxBarSize={14}
             />
             <Bar 
               dataKey="receipts" 
-              fill="var(--color-receipts)" 
+              fill="url(#fillReceipts)" 
               radius={[2, 2, 0, 0]} 
               maxBarSize={14}
             />

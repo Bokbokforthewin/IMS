@@ -19,6 +19,7 @@ import AccountabilityPage from "./pages/AccountabilityPage";
 import TransferReturnPage from "./pages/TransferReturnPage";
 import UserManagementPage from "./pages/UserManagementPage";
 import AuditPage from "./pages/AuditPage";
+import QuickReceivePage from "./pages/QuickReceivePage";
 
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
@@ -165,6 +166,17 @@ export default function App() {
           categories={categories}
           stockBatches={stockBatches}
           serializedAssets={serializedAssets}
+        />
+      );
+    }
+
+    if (activeTab.startsWith("quick-receive")) {
+      if (!hasPermission("view quick receive")) return <AccessDenied />;
+      return (
+        <QuickReceivePage
+          categories={categories}
+          items={items}
+          handleApiCall={handleApiCall}
         />
       );
     }

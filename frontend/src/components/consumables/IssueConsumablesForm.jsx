@@ -1,14 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { CalendarIcon, Search, Check, X } from 'lucide-react';
 import api from '../../api/client';
 
 import {
   Field,
   FieldGroup,
   FieldLabel,
-  FieldDescription,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +31,288 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
+// --- Date Helpers ---
+function formatDateDisplay(date) {
+  if (!date || isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function formatISO(date) {
+  if (!date || isNaN(date.getTime())) return '';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function parseISO(isoString) {
+  if (!isoString) return undefined;
+  const [y, m, d] = isoString.split('-').map(Number);
+  if (y && m && d) return new Date(y, m - 1, d);
+  const date = new Date(isoString);
+  return isNaN(date.getTime()) ? undefined : date;
+}
+
+function isValidDate(date) {
+  return !!date && !isNaN(date.getTime());
+}
+
+// --- DatePicker Component using Shadcn InputGroup + Popover + Calendar ---
+function IssuanceDatePicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const currentDate = parseISO(value);
+  const [month, setMonth] = useState(currentDate || new Date());
+  const [inputValue, setInputValue] = useState(formatDateDisplay(currentDate));
+
+  useEffect(() => {
+    const parsed = parseISO(value);
+    setInputValue(formatDateDisplay(parsed));
+    if (parsed) setMonth(parsed);
+  }, [value]);
+
+  const handleInputChange = (e) => {
+    const rawVal = e.target.value;
+    setInputValue(rawVal);
+    const parsed = new Date(rawVal);
+    if (isValidDate(parsed)) {
+      onChange(formatISO(parsed));
+      setMonth(parsed);
+    }
+  };
+
+  const handleSelectDate = (selectedDate) => {
+    if (selectedDate) {
+      onChange(formatISO(selectedDate));
+      setInputValue(formatDateDisplay(selectedDate));
+    } else {
+      onChange('');
+      setInputValue('');
+    }
+    setOpen(false);
+  };
+
+  return (
+    <InputGroup>
+      <InputGroupInput
+        id="issuance_date"
+        value={inputValue}
+        onChange={handleInputChange}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+        required
+      />
+      <InputGroupAddon align="inline-end">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger
+            render={
+              <InputGroupButton
+                id="date-picker-trigger"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Select issuance date"
+                type="button"
+              >
+                <CalendarIcon className="size-4" />
+                <span className="sr-only">Select issuance date</span>
+              </InputGroupButton>
+            }
+          />
+          <PopoverContent
+            className="w-auto overflow-hidden p-0"
+            align="end"
+            alignOffset={-8}
+            sideOffset={10}
+          >
+            <Calendar
+              mode="single"
+              selected={currentDate}
+              month={month}
+              onMonthChange={setMonth}
+              onSelect={handleSelectDate}
+            />
+          </PopoverContent>
+        </Popover>
+      </InputGroupAddon>
+    </InputGroup>
+  );
+}
+
+// --- Helper to Format User Label ---
+function getUserLabel(user) {
+  if (!user) return '';
+  const desig = user.designation ? ` — ${user.designation}` : '';
+  const dept = user.unit || user.division ? ` (${[user.unit, user.division].filter(Boolean).join(' / ')})` : '';
+  return `${user.name}${desig}${dept}`;
+}
+
+// --- Responsive Searchable Employee Select Dropdown ---
+function UserSearch({ users = [], userId, onSelectUser }) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  // Sync search input when userId changes externally or on user list load
+  useEffect(() => {
+    if (!userId) {
+      setSearchTerm('');
+    } else {
+      const match = users.find((u) => String(u.id) === String(userId));
+      if (match) {
+        const label = getUserLabel(match);
+        if (label !== searchTerm && !isOpen) {
+          setSearchTerm(label);
+        }
+      }
+    }
+  }, [userId, users]);
+
+  // Click outside listener
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filter users based on input query
+  const filteredUsers = (users || []).filter((user) => {
+    if (!searchTerm.trim()) return true;
+    const q = searchTerm.toLowerCase().trim();
+    const name = (user.name || '').toLowerCase();
+    const designation = (user.designation || '').toLowerCase();
+    const unit = (user.unit || '').toLowerCase();
+    const division = (user.division || '').toLowerCase();
+    const email = (user.email || '').toLowerCase();
+
+    return (
+      name.includes(q) ||
+      designation.includes(q) ||
+      unit.includes(q) ||
+      division.includes(q) ||
+      email.includes(q)
+    );
+  });
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setSearchTerm(val);
+    setIsOpen(true);
+
+    // Auto-match exact name or formatted label
+    const exactMatch = users.find((u) => {
+      const label = getUserLabel(u).toLowerCase();
+      const name = (u.name || '').toLowerCase();
+      const trimmed = val.trim().toLowerCase();
+      return trimmed && (label === trimmed || name === trimmed);
+    });
+
+    if (exactMatch) {
+      onSelectUser(String(exactMatch.id));
+    } else {
+      onSelectUser('');
+    }
+  };
+
+  const handleSelectOption = (user) => {
+    setSearchTerm(getUserLabel(user));
+    onSelectUser(String(user.id));
+    setIsOpen(false);
+  };
+
+  const handleClear = () => {
+    setSearchTerm('');
+    onSelectUser('');
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative w-full">
+      <div className="relative flex items-center">
+        <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <Input
+          id="issued_to_id"
+          type="text"
+          required
+          value={searchTerm}
+          onFocus={() => setIsOpen(true)}
+          onChange={handleInputChange}
+          className="pl-9 pr-8"
+          autoComplete="off"
+        />
+        {searchTerm && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="absolute right-2.5 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Clear employee search"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Employee List Dropdown */}
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-lg max-h-64 overflow-y-auto">
+          {filteredUsers.length > 0 ? (
+            <ul className="py-1 divide-y divide-border/40 text-sm">
+              {filteredUsers.map((u) => {
+                const isSelected = String(u.id) === String(userId);
+                const dept = [u.unit, u.division].filter(Boolean).join(' / ');
+
+                return (
+                  <li
+                    key={u.id}
+                    onClick={() => handleSelectOption(u)}
+                    className={`flex flex-col gap-0.5 p-2.5 cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-accent text-accent-foreground font-medium'
+                        : 'hover:bg-muted/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-sm">
+                        {u.name}
+                        {u.designation && (
+                          <span className="ml-1 text-xs text-muted-foreground font-normal">
+                            — {u.designation}
+                          </span>
+                        )}
+                      </span>
+                      {isSelected && <Check className="w-4 h-4 text-primary shrink-0" />}
+                    </div>
+
+                    {dept && (
+                      <div className="text-xs text-muted-foreground">
+                        {dept}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="p-3 text-sm text-muted-foreground text-center">
+              No matching employees found
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function IssueConsumablesForm({ item, handleApiCall, onSuccess }) {
   const [form, setForm] = useState({
@@ -35,7 +329,7 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
   const [successMessage, setSuccessMessage] = useState(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
-  // Fetch users using the authenticated Axios client
+  // Fetch users using authenticated client
   const fetchUsers = useCallback(async () => {
     try {
       const response = await api.get('/v1/users');
@@ -59,14 +353,14 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
     fetchUsers();
   }, [fetchUsers]);
 
-  // Keep item_id in sync when prop changes
+  // Keep item_id in sync when item prop updates
   useEffect(() => {
     setForm((f) => ({ ...f, item_id: item?.id || '' }));
   }, [item]);
 
   const selectedUser = users.find((u) => String(u.id) === String(form.issued_to_id));
 
-  // Pre-validate form before opening confirmation dialog
+  // Pre-validate form before opening confirmation modal
   const handlePreSubmit = (e) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -131,71 +425,68 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
         </div>
       )}
 
-      {/* Target Item Card Summary */}
+      {/* Target Item Summary Card */}
       <div className="rounded-lg border bg-muted/40 p-4 space-y-1">
         <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Issuing Item</span>
         <h4 className="text-base font-semibold">{item.name}</h4>
         <p className="text-xs text-muted-foreground">
-          <span className="font-mono">[{item.item_code}]</span> &mdash; Available: <strong className="text-foreground">{item.total_stock} {item.unit_of_measure}</strong>
+          <span> Available: </span>
+          <strong className="text-foreground">{item.total_stock} {item.unit_of_measure}</strong>
+        </p>
+        <p className="text-xs text-muted-foreground">
+          <span className="font-mono">[{item.item_code}]</span>
         </p>
       </div>
 
       <form onSubmit={handlePreSubmit}>
         <FieldGroup className="space-y-4">
+
+           {/* Searchable Issued To Employee Field */}
+          <Field>
+            <FieldLabel htmlFor="issued_to_id">
+              Issued To <span className="text-destructive">*</span>
+            </FieldLabel>
+            <UserSearch
+              users={users}
+              userId={form.issued_to_id}
+              onSelectUser={(id) => setForm({ ...form, issued_to_id: id })}
+            />
+          </Field>
+
+
           {/* Quantity Field */}
           <Field>
-            <FieldLabel htmlFor="quantity_requested">Quantity to Issue</FieldLabel>
+            <FieldLabel htmlFor="quantity_requested">
+              Quantity to Issue <span className="text-destructive">*</span>
+            </FieldLabel>
             <Input
               id="quantity_requested"
               type="number"
               required
               min="1"
               max={item.total_stock}
-              placeholder="e.g., 5"
               value={form.quantity_requested}
               onChange={(e) => setForm({ ...form, quantity_requested: e.target.value })}
             />
-            <FieldDescription>Maximum available stock is {item.total_stock} {item.unit_of_measure}</FieldDescription>
           </Field>
 
-          {/* Issued To Field */}
+          {/* Custom Issuance DatePicker Field */}
           <Field>
-            <FieldLabel htmlFor="issued_to_id">Issued To</FieldLabel>
-            <select
-              id="issued_to_id"
-              required
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              value={form.issued_to_id}
-              onChange={(e) => setForm({ ...form, issued_to_id: e.target.value })}
-            >
-              <option value="" disabled>Select employee...</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} {u.designation ? `— ${u.designation}` : ''} {u.unit || u.division ? `(${[u.unit, u.division].filter(Boolean).join(' / ')})` : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          {/* Issuance Date Field */}
-          <Field>
-            <FieldLabel htmlFor="issuance_date">Issuance Date</FieldLabel>
-            <Input
-              id="issuance_date"
-              type="date"
-              required
+            <FieldLabel htmlFor="issuance_date">
+              Issuance Date <span className="text-destructive">*</span>
+            </FieldLabel>
+            <IssuanceDatePicker
               value={form.issuance_date}
-              onChange={(e) => setForm({ ...form, issuance_date: e.target.value })}
+              onChange={(dateStr) => setForm({ ...form, issuance_date: dateStr })}
             />
           </Field>
 
           {/* Purpose / Remarks Field */}
           <Field>
-            <FieldLabel htmlFor="purpose">Purpose / Remarks (Optional)</FieldLabel>
+            <FieldLabel htmlFor="purpose">Purpose / Remarks</FieldLabel>
             <Input
               id="purpose"
               type="text"
-              placeholder="e.g., Monthly office supplies printing"
               value={form.purpose}
               onChange={(e) => setForm({ ...form, purpose: e.target.value })}
             />

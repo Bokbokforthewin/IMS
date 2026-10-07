@@ -12,7 +12,7 @@ export default function AuditPage() {
   const [logs, setLogs] = useState([]);
   const [pagination, setPagination] = useState({ currentPage: 1, lastPage: 1, total: 0 });
   const [loading, setLoading] = useState(true);
-  
+
   // Filters & Search
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -29,7 +29,7 @@ export default function AuditPage() {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search);
-      setPage(1); // Reset to page 1 on new search
+      setPage(1);
     }, 300);
 
     return () => clearTimeout(handler);
@@ -42,11 +42,11 @@ export default function AuditPage() {
   };
 
   const fetchAuditLogs = useCallback(async () => {
-    // Abort previous pending request if new fetch is triggered
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    abortControllerRef.current = new AbortController();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setLoading(true);
     try {
@@ -56,7 +56,7 @@ export default function AuditPage() {
           search: debouncedSearch || undefined,
           event: eventFilter !== "all" ? eventFilter : undefined,
         },
-        signal: abortControllerRef.current.signal,
+        signal: controller.signal,
       });
 
       const resData = response.data;
@@ -71,7 +71,10 @@ export default function AuditPage() {
         console.error("Failed to load audit logs:", error);
       }
     } finally {
-      setLoading(false);
+      // Prevents cancelled requests from turning off loading for newer active requests
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [page, debouncedSearch, eventFilter]);
 
@@ -106,9 +109,21 @@ export default function AuditPage() {
     });
   };
 
-  // Helper to extract all unique keys modified in diffs
+  // Safely parse JSON strings or objects
+  const parsePayload = (val) => {
+    if (!val) return {};
+    if (typeof val === "object") return val;
+    try {
+      return JSON.parse(val);
+    } catch {
+      return {};
+    }
+  };
+
   const getDiffKeys = (oldVals = {}, newVals = {}) => {
-    const keys = new Set([...Object.keys(oldVals || {}), ...Object.keys(newVals || {})]);
+    const oldObj = parsePayload(oldVals);
+    const newObj = parsePayload(newVals);
+    const keys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
     return Array.from(keys);
   };
 
@@ -118,13 +133,9 @@ export default function AuditPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">System Audit Trail</h1>
-          <p className="text-sm text-muted-foreground">
-            Track user activity, system changes, and access logs.
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Event Filter Dropdown */}
           <Select value={eventFilter} onValueChange={handleEventFilterChange}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="All Events" />
@@ -140,7 +151,6 @@ export default function AuditPage() {
             </SelectContent>
           </Select>
 
-          {/* Search Input */}
           <Input
             placeholder="Search user, IP, OS, or browser..."
             value={search}
@@ -202,10 +212,18 @@ export default function AuditPage() {
                   <TableCell>{getEventBadge(log.event)}</TableCell>
                   <TableCell className="font-mono text-xs">{log.ip_address || "N/A"}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {log.browser} • {log.os} ({log.device})
+                    {log.browser || log.os || log.device ? (
+                      <span>
+                        {log.browser ?? "Unknown Browser"}
+                        {log.os ? ` • ${log.os}` : ""}
+                        {log.device ? ` (${log.device})` : ""}
+                      </span>
+                    ) : (
+                      "N/A"
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
-                    {(log.old_values || log.new_values) ? (
+                    {log.old_values || log.new_values ? (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -301,8 +319,10 @@ export default function AuditPage() {
                     </TableHeader>
                     <TableBody>
                       {getDiffKeys(selectedLog.old_values, selectedLog.new_values).map((key) => {
-                        const oldVal = selectedLog.old_values?.[key];
-                        const newVal = selectedLog.new_values?.[key];
+                        const oldObj = parsePayload(selectedLog.old_values);
+                        const newObj = parsePayload(selectedLog.new_values);
+                        const oldVal = oldObj[key];
+                        const newVal = newObj[key];
                         const isChanged = oldVal !== newVal;
 
                         return (
@@ -326,7 +346,7 @@ export default function AuditPage() {
                     <div>
                       <h4 className="font-bold text-rose-500 mb-1">Old Values:</h4>
                       <pre className="bg-muted p-3 rounded-md overflow-x-auto border">
-                        {JSON.stringify(selectedLog.old_values, null, 2)}
+                        {JSON.stringify(parsePayload(selectedLog.old_values), null, 2)}
                       </pre>
                     </div>
                   )}
@@ -334,7 +354,7 @@ export default function AuditPage() {
                     <div>
                       <h4 className="font-bold text-emerald-500 mb-1">New Values:</h4>
                       <pre className="bg-muted p-3 rounded-md overflow-x-auto border">
-                        {JSON.stringify(selectedLog.new_values, null, 2)}
+                        {JSON.stringify(parsePayload(selectedLog.new_values), null, 2)}
                       </pre>
                     </div>
                   )}

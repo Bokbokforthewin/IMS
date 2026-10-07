@@ -10,8 +10,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from "@/components/ui/button";
-
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import api from '../../api/client.js';
 
 export default function DeleteReceivedItemModal({ isOpen, onClose, row, onDeleted }) {
   const [deleting, setDeleting] = useState(false);
@@ -21,31 +20,22 @@ export default function DeleteReceivedItemModal({ isOpen, onClose, row, onDelete
 
   const isConsumable = row.type === 'Consumable';
   const endpoint = isConsumable
-    ? `/inventory/stock-batches/${row.id}`
-    : `/inventory/serialized-assets/${row.id}`;
+    ? `/v1/inventory/stock-batches/${row.id}`
+    : `/v1/inventory/serialized-assets/${row.id}`;
 
   const handleDelete = async (e) => {
-    // Prevent default closing so modal remains open if an API error occurs
     e.preventDefault();
     setDeleting(true);
     setError(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'DELETE',
-        headers: { Accept: 'application/json' },
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || 'Failed to delete record.');
-        return;
-      }
-
+      await api.delete(endpoint);
       onDeleted();
       onClose();
     } catch (err) {
-      setError('Network error while deleting.');
+      // Surface whatever the server actually said, instead of a generic fallback.
+      const data = err.response?.data;
+      setError(data?.error || data?.message || `Request failed${err.response?.status ? ` (${err.response.status})` : ''}.`);
     } finally {
       setDeleting(false);
     }
@@ -58,13 +48,11 @@ export default function DeleteReceivedItemModal({ isOpen, onClose, row, onDelete
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-3 text-sm text-muted-foreground">
-              {/* Error Callout */}
               {error && (
                 <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm font-medium text-destructive">
                   {error}
                 </div>
               )}
-
               <p>
                 This action cannot be undone. This will permanently delete the received item record for{' '}
                 <strong className="font-bold text-foreground">{row.item_name}</strong>{' '}

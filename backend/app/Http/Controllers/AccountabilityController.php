@@ -134,38 +134,55 @@ class AccountabilityController extends Controller
                         }
                     }
 
+                    // Pass 3: Derive unit acronym and shared sequence before processing buckets
+                    $recipientUserId = $validated['user_id'] ?? $validated['received_mr_by_id'];
+                    $recipient = User::find($recipientUserId);
+                    $rawUnitName = trim($recipient?->unit ?? 'OFFICE');
+
+                    if (preg_match('/^[A-Za-z0-9]{2,6}$/', $rawUnitName)) {
+                        $unitName = strtoupper($rawUnitName);
+                    } else {
+                        $acronym = '';
+                        foreach (explode(' ', $rawUnitName) as $word) {
+                            $cleanWord = preg_replace('/[^A-Za-z0-9]/', '', $word);
+                            if (!empty($cleanWord)) {
+                                $acronym .= strtoupper($cleanWord[0]);
+                            }
+                        }
+                        $unitName = !empty($acronym) ? $acronym : 'OFFICE';
+                    }
+
+                    // One shared counter for this unit + year across BOTH receipt types
+                    $lastReceipt = AccountabilityReceipt::where('document_number', 'like', "{$unitName}-{$year}-%")
+                        ->orderBy('id', 'desc')
+                        ->lockForUpdate()
+                        ->first();
+
+                    $nextSeq = 1;
+                    if ($lastReceipt && $lastReceipt->document_number) {
+                        $parts = explode('-', $lastReceipt->document_number);
+                        $nextSeq = intval(end($parts)) + 1;
+                    }
+
                     $createdReceipts = [];
                     $buckets = [
                         ['type' => 'PAR', 'lines' => $parLines],
                         ['type' => 'ICS', 'lines' => $icsLines],
                     ];
 
-                    // Pass 3: Create distinct accountability receipts (PAR/ICS) and assign assets
                     foreach ($buckets as $bucket) {
                         if (empty($bucket['lines'])) continue;
 
                         $receiptType = $bucket['type'];
-
-                        // Lock and generate next sequential document number
-                        $lastReceipt = AccountabilityReceipt::where('receipt_type', $receiptType)
-                            ->whereYear('date_issued', $year)
-                            ->orderBy('id', 'desc')
-                            ->lockForUpdate()
-                            ->first();
-
-                        $nextSeq = 1;
-                        if ($lastReceipt && $lastReceipt->document_number) {
-                            $parts = explode('-', $lastReceipt->document_number);
-                            $nextSeq = intval(end($parts)) + 1;
-                        }
-                        $documentNumber = sprintf("%s-%s-%04d", $receiptType, $year, $nextSeq);
+                        $documentNumber = sprintf("%s-%s-%04d", $rawUnitName, $year, $nextSeq);
+                        $nextSeq++; // Increment locally so PAR + ICS pair in same issuance get sequential numbers
 
                         $receipt = AccountabilityReceipt::create([
                             'receipt_type' => $receiptType,
                             'document_number' => $documentNumber,
-                            'user_id' => $validated['user_id'] ?? $validated['received_mr_by_id'],
+                            'user_id' => $recipientUserId,
                             'issued_by_id' => $validated['issued_by_id'],
-                            'received_mr_by_id' => $validated['received_mr_by_id'],
+                            'received_mr_by_id' => $recipient?->findUnitHead()?->id ?? $validated['received_mr_by_id'],
                             'date_issued' => $dateIssued,
                             'remarks' => $validated['remarks'] ?? null,
                         ]);

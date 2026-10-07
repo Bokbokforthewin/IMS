@@ -13,6 +13,8 @@ use App\Http\Controllers\AppConfigController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\SystemSettingController;
+use App\Http\Controllers\QuickReceiveController;
 
 /*
 |--------------------------------------------------------------------------
@@ -39,6 +41,17 @@ Route::prefix('v1')->group(function () {
 Route::prefix('v1')
     ->middleware(['auth:sanctum'])
     ->group(function () {
+
+        // System Settings
+        Route::get('/settings', [SystemSettingController::class, 'index']); // any logged-in user can read
+        Route::middleware('permission:manage roles,sanctum')->group(function () {
+            Route::put('/settings', [SystemSettingController::class, 'update']);
+            Route::post('/quick-receive-bundle', [QuickReceiveController::class, 'storeBundle']);
+        });
+
+        Route::middleware('permission:view quick receive')->group(function () {
+            Route::post('/quick-receive', [QuickReceiveController::class, 'store']);
+        });
 
         // Session & Identity
         Route::post('/auth/logout', [AuthController::class, 'logout']);

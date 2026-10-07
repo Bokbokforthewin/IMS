@@ -387,7 +387,7 @@ export default function ReceiveForm({
         <FieldGroup>
           {/* Responsive Auto-Matching Catalog Item Search */}
           <Field data-invalid={!receiveForm.item_id ? undefined : false}>
-            <FieldLabel htmlFor="item_id">Select Catalog Item *</FieldLabel>
+            <FieldLabel htmlFor="item_id">Select Catalog Item <span className="text-destructive">*</span></FieldLabel>
             <ItemSearch
               items={items}
               itemId={receiveForm.item_id}
@@ -399,7 +399,7 @@ export default function ReceiveForm({
 
           {/* Unit Cost */}
           <Field>
-            <FieldLabel htmlFor="unit_cost">Unit Cost (₱) *</FieldLabel>
+            <FieldLabel htmlFor="unit_cost">Unit Cost (₱) <span className="text-destructive">*</span></FieldLabel>
             <Input
               id="unit_cost"
               type="number"
@@ -415,7 +415,7 @@ export default function ReceiveForm({
 
           {/* Custom DatePicker Input */}
           <Field>
-            <FieldLabel htmlFor="arrival_date">Arrival Date *</FieldLabel>
+            <FieldLabel htmlFor="arrival_date">Arrival Date <span className="text-destructive">*</span></FieldLabel>
             <ArrivalDatePicker
               value={receiveForm.arrival_date || ''}
               onChange={(dateStr) =>
@@ -426,7 +426,7 @@ export default function ReceiveForm({
 
           {/* Quantity */}
           <Field>
-            <FieldLabel htmlFor="quantity">Quantity *</FieldLabel>
+            <FieldLabel htmlFor="quantity">Quantity <span className="text-destructive">*</span></FieldLabel>
             <Input
               id="quantity"
               type="number"
@@ -437,9 +437,6 @@ export default function ReceiveForm({
                 setReceiveForm({ ...receiveForm, quantity: e.target.value })
               }
             />
-            <FieldDescription>
-              How many identical units arrived in this delivery.
-            </FieldDescription>
           </Field>
 
           {/* Asset Specific Details */}
@@ -468,13 +465,12 @@ export default function ReceiveForm({
                     </FieldLabel>
                   </div>
                   <FieldDescription>
-                    Turn on to automatically assign a property number. Leave off if
-                    the asset only requires a serial number.
+                    Turn on to automatically assign a property number.
                   </FieldDescription>
                 </Field>
 
                 <Field>
-                  <FieldLabel htmlFor="model">Model (Optional)</FieldLabel>
+                  <FieldLabel htmlFor="model">Model</FieldLabel>
                   <Input
                     id="model"
                     value={receiveForm.model || ''}
@@ -486,7 +482,7 @@ export default function ReceiveForm({
 
                 <Field>
                   <FieldLabel htmlFor="manufacturer_name">
-                    Manufacturer (Optional)
+                    Manufacturer
                   </FieldLabel>
                   <Input
                     id="manufacturer_name"
@@ -502,7 +498,7 @@ export default function ReceiveForm({
 
                 <Field>
                   <FieldLabel htmlFor="country_of_origin">
-                    Country of Origin (Optional)
+                    Country of Origin
                   </FieldLabel>
                   <Input
                     id="country_of_origin"
@@ -518,7 +514,7 @@ export default function ReceiveForm({
 
                 {quantity > 0 && (
                   <Field>
-                    <FieldLabel>Serial Numbers *</FieldLabel>
+                    <FieldLabel>Serial Numbers <span className="text-destructive">*</span></FieldLabel>
                     <SerialNumberScanner
                       quantity={quantity}
                       serials={serials}

@@ -1,10 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { format } from 'date-fns';
 import api from '@/api/client'; // Import your centralized Axios client
 import EditReceivedItemModal from './EditReceivedItemModal.jsx';
 import DeleteReceivedItemModal from './DeleteReceivedItemModal.jsx';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Search, RotateCcw, Calendar as CalendarIcon } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -59,6 +68,11 @@ export default function ReceivedStockTable({ refreshKey }) {
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
+  // Filter States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('ALL'); // 'ALL' | 'Asset' | 'Consumable'
+  const [dateRange, setDateRange] = useState(undefined); // { from: Date, to: Date } | undefined
+
   const [editingRow, setEditingRow] = useState(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -71,10 +85,8 @@ export default function ReceivedStockTable({ refreshKey }) {
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      // Using centralized Axios client (api base is '/api', so path is '/v1/inventory/...')
       const res = await api.get('/v1/inventory/received-history?per_page=50');
       
-      // Handles both paginated (res.data.data) and non-paginated (res.data) responses
       const payload = res.data;
       const dataList = Array.isArray(payload) 
         ? payload 
@@ -110,12 +122,154 @@ export default function ReceivedStockTable({ refreshKey }) {
     setIsDetailsOpen(true);
   };
 
+  const resetFilters = () => {
+    setSearchQuery('');
+    setTypeFilter('ALL');
+    setDateRange(undefined);
+  };
+
   const grouped = groupHistory(history);
+
+  // Filter grouped items based on text search, type, and date range
+  const filteredGrouped = grouped.filter(({ primary, children }) => {
+    // 1. Filter by Item Type
+    if (typeFilter !== 'ALL') {
+      const isTypeMatch = (row) => {
+        if (typeFilter === 'Asset') return row.type === 'Asset';
+        if (typeFilter === 'Consumable') return row.type !== 'Asset'; // Handles 'Consumable', 'Stock', 'Inventory', etc.
+        return true;
+      };
+
+      const primaryMatch = isTypeMatch(primary);
+      const childMatch = children.some(isTypeMatch);
+
+      if (!primaryMatch && !childMatch) return false;
+    }
+
+    // 2. Filter by Date Range
+    if (dateRange?.from || dateRange?.to) {
+      const rowDateStr = primary.received_at || primary.created_at;
+      if (!rowDateStr) return false;
+
+      const itemDate = new Date(rowDateStr);
+
+      if (dateRange.from) {
+        const start = new Date(dateRange.from);
+        start.setHours(0, 0, 0, 0);
+        if (itemDate < start) return false;
+      }
+
+      if (dateRange.to) {
+        const end = new Date(dateRange.to);
+        end.setHours(23, 59, 59, 999);
+        if (itemDate > end) return false;
+      }
+    }
+
+    // 3. Search Query Filter (Text, Codes, Specs, or Formatted Dates)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+
+      const matchesQuery = (row) => {
+        const formattedDate = row.received_at ? new Date(row.received_at).toLocaleDateString() : '';
+        return (
+          row.item_name?.toLowerCase().includes(query) ||
+          row.item_code?.toLowerCase().includes(query) ||
+          row.reference_no?.toLowerCase().includes(query) ||
+          row.serial_number?.toLowerCase().includes(query) ||
+          row.model?.toLowerCase().includes(query) ||
+          row.manufacturer_name?.toLowerCase().includes(query) ||
+          formattedDate.toLowerCase().includes(query)
+        );
+      };
+
+      return matchesQuery(primary) || children.some(matchesQuery);
+    }
+
+    return true;
+  });
+
+  const hasActiveFilters = searchQuery || typeFilter !== 'ALL' || Boolean(dateRange?.from || dateRange?.to);
   const allDetailRows = detailsGroup ? [detailsGroup.primary, ...detailsGroup.children] : [];
 
   return (
     <div className="receive-panel">
-      <h2 className="receive-panel__title text-xl font-bold mb-4">Received Stocks & Assets</h2>
+      {/* Title & Filter Bar Controls */}
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <h2 className="receive-panel__title text-xl font-bold tracking-tight">
+            Received Stocks & Assets
+          </h2>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={resetFilters} className="self-start sm:self-auto text-xs gap-1">
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset Filters
+            </Button>
+          )}
+        </div>
+
+        {/* Toolbar: Search, Type Filter, Date Range Popover */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search name, code, ref, date..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-9"
+            />
+          </div>
+
+          {/* Type Filter Select */}
+          <div className="relative">
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
+            >
+              <option value="ALL">All Item Types</option>
+              <option value="Asset">Assets Only</option>
+              <option value="Consumable">Consumables / Stocks</option>
+            </select>
+          </div>
+
+          {/* Date Range Picker Popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left font-normal h-9 px-3"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, "LLL dd, y")} -{" "}
+                      {format(dateRange.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(dateRange.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span className="text-muted-foreground">Pick a date range</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
 
       {loadingHistory && <p className="receive-table__loading text-muted-foreground">Loading...</p>}
 
@@ -123,9 +277,18 @@ export default function ReceivedStockTable({ refreshKey }) {
         <p className="receive-table__empty text-muted-foreground">No received records found.</p>
       )}
 
-      {!loadingHistory && grouped.length > 0 && (
+      {!loadingHistory && grouped.length > 0 && filteredGrouped.length === 0 && (
+        <div className="flex flex-col h-32 items-center justify-center text-center text-sm text-muted-foreground gap-2">
+          <span>No records match your selected filter criteria.</span>
+          <Button variant="outline" size="sm" onClick={resetFilters}>
+            Clear Filters
+          </Button>
+        </div>
+      )}
+
+      {!loadingHistory && filteredGrouped.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {grouped.map(({ primary, children }) => {
+          {filteredGrouped.map(({ primary, children }) => {
             const isBundled = children.length > 0;
 
             return (
@@ -177,6 +340,7 @@ export default function ReceivedStockTable({ refreshKey }) {
         </div>
       )}
 
+      {/* Details Modal */}
       <AlertDialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
@@ -184,9 +348,6 @@ export default function ReceivedStockTable({ refreshKey }) {
               {detailsGroup?.primary?.item_name}
               {detailsGroup?.children.length > 0 && ` + ${detailsGroup.children.length} bundled item(s)`}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Full details for every item received together in this batch.
-            </AlertDialogDescription>
           </AlertDialogHeader>
 
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">

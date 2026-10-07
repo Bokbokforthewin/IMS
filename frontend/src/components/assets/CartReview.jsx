@@ -140,7 +140,7 @@ export default function CartReview({
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                   <span className="text-muted-foreground flex items-center gap-1 font-medium">
                     <UserCheck className="h-3.5 w-3.5 text-primary shrink-0" />
-                    Secondary Receiver:
+                    End User:
                     <strong className="text-foreground font-semibold">
                       {secondaryReceiver}
                     </strong>
@@ -174,11 +174,8 @@ export default function CartReview({
         <div>
           <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
             <ShoppingCart className="h-5 w-5 text-primary" />
-            Confirm Delivery & Receiver Assignments
+            Confirm Receiver Assignments
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Review primary and secondary receiver details before generating official receipts.
-          </p>
         </div>
       </div>
 
@@ -186,11 +183,8 @@ export default function CartReview({
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold">
-            Delivery Signatories & Overview
+            Signatories & Overview
           </CardTitle>
-          <CardDescription className="text-xs">
-            Summary of primary accountabilities and issuing officer.
-          </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm pt-2 border-t">
           {/* Primary Receiver */}
@@ -198,7 +192,7 @@ export default function CartReview({
             <User className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <div>
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Primary Receiver (`received_mr_by_id`)
+                Issued To
               </p>
               <p className="font-semibold text-foreground">
                 {deliveryDetails?.primaryReceiverUser?.name ||
@@ -216,7 +210,7 @@ export default function CartReview({
             <ShieldCheck className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <div>
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Issued By / Sender (`issued_by_id`)
+                Issued By
               </p>
               <p className="font-semibold text-foreground">
                 {deliveryDetails?.issuerUser?.name || 'N/A'}
@@ -253,11 +247,8 @@ export default function CartReview({
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-semibold">
-            Items & Secondary Receiver Allocation
+            Items & End User Allocation
           </CardTitle>
-          <CardDescription className="text-xs">
-            Review individual asset items and their allocated end-users (`user_id`).
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           {renderGroup(parItems, 'PAR (≥ ₱50,000)', 'default')}

@@ -210,7 +210,7 @@ export default function StockStatusGrid({
                   <CardFooter className="flex flex-col gap-2 pt-2 border-t">
                     <div className="flex w-full gap-2">
                       <Button
-                        variant="secondary"
+                        variant="outline"
                         size="sm"
                         className="flex-1 text-xs"
                         onClick={() => openDetails(stock)}
@@ -227,7 +227,7 @@ export default function StockStatusGrid({
                       </Button>
                     </div>
 
-                    <div className="flex w-full gap-2">
+                    {/* <div className="flex w-full gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -245,7 +245,7 @@ export default function StockStatusGrid({
                       >
                         Delete
                       </Button>
-                    </div>
+                    </div> */}
                   </CardFooter>
                 </Card>
               );
@@ -361,22 +361,22 @@ export default function StockStatusGrid({
         />
 
         {/* Edit Reorder Level Modal */}
-        <EditReorderLevelModal
+        {/* <EditReorderLevelModal
           isOpen={isEditOpen}
           onClose={() => setIsEditOpen(false)}
           item={editingItem}
           handleApiCall={handleApiCall}
           onSaved={handleChanged}
-        />
+        /> */}
 
         {/* Delete Item Modal */}
-        <DeleteItemModal
+        {/* <DeleteItemModal
           isOpen={isDeleteOpen}
           onClose={() => setIsDeleteOpen(false)}
           item={deletingItem}
           handleApiCall={handleApiCall}
           onDeleted={handleChanged}
-        />
+        /> */}
       </CardContent>
     </Card>
   );

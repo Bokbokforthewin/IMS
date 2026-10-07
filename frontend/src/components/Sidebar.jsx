@@ -45,6 +45,16 @@ const menuItems = [
     subItems: [{ id: "dashboard-overview", label: "Overview" }],
   },
   {
+    id: "quick-receive",
+    label: "Quick Receive",
+    icon: PackageCheck,
+    subItems: [
+      {id: "catalog-categories", label: "Categories"},
+      { id: "quick-receive-form", label: "Quick Receive Form" },
+      {id: "receive-history", label: "Received History"},
+    ],
+  },
+  {
     id: "catalog",
     label: "Catalog",
     icon: Boxes,

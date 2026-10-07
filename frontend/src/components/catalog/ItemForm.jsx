@@ -172,7 +172,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field data-invalid={!itemForm.category_id ? undefined : false}>
             <FieldLabel htmlFor="category_id" className="flex items-center gap-2">
-              <Tag className="w-4 h-4 text-muted-foreground" /> Category *
+              <Tag className="w-4 h-4 text-muted-foreground" /> Category <span className="text-destructive">*</span>
             </FieldLabel>
             <CategorySearch
               categories={categories}
@@ -183,7 +183,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
 
           <Field>
             <FieldLabel htmlFor="name" className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-muted-foreground" /> Item Name *
+              <Package className="w-4 h-4 text-muted-foreground" /> Item Name <span className="text-destructive">*</span>
             </FieldLabel>
             <Input
               id="name"
@@ -198,7 +198,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field>
             <FieldLabel htmlFor="brand" className="flex items-center gap-2">
-              <Badge className="w-4 h-4 text-muted-foreground" /> Brand (Optional)
+              <Badge className="w-4 h-4 text-muted-foreground" /> Brand
             </FieldLabel>
             <Input
               id="brand"
@@ -210,7 +210,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
 
           <Field>
             <FieldLabel htmlFor="type" className="flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-muted-foreground" /> Type (Optional)
+              <Sliders className="w-4 h-4 text-muted-foreground" /> Type
             </FieldLabel>
             <Input
               id="type"
@@ -224,7 +224,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field>
             <FieldLabel htmlFor="specifications" className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-muted-foreground" /> Specifications (Optional)
+              <FileText className="w-4 h-4 text-muted-foreground" /> Specifications
             </FieldLabel>
             <Input
               id="specifications"
@@ -235,7 +235,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
           </Field>
           <Field>
             <FieldLabel htmlFor="unit_of_measure" className="flex items-center gap-2">
-              <Ruler className="w-4 h-4 text-muted-foreground" /> Unit of Measure *
+              <Ruler className="w-4 h-4 text-muted-foreground" /> Unit of Measure <span className="text-destructive">*</span>
             </FieldLabel>
             <Input
               id="unit_of_measure"
@@ -250,7 +250,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
         <FieldSet className="w-full mt-4 pt-4 border-t">
           <FieldLegend variant="label" className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-muted-foreground" />
-            Tracking Type *
+            Tracking Type 
           </FieldLegend>
 
           <RadioGroup
@@ -260,7 +260,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
             <Field orientation="horizontal">
               <RadioGroupItem value="asset" id="track-asset" />
               <FieldLabel htmlFor="track-asset" className="font-normal">
-                Asset <span className="text-muted-foreground text-sm">(Long-term equipment requiring serials / property numbers)</span>
+                Asset <span className="text-muted-foreground text-sm">(Equipment requiring serials / property numbers)</span>
               </FieldLabel>
             </Field>
 
@@ -277,7 +277,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
           {isConsumable && (
             <Field>
               <FieldLabel htmlFor="reorder_level" className="flex items-center gap-2">
-                <TrendingDown className="w-4 h-4 text-muted-foreground" /> Reorder Level *
+                <TrendingDown className="w-4 h-4 text-muted-foreground" /> Reorder Level <span className="text-destructive">*</span>
               </FieldLabel>
               <Input
                 id="reorder_level"
@@ -294,7 +294,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
           {isAsset && (
             <Field>
               <FieldLabel htmlFor="estimated_useful_life" className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-muted-foreground" /> Estimated Useful Life
+                <Clock className="w-4 h-4 text-muted-foreground" /> Estimated Useful Life <span className="text-destructive">*</span>
               </FieldLabel>
               <Input
                 id="estimated_useful_life"

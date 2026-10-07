@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
@@ -88,7 +89,7 @@ class UserController extends Controller
     }
 
     /**
-     * Update direct user permissions (Checking/unchecking direct boxes for a specific user).
+     * Update direct user permissions.
      */
     public function updatePermissions(Request $request, User $user)
     {
@@ -97,7 +98,6 @@ class UserController extends Controller
             'permissions.*' => 'string|exists:permissions,name',
         ]);
 
-        // Gives direct permissions to this specific user (e.g., 'print reports')
         $user->syncPermissions($validated['permissions'] ?? []);
 
         // Reset Spatie Cache
@@ -116,11 +116,11 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'unit' => 'required|string|max:255',
-            'division' => 'required|string|max:255',
-            'designation' => 'required|string|max:255',
             'email' => 'required|string|email|unique:users,email',
             'password' => 'required|string|min:8',
+            'unit' => 'nullable|string|max:255',
+            'division' => 'nullable|string|max:255',
+            'designation' => 'nullable|string|max:255',
             'is_head' => 'sometimes|boolean',
         ]);
 
@@ -129,7 +129,7 @@ class UserController extends Controller
         $user = User::create($validated);
 
         return response()->json([
-            'message' => 'User created.',
+            'message' => 'User created successfully.',
             'user' => $user->load(['roles', 'permissions']),
         ], 201);
     }
@@ -140,21 +140,33 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'unit' => 'sometimes|string|max:255',
-            'division' => 'sometimes|string|max:255',
-            'designation' => 'sometimes|string|max:255',
+            'name' => 'sometimes|required|string|max:255',
+            'email' => ['sometimes', 'required', 'email', Rule::unique('users', 'email')->ignore($user->id)],
+            'unit' => 'nullable|string|max:255',
+            'division' => 'nullable|string|max:255',
+            'designation' => 'nullable|string|max:255',
             'is_head' => 'sometimes|boolean',
+            'password' => 'nullable|string|min:8',
         ]);
+
+        // Ensure non-nullable columns get empty strings instead of null
+        $validated['unit'] = $validated['unit'] ?? '';
+        $validated['division'] = $validated['division'] ?? '';
+        $validated['designation'] = $validated['designation'] ?? '';
+
+        if (!empty($validated['password'])) {
+            $validated['password'] = bcrypt($validated['password']);
+        } else {
+            unset($validated['password']);
+        }
 
         $user->update($validated);
 
         return response()->json([
-            'message' => 'User updated.',
+            'message' => 'User information updated successfully.',
             'user' => $user->fresh(['roles', 'permissions']),
         ]);
     }
-
     /**
      * Delete a user.
      */
@@ -163,7 +175,7 @@ class UserController extends Controller
         $user->delete();
 
         return response()->json([
-            'message' => 'User deleted.',
+            'message' => 'User deleted successfully.',
         ]);
     }
 }

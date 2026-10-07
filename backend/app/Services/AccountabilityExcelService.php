@@ -50,7 +50,7 @@ class AccountabilityExcelService
             ? $this->buildIcs($receipt)
             : $this->buildPar($receipt);
 
-        $filename = "{$receipt->receipt_type}-{$receipt->document_number}.xlsx";
+        $filename = "{$receipt->document_number}.xlsx";
 
         return new StreamedResponse(function () use ($spreadsheet) {
             $writer = new Xlsx($spreadsheet);
@@ -250,7 +250,7 @@ class AccountabilityExcelService
         $sheet->setCellValue('A5', 'Fund Cluster:');
         $sheet->mergeCells('B5:D5');
         $sheet->setCellValue('B5', '');
-        $sheet->setCellValue('E5', 'PAR No.');
+        $sheet->setCellValue('E5', 'PAR No:');
         $sheet->setCellValue('F5', $receipt->document_number);
         $sheet->getStyle('E5')->getFont()->setBold(true);
 
