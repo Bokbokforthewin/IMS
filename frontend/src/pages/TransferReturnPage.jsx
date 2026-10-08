@@ -3,8 +3,6 @@ import React, { useState } from 'react';
 import TransferOrReturnForm from '../components/transferorreturn/TransferOrReturn.jsx';
 import TransferHistoryTable from '../components/transferorreturn/TransferHistoryTable.jsx';
 
-import '../components/transferorreturn/TransferOrReturn.css';
-
 export default function TransferReturnPage({ 
   activeTab, 
   serializedAssets = [], 

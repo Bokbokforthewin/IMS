@@ -20,11 +20,11 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 
-// Zod Schema for client-side form validation
+// Zod Schema matching Laravel login validation rules
 const loginSchema = z.object({
   email: z
     .string()
-    .min(1, 'Email is required')
+    .min(1, 'Email address is required')
     .email('Please enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
 });
@@ -34,10 +34,10 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [serverError, setServerError] = useState(null);
 
-  // Form management via react-hook-form & Zod resolver
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(loginSchema),
@@ -53,18 +53,34 @@ export default function LoginPage() {
       await login(data.email, data.password);
       navigate('/');
     } catch (err) {
-      setServerError(
-        err.response?.data?.message ||
-          err.message ||
-          'Failed to sign in. Please check your credentials.'
-      );
+      if (err.response?.status === 422 && err.response?.data?.errors) {
+        // Map Laravel 422 validation errors to specific input fields
+        const backendErrors = err.response.data.errors;
+        Object.keys(backendErrors).forEach((field) => {
+          setError(field, {
+            type: 'server',
+            message: backendErrors[field][0],
+          });
+        });
+      } else if (err.response?.status === 401) {
+        // Display 401 "Invalid email or password." in top alert
+        setServerError(
+          err.response?.data?.message || 'Invalid email or password.'
+        );
+      } else {
+        // Fallback generic server error (e.g. 500 or Network Error)
+        setServerError(
+          err.response?.data?.message ||
+            err.message ||
+            'Failed to sign in. Please check your credentials.'
+        );
+      }
     }
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-sm shadow-md">
-        {/* Structural Layout Header */}
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold tracking-tight">Sign In</CardTitle>
           <CardDescription>
@@ -73,7 +89,7 @@ export default function LoginPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Top-level Feedback Alert for Processing/Auth Errors */}
+          {/* Top-level Alert for Auth (401) or System Errors */}
           {serverError && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -82,7 +98,6 @@ export default function LoginPage() {
             </Alert>
           )}
 
-          {/* Credential Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
@@ -119,7 +134,6 @@ export default function LoginPage() {
               )}
             </div>
 
-            {/* Primary Action Button */}
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
@@ -132,7 +146,6 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* Separator for Social / Secondary Options */}
           <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
               <Separator />
@@ -145,7 +158,6 @@ export default function LoginPage() {
           </div>
         </CardContent>
 
-        {/* Structural Layout Footer */}
         <CardFooter className="flex justify-center border-t pt-4">
           <p className="text-center text-sm text-muted-foreground">
             Don't have an account?{' '}

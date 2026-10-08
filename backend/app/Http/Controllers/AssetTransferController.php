@@ -28,13 +28,13 @@ class AssetTransferController extends Controller
     {
         $validatedData = $request->validate([
             'serialized_asset_id' => 'required|exists:serialized_assets,id',
-            'transfer_type' => 'required|in:RETURN,TRANSFER',
-            'user_id' => 'required|exists:users,id', // transferring FROM (current holder)
-            'transfered_to' => 'required|exists:users,id', // transferring TO
-            'description' => 'required|string|max:255',
-            'reason' => 'required|string|max:255',
-            'transfer_date' => 'required|date',
-            'remarks' => 'nullable|string|max:1000',
+            'transfer_type'       => 'required|in:RETURN,TRANSFER',
+            'user_id'             => 'required|exists:users,id', // transferring FROM (current holder)
+            'transfered_to'       => 'required|exists:users,id', // transferring TO
+            'description'         => 'required|string|max:255',
+            'reason'              => 'required|string|max:255',
+            'transfer_date'       => 'required|date',
+            'remarks'             => 'nullable|string|max:1000',
         ]);
 
         $date = $validatedData['transfer_date'];
@@ -61,33 +61,39 @@ class AssetTransferController extends Controller
                     $nextSeq = intval(end($parts)) + 1;
                 }
 
-                $documentNumber = sprintf("%s-%s-%s-%03d", $prefix, $year, $month, $nextSeq);
+                $documentNumber = sprintf("%s-%s-%s-%04d", $prefix, $year, $month, $nextSeq);
 
                 $transfer = AssetTransfer::create([
-                    'document_number' => $documentNumber,
-                    'transfer_type' => $validatedData['transfer_type'],
+                    'document_number'     => $documentNumber,
+                    'transfer_type'       => $validatedData['transfer_type'],
                     'serialized_asset_id' => $asset->id,
-                    'user_id' => $validatedData['user_id'],
-                    'transfered_to' => $validatedData['transfered_to'],
-                    'description' => $validatedData['description'],
-                    'reason' => $validatedData['reason'],
-                    'transfer_date' => $validatedData['transfer_date'],
-                    'remarks' => $validatedData['remarks'] ?? null,
+                    'user_id'             => $validatedData['user_id'],
+                    'transfered_to'       => $validatedData['transfered_to'],
+                    'description'         => $validatedData['description'],
+                    'reason'              => $validatedData['reason'],
+                    'transfer_date'       => $validatedData['transfer_date'],
+                    'remarks'             => $validatedData['remarks'] ?? null,
                 ]);
 
+                // Update asset status AND assign the new holder ID
                 if ($validatedData['transfer_type'] === 'RETURN') {
-                    $asset->update(['status' => 'Available']);
+                    $asset->update([
+                        'status'            => 'Available',
+                        'current_holder_id' => null, // Returned back to inventory
+                    ]);
                 } else {
-                    // TRANSFER keeps the asset assigned, just to a different person
-                    $asset->update(['status' => 'Assigned']);
+                    $asset->update([
+                        'status'            => 'Assigned',
+                        'current_holder_id' => $validatedData['transfered_to'], // Reassigned to new user
+                    ]);
                 }
 
                 $transfer->load(['serializedAsset.item.category', 'transferredFrom', 'transferredTo']);
 
                 return response()->json([
-                    'message' => "Asset successfully processed under {$documentNumber}",
+                    'message'         => "Asset successfully processed under {$documentNumber}",
                     'document_number' => $documentNumber,
-                    'transfer' => $transfer
+                    'transfer'        => $transfer,
                 ], 201);
             });
         } catch (\Exception $e) {

@@ -24,7 +24,7 @@
 
         .cutting-guide {
             position: relative;
-            width: 163.67pt;
+            width: 172.67pt;
             height: 97.67pt;
             border: 0.8pt dashed #64748b;
             background: #ffffff;
@@ -34,7 +34,7 @@
             position: absolute;
             top: 4pt;
             left: 4pt;
-            width: 141.33pt;
+            width: 150.33pt;
             height: 80pt;
             overflow: hidden;
             border: 1.2pt solid #1f2a45;

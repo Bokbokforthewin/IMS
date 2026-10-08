@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('asset_transfer', function (Blueprint $table) {
             $table->id();
-            $table->string('document_number'); // e.g., PTR-2026-08-001
+            $table->string('document_number'); // e.g., PTR-2026-08-0001
             $table->enum('transfer_type', ['RETURN', 'TRANSFER']);
             $table->foreignId('serialized_asset_id')->constrained('serialized_assets')->onDelete('cascade');
             

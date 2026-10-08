@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { AlertCircle, Loader2 } from 'lucide-react';
+
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   Card,
@@ -15,89 +20,80 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 
-export default function RegisterPage() {
-  const { register } = useAuth();
-  const navigate = useNavigate();
-
-  // Form State
-  const [formData, setFormData] = useState({
-    name: '',
-    unit: '',
-    division: '',
-    designation: '',
-    email: '',
-    password: '',
-    password_confirmation: '',
+// Zod Schema strictly matched with Laravel's register validation rules
+const registerSchema = z
+  .object({
+    name: z.string().min(1, 'Full name is required').max(255),
+    email: z
+      .string()
+      .min(1, 'Email address is required')
+      .email('Please enter a valid email address')
+      .max(255),
+    unit: z.string().min(1, 'Unit is required').max(255),
+    division: z.string().min(1, 'Division is required').max(255),
+    designation: z.string().min(1, 'Designation is required').max(255),
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters long'),
+    password_confirmation: z.string().min(1, 'Please confirm your password'),
+  })
+  .refine((data) => data.password === data.password_confirmation, {
+    message: 'Passwords do not match',
+    path: ['password_confirmation'],
   });
 
-  // Error States
+export default function RegisterPage() {
+  const { register: registerAuth } = useAuth();
+  const navigate = useNavigate();
   const [generalError, setGeneralError] = useState(null);
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
 
-  // Universal change handler to update state and clear field-specific errors as user types
-  const handleChange = (e) => {
-    const { id, value } = e.target;
-    setFormData((prev) => ({ ...prev, [id]: value }));
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      unit: '',
+      division: '',
+      designation: '',
+      password: '',
+      password_confirmation: '',
+    },
+  });
 
-    if (fieldErrors[id]) {
-      setFieldErrors((prev) => {
-        const updated = { ...prev };
-        delete updated[id];
-        return updated;
-      });
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
+  const onSubmit = async (data) => {
     setGeneralError(null);
-    setFieldErrors({});
-
-    // Client-side confirmation check
-    if (formData.password !== formData.password_confirmation) {
-      setFieldErrors({
-        password_confirmation: ['Passwords do not match.'],
-      });
-      setSubmitting(false);
-      return;
-    }
-
     try {
-      await register(formData);
+      await registerAuth(data);
       navigate('/');
     } catch (err) {
       if (err.response?.status === 422 && err.response?.data?.errors) {
-        // Capture Laravel 422 validation errors object
-        setFieldErrors(err.response.data.errors);
+        // Map Laravel 422 validation errors to specific fields (e.g. unique email)
+        const backendErrors = err.response.data.errors;
+        Object.keys(backendErrors).forEach((field) => {
+          setError(field, {
+            type: 'server',
+            message: backendErrors[field][0],
+          });
+        });
       } else {
-        // Fallback for non-validation errors (500, network error, 401, etc.)
+        // Fallback for non-validation server/network errors
         setGeneralError(
           err.response?.data?.error ||
             err.response?.data?.message ||
             'Registration failed. Please try again.'
         );
       }
-    } finally {
-      setSubmitting(false);
     }
-  };
-
-  // Helper component to render field errors cleanly
-  const renderFieldError = (fieldName) => {
-    if (!fieldErrors[fieldName]) return null;
-    return (
-      <p className="text-xs font-medium text-destructive mt-1">
-        {fieldErrors[fieldName][0]}
-      </p>
-    );
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4 py-8">
       <Card className="w-full max-w-lg shadow-md">
-        {/* Structural Layout Header */}
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold tracking-tight">Create Account</CardTitle>
           <CardDescription>
@@ -106,16 +102,16 @@ export default function RegisterPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Top-level Feedback Alert for Processing/Auth Errors */}
+          {/* Top-level Alert for System/Network Failure */}
           {generalError && (
             <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
               <AlertTitle>Registration Failed</AlertTitle>
               <AlertDescription>{generalError}</AlertDescription>
             </Alert>
           )}
 
-          {/* Registration Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {/* Full Name */}
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
@@ -123,12 +119,14 @@ export default function RegisterPage() {
                 id="name"
                 type="text"
                 placeholder="John Doe"
-                required
-                value={formData.name}
-                onChange={handleChange}
-                aria-invalid={!!fieldErrors.name}
+                {...register('name')}
+                aria-invalid={!!errors.name}
               />
-              {renderFieldError('name')}
+              {errors.name && (
+                <p className="text-xs font-medium text-destructive mt-1">
+                  {errors.name.message}
+                </p>
+              )}
             </div>
 
             {/* Email Address */}
@@ -138,12 +136,14 @@ export default function RegisterPage() {
                 id="email"
                 type="email"
                 placeholder="name@example.com"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                aria-invalid={!!fieldErrors.email}
+                {...register('email')}
+                aria-invalid={!!errors.email}
               />
-              {renderFieldError('email')}
+              {errors.email && (
+                <p className="text-xs font-medium text-destructive mt-1">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
 
             {/* Unit & Division Grid */}
@@ -154,12 +154,14 @@ export default function RegisterPage() {
                   id="unit"
                   type="text"
                   placeholder="e.g. IT Operations"
-                  required
-                  value={formData.unit}
-                  onChange={handleChange}
-                  aria-invalid={!!fieldErrors.unit}
+                  {...register('unit')}
+                  aria-invalid={!!errors.unit}
                 />
-                {renderFieldError('unit')}
+                {errors.unit && (
+                  <p className="text-xs font-medium text-destructive mt-1">
+                    {errors.unit.message}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -168,12 +170,14 @@ export default function RegisterPage() {
                   id="division"
                   type="text"
                   placeholder="e.g. Technology"
-                  required
-                  value={formData.division}
-                  onChange={handleChange}
-                  aria-invalid={!!fieldErrors.division}
+                  {...register('division')}
+                  aria-invalid={!!errors.division}
                 />
-                {renderFieldError('division')}
+                {errors.division && (
+                  <p className="text-xs font-medium text-destructive mt-1">
+                    {errors.division.message}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -184,12 +188,14 @@ export default function RegisterPage() {
                 id="designation"
                 type="text"
                 placeholder="e.g. System Administrator"
-                required
-                value={formData.designation}
-                onChange={handleChange}
-                aria-invalid={!!fieldErrors.designation}
+                {...register('designation')}
+                aria-invalid={!!errors.designation}
               />
-              {renderFieldError('designation')}
+              {errors.designation && (
+                <p className="text-xs font-medium text-destructive mt-1">
+                  {errors.designation.message}
+                </p>
+              )}
             </div>
 
             {/* Password Inputs Grid */}
@@ -199,12 +205,14 @@ export default function RegisterPage() {
                 <Input
                   id="password"
                   type="password"
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
-                  aria-invalid={!!fieldErrors.password}
+                  {...register('password')}
+                  aria-invalid={!!errors.password}
                 />
-                {renderFieldError('password')}
+                {errors.password && (
+                  <p className="text-xs font-medium text-destructive mt-1">
+                    {errors.password.message}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -212,22 +220,30 @@ export default function RegisterPage() {
                 <Input
                   id="password_confirmation"
                   type="password"
-                  required
-                  value={formData.password_confirmation}
-                  onChange={handleChange}
-                  aria-invalid={!!fieldErrors.password_confirmation}
+                  {...register('password_confirmation')}
+                  aria-invalid={!!errors.password_confirmation}
                 />
-                {renderFieldError('password_confirmation')}
+                {errors.password_confirmation && (
+                  <p className="text-xs font-medium text-destructive mt-1">
+                    {errors.password_confirmation.message}
+                  </p>
+                )}
               </div>
             </div>
 
             {/* Primary Action Button */}
-            <Button type="submit" className="w-full mt-2" disabled={submitting}>
-              {submitting ? 'Creating account...' : 'Register'}
+            <Button type="submit" className="w-full mt-2" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                'Register'
+              )}
             </Button>
           </form>
 
-          {/* Separator for Section Break */}
           <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
               <Separator />
@@ -240,7 +256,6 @@ export default function RegisterPage() {
           </div>
         </CardContent>
 
-        {/* Structural Layout Footer */}
         <CardFooter className="flex justify-center border-t pt-4">
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{' '}
