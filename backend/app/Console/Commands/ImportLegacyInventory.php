@@ -2,22 +2,43 @@
 
 namespace App\Console\Commands;
 
+use App\Models\AccountabilityReceipt;
+use App\Models\AssetTransfer;
 use App\Models\Category;
 use App\Models\Item;
 use App\Models\SerializedAsset;
 use App\Models\User;
-use App\Models\AccountabilityReceipt;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
 
 /**
- * One-time import of legacy inventory data from two CSV exports of a
- * previous system (devices.csv = receiving log, Inventory.csv = who
- * currently holds what). Both files use "Sticker No." (the property
- * number) as the true shared key — their "Item No." columns are two
- * independent counters and do NOT line up between files.
+ * One-time import of legacy inventory data.
+ *
+ *  - devices.csv   = receiving log (every physical asset)
+ *  - Inventory.csv = who holds what (end-user, memorandum receipt holder, PTR)
+ *
+ * "Sticker No." (the property number) is the true shared key. The two files'
+ * "Item No." columns are independent counters and do NOT line up.
+ *
+ * Where each record goes:
+ *  - Every asset                    -> serialized_assets
+ *  - Every distributed asset        -> exactly ONE accountability_receipts line
+ *                                      (grouped per end-user + date). A PAR/ICS is
+ *                                      never issued twice for the same asset.
+ *  - Distributed asset WITH a PTR   -> ALSO one asset_transfer row (the PTR number
+ *                                      is the document). The transfer only changes
+ *                                      serialized_assets.current_holder_id; the
+ *                                      receipt itself is never touched.
+ *  - Available asset                -> serialized_assets only (never has a PTR)
+ *
+ * Limitation: the CSV only records who holds an asset NOW. For PTR-tagged
+ * assets the receipt therefore uses that person and date, and the transfer's
+ * "from" is a clearly-labelled placeholder user.
+ *
+ * Every recorded value is kept as written, including "CPU Clone", "Unknown"
+ * and "N/A" - those are real encoder entries, not missing data.
  *
  * Usage:
  *   php artisan import:legacy-inventory devices.csv Inventory.csv --dry-run
@@ -26,15 +47,21 @@ use Carbon\Carbon;
 class ImportLegacyInventory extends Command
 {
     protected $signature = 'import:legacy-inventory
-        {devices? : "C:\Users\Administrator\Downloads\devices.csv"}
-        {inventory? : "C:\Users\Administrator\Downloads\Inventory.csv"}
+        {devices : Path to devices.csv}
+        {inventory : Path to Inventory.csv}
         {--dry-run : Show what would be imported without writing anything}';
 
-    protected $description = 'Import legacy inventory data (devices.csv + Inventory.csv) into categories, items, and serialized_assets';
+    protected $description = 'Import legacy inventory (devices.csv + Inventory.csv) into categories, items, assets, receipts and transfers';
 
-    // Values that mean "no real serial was recorded" — stored as NULL,
-    // never preserved as a fake-unique string (serial_number is unique()).
-    private const PLACEHOLDER_SERIALS = ['', 'n/a', 'na', 'cpu clone', 'unknown', 'none'];
+    // Placeholder-looking serial text is kept verbatim, but suffixed with the
+    // asset's own unique property number because serial_number is unique().
+    private const PLACEHOLDER_SERIALS = ['cpu clone', 'unknown', 'n/a', 'na', 'none'];
+
+    // The CSV never records who held an asset BEFORE a PTR transfer, but
+    // asset_transfer.user_id (from) is required. One clearly-labelled
+    // placeholder user stands in for "previous holder unknown".
+    private const UNKNOWN_HOLDER_EMAIL = 'legacy-unknown-holder@doh-nir.local';
+    private const UNKNOWN_HOLDER_NAME = 'Legacy Import - Previous Holder Unknown';
 
     private array $stats = [
         'categories_created' => 0,
@@ -42,14 +69,18 @@ class ImportLegacyInventory extends Command
         'assets_created' => 0,
         'receipts_created' => 0,
         'lines_created' => 0,
+        'transfers_created' => 0,
         'users_created' => 0,
         'warnings' => [],
     ];
 
+    /** normalized lowercase name => user id */
+    private ?array $userMap = null;
+
     public function handle(): int
     {
-        $devicesPath = $this->argument('devices') ?? 'C:/Users/Administrator/Downloads/devices.csv';
-        $inventoryPath = $this->argument('inventory') ?? 'C:/Users/Administrator/Downloads/Inventory.csv';
+        $devicesPath = $this->argument('devices');
+        $inventoryPath = $this->argument('inventory');
         $dryRun = $this->option('dry-run');
 
         if (!file_exists($devicesPath) || !file_exists($inventoryPath)) {
@@ -58,12 +89,12 @@ class ImportLegacyInventory extends Command
         }
 
         $devices = $this->readCsv($devicesPath);
-        $inventory = $this->readCsv($inventoryPath, 13); // Inventory.csv is well-formed, no repair needed
+        $inventory = $this->readCsv($inventoryPath);
 
         $this->info('Read ' . count($devices) . ' rows from devices.csv');
         $this->info('Read ' . count($inventory) . ' rows from Inventory.csv');
 
-        // --- Step 1: merge by Sticker No. (the true shared key) ---
+        // --- Step 1: merge by Sticker No. ---
         $merged = [];
         foreach ($devices as $row) {
             $sticker = trim($row['Sticker No.']);
@@ -75,7 +106,7 @@ class ImportLegacyInventory extends Command
             if ($sticker === '') continue;
             $norm = $this->normalizeInventoryRow($row);
             if (isset($merged[$sticker])) {
-                // Inventory.csv fields win when present (it's the more current record)
+                // Inventory.csv wins wherever it has a value (more current record)
                 foreach ($norm as $k => $v) {
                     if ($v !== null && $v !== '') {
                         $merged[$sticker][$k] = $v;
@@ -86,22 +117,32 @@ class ImportLegacyInventory extends Command
             }
         }
 
+        // devices.csv's "PTR No." column holds spilled serial/accessory text on
+        // some rows (e.g. "Mouse - FCYRV0AHD6971Y"). A real PTR only ever comes
+        // from Inventory.csv, so anything left over is kept as a note instead.
+        foreach ($merged as $sticker => &$row) {
+            if ($row['ptr_no'] === '' && $row['ptr_spill'] !== '') {
+                $row['notes'] = trim($row['notes'] . ' | PTR column text: ' . $row['ptr_spill'], ' |');
+            }
+        }
+        unset($row);
+
         $this->info('Merged into ' . count($merged) . ' unique physical assets (by Sticker No.)');
 
-        // --- Step 2: build category map (normalized, casing-merged) ---
+        // --- Step 2: categories ---
         $categoryMap = $this->buildCategoryMap($merged);
         $this->line('');
         $this->info('Categories to be used (' . count($categoryMap) . '):');
-        foreach ($categoryMap as $label => $info) {
-            $this->line("  - {$label}  (from: " . implode(', ', array_unique($info['original_casings'])) . ')');
+        foreach ($categoryMap as $info) {
+            $this->line("  - {$info['label']}  (from: " . implode(', ', array_unique($info['original_casings'])) . ')');
         }
 
-        // --- Step 3: build item (catalog) map, grouped by (category, brand, model) ---
+        // --- Step 3: catalog items, grouped by (category, brand, model) ---
         $itemGroups = [];
         foreach ($merged as $sticker => $row) {
             $categoryLabel = $categoryMap[Str::lower(trim($row['category_raw']))]['label'];
-            $brand = $this->cleanOrNull($row['brand']);
-            $model = $this->cleanOrNull($row['model']);
+            $brand = $this->trimOrNull($row['brand']);
+            $model = $this->trimOrNull($row['model']);
             $itemKey = Str::lower($categoryLabel . '|' . ($brand ?? '') . '|' . ($model ?? ''));
 
             if (!isset($itemGroups[$itemKey])) {
@@ -122,40 +163,58 @@ class ImportLegacyInventory extends Command
             $this->line("  - [{$group['category_label']}] {$group['name']} (" . count($group['assets']) . ' unit(s))');
         }
 
-        // --- Step 4: build receipt groups: (end-user, date) for Distributed rows ---
+        // --- Step 4: every distributed asset gets exactly ONE receipt line;
+        //     those that also carry a PTR additionally get a transfer record ---
+        $transferStickers = [];
         $receiptGroups = [];
         foreach ($merged as $sticker => $row) {
-            if ($row['status'] !== 'Assigned' || empty($row['end_user'])) continue;
+            if ($row['status'] !== 'Assigned' || $row['end_user'] === '') continue;
+
             $key = Str::lower($row['end_user']) . '|' . $row['date_issued'];
             $receiptGroups[$key]['end_user'] ??= $row['end_user'];
-            $receiptGroups[$key]['issued_by'] ??= $row['management_receipt'];
+            // "Management Receipt" = the memorandum receipt holder (unit head)
+            $receiptGroups[$key]['mr_holder'] ??= $row['management_receipt'];
             $receiptGroups[$key]['date'] ??= $row['date_issued'];
-            $receiptGroups[$key]['ptr_refs'][] = $row['ptr_no'];
             $receiptGroups[$key]['assets'][] = $sticker;
+
+            if ($row['ptr_no'] !== '') {
+                $transferStickers[] = $sticker;
+            }
+        }
+
+        $this->line('');
+        $this->info('Asset transfers (PTR) to be created (' . count($transferStickers) . '):');
+        $ptrCounts = [];
+        foreach ($transferStickers as $s) {
+            $ptrCounts[$merged[$s]['ptr_no']] = ($ptrCounts[$merged[$s]['ptr_no']] ?? 0) + 1;
+        }
+        foreach ($ptrCounts as $ptr => $count) {
+            $this->line("  - {$ptr}  ({$count} asset(s))");
         }
 
         $this->line('');
         $this->info('Accountability receipts to be created (' . count($receiptGroups) . '):');
-        $unmatchedUsers = [];
         foreach ($receiptGroups as $group) {
-            $count = count($group['assets']);
-            $this->line("  - {$group['end_user']} on {$group['date']} ({$count} item(s))");
+            $this->line("  - {$group['end_user']} on {$group['date']} (" . count($group['assets']) . ' item(s))');
         }
 
         if ($dryRun) {
             $this->line('');
-            $this->warn('DRY RUN — nothing was written. Re-run without --dry-run to import for real.');
+            $this->warn('DRY RUN - nothing was written. Re-run without --dry-run to import for real.');
+            $this->printWarnings();
             $this->printCostWarning();
             return self::SUCCESS;
         }
 
-        if (!$this->confirm('Proceed with writing ' . count($merged) . ' assets and ' . count($receiptGroups) . ' receipts to the database?')) {
+        if (!$this->confirm('Write ' . count($merged) . ' assets, ' . count($transferStickers) . ' transfers and ' . count($receiptGroups) . ' receipts to the database?')) {
             $this->warn('Cancelled.');
             return self::SUCCESS;
         }
 
-        // --- Step 5: actually write everything, inside one transaction ---
-        DB::transaction(function () use ($categoryMap, $itemGroups, $merged, $receiptGroups) {
+        // --- Step 5: write everything in one transaction ---
+        $usedSerials = [];
+
+        DB::transaction(function () use ($categoryMap, $itemGroups, $merged, $receiptGroups, $transferStickers, &$usedSerials) {
             $categoryIds = [];
             foreach ($categoryMap as $info) {
                 $category = Category::firstOrCreate(
@@ -166,13 +225,11 @@ class ImportLegacyInventory extends Command
                 if ($category->wasRecentlyCreated) $this->stats['categories_created']++;
             }
 
-            $itemIds = []; // itemKey => Item id
+            $itemIds = [];
             foreach ($itemGroups as $itemKey => $group) {
-                $categoryId = $categoryIds[$group['category_label']];
-
                 $item = Item::firstOrCreate(
                     [
-                        'category_id' => $categoryId,
+                        'category_id' => $categoryIds[$group['category_label']],
                         'name' => $group['name'],
                         'brand' => $group['brand'],
                     ],
@@ -190,29 +247,32 @@ class ImportLegacyInventory extends Command
                 if ($item->wasRecentlyCreated) $this->stats['items_created']++;
             }
 
-            $assetIdBySticker = [];
+            $assetBySticker = [];
+            $itemNameBySticker = [];
             foreach ($merged as $sticker => $row) {
                 $categoryLabel = $categoryMap[Str::lower(trim($row['category_raw']))]['label'];
-                $brand = $this->cleanOrNull($row['brand']);
-                $model = $this->cleanOrNull($row['model']);
+                $brand = $this->trimOrNull($row['brand']);
+                $model = $this->trimOrNull($row['model']);
                 $itemKey = Str::lower($categoryLabel . '|' . ($brand ?? '') . '|' . ($model ?? ''));
-                $itemId = $itemIds[$itemKey];
 
                 $holderId = null;
-                if ($row['status'] === 'Assigned' && !empty($row['end_user'])) {
-                    $holderId = $this->resolveUserId($row['end_user']);
+                if ($row['status'] === 'Assigned') {
+                    if ($row['end_user'] !== '') {
+                        $holderId = $this->resolveUserId($row['end_user']);
+                    } else {
+                        $this->stats['warnings'][] = "{$sticker} is marked Distributed but has no end-user - imported with no holder.";
+                    }
                 }
 
                 $remarksParts = [];
-                if (!empty($row['notes'])) $remarksParts[] = 'Legacy notes: ' . $row['notes'];
-                $remarksParts[] = 'Imported from legacy system — unit_cost unknown, defaulted to 0.';
-                if (!empty($row['ptr_no'])) $remarksParts[] = 'Legacy PTR ref: ' . $row['ptr_no'];
+                if ($row['notes'] !== '') $remarksParts[] = 'Legacy notes: ' . $row['notes'];
+                $remarksParts[] = 'Imported from legacy system - unit_cost unknown, defaulted to 0.';
 
                 $createdAt = $this->parseDate($row['received_date']) ?? $this->parseDate($row['date_issued']) ?? now();
 
                 $asset = SerializedAsset::create([
-                    'item_id' => $itemId,
-                    'serial_number' => $this->cleanSerial($row['serial']),
+                    'item_id' => $itemIds[$itemKey],
+                    'serial_number' => $this->resolveSerial($row['serial'], $sticker, $usedSerials),
                     'property_number' => $sticker,
                     'model' => $model,
                     'manufacturer_name' => null,
@@ -225,51 +285,64 @@ class ImportLegacyInventory extends Command
                     'created_at' => $createdAt,
                     'updated_at' => $createdAt,
                 ]);
-                $assetIdBySticker[$sticker] = $asset;
+                $assetBySticker[$sticker] = $asset;
+                $itemNameBySticker[$sticker] = $itemGroups[$itemKey]['name'];
                 $this->stats['assets_created']++;
             }
 
+         // --- Receipts: original issuance, one per (end-user, date) ---
             foreach ($receiptGroups as $group) {
                 $userId = $this->resolveUserId($group['end_user']);
-                $issuedById = $this->resolveUserId($group['issued_by']) ?? $userId;
                 $dateIssued = $this->parseDate($group['date']) ?? now();
 
-                // 1. Fetch user model
-                $user = $userId ? User::find($userId) : null;
+                // Fetch the user record to extract their unit
+                $user = User::find($userId);
+                $unitPrefix = ($user && !empty($user->unit)) 
+                    ? strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $user->unit)) 
+                    : 'LEGACY';
 
-                // 2. Case-insensitive unit resolution
-                $rawUnit = strtoupper(trim($user?->unit ?? ''));
-                $unitAcronym = (empty($rawUnit) || $rawUnit === 'LEGACY' || $rawUnit === 'N/A') 
-                    ? 'NIR' 
-                    : $rawUnit;
-
-                $documentNumber = $this->nextLegacyDocNumber($unitAcronym, $dateIssued->format('Y'));
-
-                $ptrRefs = array_unique(array_filter($group['ptr_refs']));
-                $remarks = 'Imported from legacy system.';
-                if (!empty($ptrRefs)) {
-                    $remarks .= ' Legacy PTR ref(s): ' . implode(', ', $ptrRefs) . '.';
+                $mrHolderId = $this->findUserId($group['mr_holder']);
+                if ($mrHolderId === null && $group['mr_holder'] !== '') {
+                    $this->stats['warnings'][] = "Memorandum receipt holder '{$group['mr_holder']}' not found in users - left empty.";
                 }
 
                 $receipt = AccountabilityReceipt::create([
-                    'receipt_type' => 'ICS',
-                    'document_number' => $documentNumber,
+                    'receipt_type' => 'ICS', // cost unknown for every legacy row - see warning
+                    'document_number' => $this->nextLegacyDocNumber($unitPrefix, $dateIssued->format('Y')),
                     'user_id' => $userId,
-                    'issued_by_id' => $issuedById,
-                    'received_mr_by_id' => null,
+                    'issued_by_id' => null, // not recorded in the legacy data
+                    'received_mr_by_id' => $mrHolderId,
                     'date_issued' => $dateIssued,
-                    'remarks' => $remarks,
+                    'remarks' => 'Imported from legacy system.',
                 ]);
                 $this->stats['receipts_created']++;
 
                 foreach ($group['assets'] as $sticker) {
-                    $asset = $assetIdBySticker[$sticker];
+                    $asset = $assetBySticker[$sticker];
                     $receipt->lines()->create([
                         'serialized_asset_id' => $asset->id,
                         'item_id' => $asset->item_id,
                         'quantity' => 1,
                     ]);
                     $this->stats['lines_created']++;
+                }
+            }
+
+            // --- Transfers come AFTER issuance: one asset_transfer row per
+            //     PTR-tagged asset. Receipts are never modified by a transfer. ---
+            if (!empty($transferStickers)) {
+                $fromUserId = $this->legacyUnknownHolderId();
+
+                foreach ($transferStickers as $sticker) {
+                    $row = $merged[$sticker];
+                    $this->recordTransfer(
+                        $assetBySticker[$sticker],
+                        $row['ptr_no'],
+                        $fromUserId,
+                        $this->resolveUserId($row['end_user']),
+                        $this->parseDate($row['date_issued']) ?? now(),
+                        $itemNameBySticker[$sticker]
+                    );
                 }
             }
         });
@@ -280,35 +353,79 @@ class ImportLegacyInventory extends Command
             ['Categories created', $this->stats['categories_created']],
             ['Catalog items created', $this->stats['items_created']],
             ['Serialized assets created', $this->stats['assets_created']],
-            ['Users created (fallback)', $this->stats['users_created']],
+            ['Asset transfers created', $this->stats['transfers_created']],
             ['Accountability receipts created', $this->stats['receipts_created']],
             ['Receipt lines created', $this->stats['lines_created']],
+            ['Users created (placeholders)', $this->stats['users_created']],
         ]);
+        $this->printWarnings();
         $this->printCostWarning();
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Creates the transfer record AND enforces the rule that a transfer moves
+     * the asset to whoever it was transferred to. Only serialized_assets
+     * .current_holder_id changes - the receipt's user and issuer stay as issued.
+     */
+    private function recordTransfer(
+        SerializedAsset $asset,
+        string $ptrNo,
+        int $fromUserId,
+        int $toUserId,
+        Carbon $date,
+        string $itemName
+    ): void {
+        AssetTransfer::create([
+            'document_number' => $ptrNo, // original PTR number, verbatim
+            'transfer_type' => 'TRANSFER',
+            'serialized_asset_id' => $asset->id,
+            'user_id' => $fromUserId,
+            'transfered_to' => $toUserId,
+            'description' => "Legacy transfer - {$itemName}",
+            'reason' => ' ', // required column, nothing recorded in the legacy data
+            'transfer_date' => $date,
+            'remarks' => 'Imported from legacy system. Previous holder was not recorded.',
+        ]);
+
+        $asset->update([
+            'current_holder_id' => $toUserId,
+            'status' => 'Assigned',
+        ]);
+
+        $this->stats['transfers_created']++;
+    }
+
+    private function printWarnings(): void
+    {
+        if (empty($this->stats['warnings'])) return;
+
+        $this->line('');
+        $this->warn('Notes from the import (' . count($this->stats['warnings']) . '):');
+        foreach (array_unique($this->stats['warnings']) as $w) {
+            $this->line('  - ' . $w);
+        }
     }
 
     private function printCostWarning(): void
     {
         $this->line('');
         $this->warn('IMPORTANT: Neither source file contains cost data.');
-        $this->warn('Every imported asset has unit_cost = 0 and was classified as ICS by default,');
-        $this->warn('since $0 is below the ₱50,000 PAR threshold. Many of these (desktops, laptops,');
-        $this->warn('servers) are almost certainly worth more in reality. Review and correct unit_cost');
-        $this->warn('on these records, and reclassify any receipt that should actually be a PAR.');
+        $this->warn('Every imported asset has unit_cost = 0 and any receipt was classified as ICS,');
+        $this->warn('since 0 is below the 50,000 PAR threshold. Many of these (desktops, laptops,');
+        $this->warn('servers) are almost certainly worth more. Correct unit_cost and reclassify');
+        $this->warn('receipts to PAR where appropriate.');
     }
 
     /**
-     * Reads a CSV with fgetcsv (not Laravel's stricter CSV packages) so we
-     * can repair malformed rows (extra commas from unescaped Notes fields)
-     * instead of failing on them.
+     * fgetcsv (not a stricter CSV package) so malformed rows - extra commas
+     * from unescaped Notes text - can be repaired instead of dropped.
      */
-    private function readCsv(string $path, ?int $expectedColumns = null): array
+    private function readCsv(string $path): array
     {
         $rows = [];
         $handle = fopen($path, 'r');
-        // Strip UTF-8 BOM if present
         $bom = fread($handle, 3);
         if ($bom !== "\xEF\xBB\xBF") rewind($handle);
 
@@ -322,9 +439,8 @@ class ImportLegacyInventory extends Command
             }
 
             if (count($fields) > $headerCount) {
-                // Extra commas inside what should have been one "Notes" field.
-                // First 9 columns map normally (Item No. .. Status), the
-                // overflow gets rejoined as Notes, the last field is Received.
+                // First 9 columns map normally (Item No. .. Status), the overflow
+                // is rejoined as Notes, and the last field is Received.
                 $fixed = array_slice($fields, 0, 9);
                 $overflowCount = count($fields) - $headerCount;
                 $notesParts = array_slice($fields, 9, 1 + $overflowCount);
@@ -335,9 +451,7 @@ class ImportLegacyInventory extends Command
                 continue;
             }
 
-            // Fewer fields than expected — pad with blanks rather than drop the row.
-            $fixed = array_pad($fields, $headerCount, '');
-            $rows[] = array_combine($header, $fixed);
+            $rows[] = array_combine($header, array_pad($fields, $headerCount, ''));
             $this->stats['warnings'][] = 'Padded short row: ' . implode(',', $fields);
         }
 
@@ -353,9 +467,10 @@ class ImportLegacyInventory extends Command
             'model' => $row['Model'] ?? '',
             'serial' => $row['Serial No.'] ?? '',
             'status' => $this->normalizeStatus($row['Status'] ?? ''),
-            'ptr_no' => trim($row['PTR No.'] ?? ''),
             'notes' => trim($row['Notes'] ?? ''),
             'received_date' => trim($row['Received'] ?? ''),
+            'ptr_no' => '', // never trusted from devices.csv
+            'ptr_spill' => $this->normalizeWhitespace($row['PTR No.'] ?? ''),
             'end_user' => '',
             'management_receipt' => '',
             'date_issued' => '',
@@ -370,9 +485,10 @@ class ImportLegacyInventory extends Command
             'model' => $row['Model'] ?? '',
             'serial' => $row['Serial No.'] ?? '',
             'status' => $this->normalizeStatus($row['Status'] ?? ''),
-            'ptr_no' => trim($row['PTR No.'] ?? ''),
             'notes' => '',
             'received_date' => '',
+            'ptr_no' => $this->normalizeWhitespace($row['PTR No.'] ?? ''),
+            'ptr_spill' => '',
             'end_user' => $this->normalizeWhitespace($row['End-user'] ?? ''),
             'management_receipt' => $this->normalizeWhitespace($row['Management Receipt'] ?? ''),
             'date_issued' => trim($row['Date'] ?? ''),
@@ -381,10 +497,8 @@ class ImportLegacyInventory extends Command
 
     private function normalizeStatus(string $status): string
     {
-        $status = trim($status);
-        return match (strtolower($status)) {
+        return match (strtolower(trim($status))) {
             'distributed' => 'Assigned',
-            'available' => 'Available',
             default => 'Available',
         };
     }
@@ -394,19 +508,32 @@ class ImportLegacyInventory extends Command
         return trim(preg_replace('/\s+/', ' ', $s));
     }
 
-    private function cleanOrNull(string $value): ?string
+    // Only truly empty fields become NULL - "N/A" and "Unknown" are kept as written.
+    private function trimOrNull(string $value): ?string
     {
-        $value = trim($value);
-        if ($value === '' || strtolower($value) === 'n/a' || strtolower($value) === 'unknown') {
-            return null;
-        }
-        return $value;
+        $value = $this->normalizeWhitespace($value);
+        return $value === '' ? null : $value;
     }
 
-    private function cleanSerial(string $value): ?string
+    private function resolveSerial(string $rawValue, string $propertyNumber, array &$usedSerials): ?string
     {
-        $normalized = strtolower(trim($value));
-        return in_array($normalized, self::PLACEHOLDER_SERIALS, true) ? null : trim($value);
+        $trimmed = $this->normalizeWhitespace($rawValue);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        $lower = Str::lower($trimmed);
+
+        if (in_array($lower, self::PLACEHOLDER_SERIALS, true)) {
+            return "{$trimmed} - {$propertyNumber}";
+        }
+
+        if (isset($usedSerials[$lower])) {
+            return "{$trimmed} - {$propertyNumber}";
+        }
+
+        $usedSerials[$lower] = true;
+        return $trimmed;
     }
 
     private function parseDate(?string $value): ?Carbon
@@ -420,89 +547,100 @@ class ImportLegacyInventory extends Command
         }
     }
 
-    /**
-     * Groups category names case-insensitively, producing a merged label
-     * like "Ipad/iPad" from whatever original casings actually appear —
-     * exactly the normalization the person asked for.
-     */
+    // "Ipad" + "iPad" -> "Ipad/iPad" (whatever casings actually appear)
     private function buildCategoryMap(array $merged): array
     {
         $byLower = [];
         foreach ($merged as $row) {
             $raw = trim($row['category_raw']);
             if ($raw === '') continue;
-            $lower = Str::lower($raw);
-            $byLower[$lower]['original_casings'][] = $raw;
+            $byLower[Str::lower($raw)]['original_casings'][] = $raw;
         }
 
-        foreach ($byLower as $lower => &$info) {
+        foreach ($byLower as &$info) {
             $uniqueCasings = array_values(array_unique($info['original_casings']));
             $info['label'] = count($uniqueCasings) > 1
                 ? implode('/', $uniqueCasings)
                 : $uniqueCasings[0];
         }
+        unset($info);
 
         return $byLower;
     }
 
+    private array $generatedItemCodes = [];
+
     private function generateItemCode(string $categoryLabel): string
     {
-        $year = date('Y');
-        $month = date('m');
         $cleaned = preg_replace('/[^a-zA-Z]/', '', $categoryLabel);
         $prefix = strtoupper(substr($cleaned, 0, 3));
         if (strlen($prefix) < 3) $prefix = str_pad($prefix, 3, 'X', STR_PAD_RIGHT);
 
-        $pattern = sprintf('%s-%s-%s-', $prefix, $year, $month);
+        $pattern = sprintf('DOH-NIR-%s-%s-%s-', $prefix, date('Y'), date('m'));
         $last = Item::where('item_code', 'LIKE', $pattern . '%')->orderBy('id', 'desc')->first();
         $seq = 1;
         if ($last) {
             $parts = explode('-', $last->item_code);
             $seq = intval(end($parts)) + 1;
         }
-        return sprintf('%s%03d', $pattern, $seq);
+        do {
+        $candidateCode = sprintf('%s%03d', $pattern, $seq);
+        $seq++;
+            } while (
+                in_array($candidateCode, $this->generatedItemCodes) ||
+                Item::where('item_code', $candidateCode)->exists()
+            );
+        $this->generatedItemCodes[] = $candidateCode;
+        return $candidateCode;
     }
 
-    private function nextLegacyDocNumber(string $unitAcronym, string $year): string
+    private function nextLegacyDocNumber(string $prefix, string $year): string
     {
-        // Extra safeguard: Force uppercase and fallback if still invalid
-        $unit = strtoupper(trim($unitAcronym));
-        if (empty($unit) || $unit === 'LEGACY' || $unit === 'N/A') {
-            $unit = 'NIR';
-        }
-
-        $last = AccountabilityReceipt::where('document_number', 'like', "{$unit}-{$year}-%")
-            ->orderBy('id', 'desc')
-            ->first();
-
+        $last = AccountabilityReceipt::where('document_number', 'like', "{$prefix}-{$year}-%")
+            ->orderBy('id', 'desc')->first();
         $seq = 1;
         if ($last) {
             $parts = explode('-', $last->document_number);
             $seq = intval(end($parts)) + 1;
         }
-
-        return sprintf('%s-%s-%04d', $unit, $year, $seq);
+        return sprintf('%s-%s-%04d', $prefix, $year, $seq);
     }
 
     /**
-     * Matches a name against users.name using normalized (whitespace-collapsed,
-     * case-insensitive) comparison. Creates a placeholder user — matching the
-     * style already used in populate_users.sql — if genuinely no match exists,
-     * rather than failing the whole import over one bad name.
+     * Name lookup against all users, loaded once. Matching happens in PHP
+     * (whitespace-collapsed, case-insensitive) so it doesn't depend on any
+     * database regex function.
      */
+    private function loadUserMap(): void
+    {
+        if ($this->userMap !== null) return;
+
+        $this->userMap = [];
+        foreach (User::query()->get(['id', 'name']) as $user) {
+            $this->userMap[Str::lower($this->normalizeWhitespace($user->name))] = $user->id;
+        }
+    }
+
+    // Lookup only - returns null instead of creating anything.
+    private function findUserId(string $name): ?int
+    {
+        $name = $this->normalizeWhitespace($name);
+        if ($name === '') return null;
+
+        $this->loadUserMap();
+        return $this->userMap[Str::lower($name)] ?? null;
+    }
+
+    // Lookup, falling back to a placeholder user (for required recipient columns).
     private function resolveUserId(string $name): ?int
     {
         $name = $this->normalizeWhitespace($name);
         if ($name === '') return null;
 
-        $user = User::whereRaw('LOWER(TRIM(REGEXP_REPLACE(name, "\\\\s+", " "))) = ?', [Str::lower($name)])->first();
-        if ($user) return $user->id;
+        $found = $this->findUserId($name);
+        if ($found !== null) return $found;
 
-        // Fallback: case-insensitive exact match without the regex (in case the DB lacks REGEXP_REPLACE)
-        $user = User::whereRaw('LOWER(name) = ?', [Str::lower($name)])->first();
-        if ($user) return $user->id;
-
-        $this->stats['warnings'][] = "No matching user for '{$name}' — created placeholder.";
+        $this->stats['warnings'][] = "No matching user for '{$name}' - created a placeholder user.";
         $this->stats['users_created']++;
 
         $placeholder = User::create([
@@ -511,9 +649,28 @@ class ImportLegacyInventory extends Command
             'division' => ' ',
             'designation' => ' ',
             'email' => 'legacy-' . Str::slug($name) . '-' . Str::random(4) . '@doh-nir.local',
-            'password' => '',
+            'password' => Str::random(40),
         ]);
 
+        $this->userMap[Str::lower($name)] = $placeholder->id;
         return $placeholder->id;
+    }
+
+    private function legacyUnknownHolderId(): int
+    {
+        $user = User::firstOrCreate(
+            ['email' => self::UNKNOWN_HOLDER_EMAIL],
+            [
+                'name' => self::UNKNOWN_HOLDER_NAME,
+                'unit' => ' ',
+                'division' => ' ',
+                'designation' => ' ',
+                'password' => Str::random(40),
+            ]
+        );
+
+        if ($user->wasRecentlyCreated) $this->stats['users_created']++;
+
+        return $user->id;
     }
 }

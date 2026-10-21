@@ -60,18 +60,25 @@ export default function AuditPage() {
       });
 
       const resData = response.data;
-      setLogs(resData.data || []);
+      const logList = Array.isArray(resData)
+        ? resData
+        : Array.isArray(resData?.data)
+        ? resData.data
+        : Array.isArray(resData?.data?.data)
+        ? resData.data.data
+        : [];
+
+      setLogs(logList);
       setPagination({
-        currentPage: resData.current_page || 1,
-        lastPage: resData.last_page || 1,
-        total: resData.total || 0,
+        currentPage: resData.current_page || resData?.meta?.current_page || 1,
+        lastPage: resData.last_page || resData?.meta?.last_page || 1,
+        total: resData.total || resData?.meta?.total || logList.length,
       });
     } catch (error) {
       if (error.name !== "CanceledError" && error.code !== "ERR_CANCELED") {
         console.error("Failed to load audit logs:", error);
       }
     } finally {
-      // Prevents cancelled requests from turning off loading for newer active requests
       if (!controller.signal.aborted) {
         setLoading(false);
       }

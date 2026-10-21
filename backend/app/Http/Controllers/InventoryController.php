@@ -60,13 +60,16 @@ class InventoryController extends Controller
                     ], 201);
                 }
 
-                // Asset — bulk receive: shared attributes filled once, one serial
-                // number per physical unit, property number auto-incremented
-                // per unit only when the toggle is on.
+                // Asset branch — evaluate optional serial number tracking toggle
+                $hasSerial = $request->boolean('has_serial_number', true);
+
                 $assetData = $request->validate([
                     'has_property_number' => 'required|boolean',
-                    'serial_numbers' => 'required|array|size:' . $validated['quantity'],
-                    'serial_numbers.*' => 'required|string|max:255|distinct|unique:serialized_assets,serial_number',
+                    'has_serial_number' => 'sometimes|boolean',
+                    'serial_numbers' => $hasSerial
+                        ? 'required|array|size:' . $validated['quantity']
+                        : 'nullable|array',
+                    'serial_numbers.*' => 'nullable|string|max:255|distinct|unique:serialized_assets,serial_number',
                     'model' => 'nullable|string|max:255',
                     'manufacturer_name' => 'nullable|string|max:255',
                     'country_of_origin' => 'nullable|string|max:255',
@@ -85,12 +88,17 @@ class InventoryController extends Controller
                 }
 
                 $createdAssets = [];
-                foreach ($assetData['serial_numbers'] as $serial) {
+                $quantity = (int) $validated['quantity'];
+                $serialList = $assetData['serial_numbers'] ?? [];
+
+                for ($i = 0; $i < $quantity; $i++) {
                     $propertyNumber = null;
                     if ($assetData['has_property_number']) {
                         $propertyNumber = sprintf("DOH NIR-%s-%04d", $year, $nextSeq);
                         $nextSeq++;
                     }
+
+                    $serial = $hasSerial ? ($serialList[$i] ?? null) : null;
 
                     $createdAssets[] = SerializedAsset::create([
                         'item_id' => $validated['item_id'],
@@ -101,7 +109,7 @@ class InventoryController extends Controller
                         'country_of_origin' => $assetData['country_of_origin'] ?? null,
                         'unit_cost' => $validated['unit_cost'],
                         'status' => 'Available',
-                        'quantity_on_hand' => 1, // every unit is now its own row, regardless of property number
+                        'quantity_on_hand' => 1,
                     ]);
                 }
 
@@ -129,8 +137,7 @@ class InventoryController extends Controller
             'main.item_id' => 'required|exists:items,id',
             'main.unit_cost' => 'required|numeric|min:0',
             'main.has_property_number' => 'required|boolean',
-            'main.serial_numbers' => 'required|array|size:' . $request->input('sets'),
-            'main.serial_numbers.*' => 'required|string|max:255|distinct|unique:serialized_assets,serial_number',
+            'main.has_serial_number' => 'sometimes|boolean',
             'main.model' => 'nullable|string|max:255',
             'main.manufacturer_name' => 'nullable|string|max:255',
             'main.country_of_origin' => 'nullable|string|max:255',
@@ -139,28 +146,36 @@ class InventoryController extends Controller
             'peripherals.*.item_id' => 'required|exists:items,id',
             'peripherals.*.unit_cost' => 'required|numeric|min:0',
             'peripherals.*.has_property_number' => 'required|boolean',
-            'peripherals.*.serial_numbers' => 'required|array|size:' . $request->input('sets'),
-            'peripherals.*.serial_numbers.*' => 'required|string|max:255|distinct|unique:serialized_assets,serial_number',
+            'peripherals.*.has_serial_number' => 'sometimes|boolean',
             'peripherals.*.model' => 'nullable|string|max:255',
             'peripherals.*.manufacturer_name' => 'nullable|string|max:255',
             'peripherals.*.country_of_origin' => 'nullable|string|max:255',
             'peripherals.*.estimated_useful_life' => 'nullable|string|max:255',
         ]);
 
-        // A bundle only makes sense if the main unit has a property number to
-        // attach peripherals to — otherwise there's nothing for them to link.
+        $sets = $validated['sets'];
+        $mainHasSerial = $request->boolean('main.has_serial_number', true);
+
+        $serialRules = $request->validate([
+            'main.serial_numbers' => $mainHasSerial
+                ? 'required|array|size:' . $sets
+                : 'nullable|array',
+            'main.serial_numbers.*' => 'nullable|string|max:255|distinct|unique:serialized_assets,serial_number',
+            'peripherals.*.serial_numbers' => 'nullable|array',
+            'peripherals.*.serial_numbers.*' => 'nullable|string|max:255|distinct|unique:serialized_assets,serial_number',
+        ]);
+
         if (!empty($validated['peripherals']) && !$validated['main']['has_property_number']) {
             return response()->json([
                 'error' => 'A bundle requires the main item to have a property number, so peripherals have something to attach to.'
             ], 422);
         }
 
-        $sets = $validated['sets'];
         $arrivalDate = $validated['arrival_date'] ?? date('Y-m-d');
         $year = date('Y', strtotime($arrivalDate));
 
         try {
-            return DB::transaction(function () use ($validated, $sets, $year) {
+            return DB::transaction(function () use ($validated, $serialRules, $sets, $year, $mainHasSerial) {
                 $mainInput = $validated['main'];
                 $mainItem = Item::findOrFail($mainInput['item_id']);
 
@@ -183,9 +198,11 @@ class InventoryController extends Controller
                         $nextSeq++;
                     }
 
+                    $serial = $mainHasSerial ? ($serialRules['main']['serial_numbers'][$i] ?? null) : null;
+
                     $createdMain[] = SerializedAsset::create([
                         'item_id' => $mainInput['item_id'],
-                        'serial_number' => $mainInput['serial_numbers'][$i],
+                        'serial_number' => $serial,
                         'property_number' => $propertyNumber,
                         'model' => $mainInput['model'] ?? null,
                         'manufacturer_name' => $mainInput['manufacturer_name'] ?? null,
@@ -200,8 +217,10 @@ class InventoryController extends Controller
                 }
 
                 $createdPeripherals = [];
-                foreach ($validated['peripherals'] ?? [] as $peripheralInput) {
+                foreach ($validated['peripherals'] ?? [] as $pIndex => $peripheralInput) {
                     $peripheralItem = Item::findOrFail($peripheralInput['item_id']);
+                    $pHasSerial = $peripheralInput['has_serial_number'] ?? true;
+                    $peripheralSerials = $serialRules['peripherals'][$pIndex]['serial_numbers'] ?? [];
 
                     $pNextSeq = 1;
                     if ($peripheralInput['has_property_number']) {
@@ -221,9 +240,11 @@ class InventoryController extends Controller
                             $pNextSeq++;
                         }
 
+                        $pSerial = $pHasSerial ? ($peripheralSerials[$i] ?? null) : null;
+
                         $createdPeripherals[] = SerializedAsset::create([
                             'item_id' => $peripheralInput['item_id'],
-                            'serial_number' => $peripheralInput['serial_numbers'][$i],
+                            'serial_number' => $pSerial,
                             'property_number' => $propertyNumber,
                             'model' => $peripheralInput['model'] ?? null,
                             'manufacturer_name' => $peripheralInput['manufacturer_name'] ?? null,
@@ -231,7 +252,7 @@ class InventoryController extends Controller
                             'unit_cost' => $peripheralInput['unit_cost'],
                             'status' => 'Available',
                             'quantity_on_hand' => 1,
-                            'attached_to' => $createdMain[$i]->property_number, // index-paired: set #i's peripheral -> set #i's main unit
+                            'attached_to' => $createdMain[$i]->property_number,
                         ]);
                     }
                     if (!empty($peripheralInput['estimated_useful_life'])) {
@@ -318,7 +339,7 @@ class InventoryController extends Controller
                 : collect();
 
             // --- Serialized Assets ---
-                $assetsQuery = SerializedAsset::with('item:id,name,item_code,unit_of_measure,estimated_useful_life');
+            $assetsQuery = SerializedAsset::with('item:id,name,item_code,unit_of_measure,estimated_useful_life');
             if ($itemId) {
                 $assetsQuery->where('item_id', $itemId);
             }
@@ -330,30 +351,30 @@ class InventoryController extends Controller
             }
 
             $assets = (!$type || $type === 'Asset')
-            ? $assetsQuery->get()->map(function ($a) {
-                return [
-                    'type' => 'Asset',
-                    'id' => $a->id,
-                    'item_id' => $a->item_id,
-                    'item_name' => $a->item->name ?? 'N/A',
-                    'item_code' => $a->item->item_code ?? 'N/A',
-                    'unit_of_measure' => $a->item->unit_of_measure ?? null,
-                    'reference_no' => $a->property_number,
-                    'attached_to' => $a->attached_to,
-                    'serial_number' => $a->serial_number,
-                    'model' => $a->model,
-                    'manufacturer_name' => $a->manufacturer_name,
-                    'country_of_origin' => $a->country_of_origin,
-                    'estimated_useful_life' => $a->item->estimated_useful_life ?? null,
-                    'quantity' => 1,
-                    'unit_cost' => (float) $a->unit_cost,
-                    'total_cost' => (float) $a->unit_cost,
-                    'received_at' => $a->created_at,
-                ];
-            })
-            : collect();
+                ? $assetsQuery->get()->map(function ($a) {
+                    return [
+                        'type' => 'Asset',
+                        'id' => $a->id,
+                        'item_id' => $a->item_id,
+                        'item_name' => $a->item->name ?? 'N/A',
+                        'item_code' => $a->item->item_code ?? 'N/A',
+                        'unit_of_measure' => $a->item->unit_of_measure ?? null,
+                        'reference_no' => $a->property_number,
+                        'attached_to' => $a->attached_to,
+                        'serial_number' => $a->serial_number,
+                        'model' => $a->model,
+                        'manufacturer_name' => $a->manufacturer_name,
+                        'country_of_origin' => $a->country_of_origin,
+                        'estimated_useful_life' => $a->item->estimated_useful_life ?? null,
+                        'quantity' => 1,
+                        'unit_cost' => (float) $a->unit_cost,
+                        'total_cost' => (float) $a->unit_cost,
+                        'received_at' => $a->created_at,
+                    ];
+                })
+                : collect();
 
-            // --- Merge, sort, paginate manually (since these come from two tables) ---
+            // --- Merge, sort, paginate manually ---
             $merged = $batches->concat($assets)
                 ->sortByDesc('received_at')
                 ->values();
@@ -404,7 +425,6 @@ class InventoryController extends Controller
 
     /**
      * Delete a stock batch — only allowed if it has never been drawn from.
-     * Deleting a batch that issuances reference would corrupt FIFO/cost history.
      */
     public function deleteStockBatch(StockBatch $stockBatch)
     {
@@ -426,8 +446,6 @@ class InventoryController extends Controller
 
     /**
      * Update an existing serialized asset (correction, not a new receipt).
-     * Status is intentionally NOT editable here — status changes go through
-     * AccountabilityController's issuance/return workflow instead.
      */
     public function updateSerializedAsset(Request $request, SerializedAsset $serializedAsset)
     {
@@ -452,7 +470,6 @@ class InventoryController extends Controller
 
     /**
      * Delete a serialized asset — only allowed while it's still 'Available'
-     * (never been issued out via ICS/PAR).
      */
     public function deleteSerializedAsset(SerializedAsset $serializedAsset)
     {
@@ -482,9 +499,6 @@ class InventoryController extends Controller
         $currentStatus = $serializedAsset->status;
         $newStatus = $validated['status'];
 
-        // Block manually reversing an active issuance — that must go through
-        // the Transfer/Return workflow, which properly logs a RET document
-        // and clears current_holder_id.
         if ($currentStatus === 'Assigned' && $newStatus === 'Available') {
             return response()->json([
                 'error' => 'This asset is currently assigned to someone. Use the Return/Transfer page to properly return it — that keeps the audit trail correct.'

@@ -22,7 +22,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -39,9 +38,6 @@ import {
 
 import { useAuth } from '@/context/AuthContext';
 import api from '@/api/client';
-
-// Endpoints for fetching active users
-const ENDPOINTS = ['/v1/users', '/users'];
 
 // --- Helper Functions ---
 function getUserLabel(user) {
@@ -224,7 +220,7 @@ function UserSearch({
     return users.filter((user) => {
       const name = (user.name || '').toLowerCase();
       const designation = (user.designation || '').toLowerCase();
-      const unit = (user.unit || user.division || '').toLowerCase();
+      const unit = (user.unit?.name || user.unit || user.division?.name || user.division || '').toLowerCase();
       return name.includes(trimmed) || designation.includes(trimmed) || unit.includes(trimmed);
     });
   }, [users, searchTerm, selectedLabel]);
@@ -294,7 +290,7 @@ function UserSearch({
             <ul className="py-1 divide-y divide-border/40 text-xs">
               {filteredUsers.map((u) => {
                 const isSelected = String(u.id) === String(userId);
-                const subText = [u.designation, u.unit || u.division].filter(Boolean).join(' • ');
+                const subText = [u.designation, u.unit?.name || u.unit || u.division?.name || u.division].filter(Boolean).join(' • ');
 
                 return (
                   <li
@@ -459,7 +455,7 @@ function AssetSearch({
                 const brandModel = (a.brand || a.model)
                   ? `(${a.brand || ''} ${a.model || ''})`.trim()
                   : '';
-                const subText = `SN: ${a.serial_number || 'N/A'}${a.property_number ? ` • PN: ${a.property_number}` : ''} • [${a.status}]`;
+                const subText = `SN: ${a.serial_number || 'N/A'}${a.property_number ? ` • PN: ${a.property_number}` : ''} [${a.status}]`;
 
                 return (
                   <li
@@ -518,34 +514,27 @@ export default function TransferOrReturnForm({
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch users list
+  // Fetch lightweight user options directly via central Axios instance
   const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
-    for (const endpoint of ENDPOINTS) {
-      try {
-        const response = await api.get(endpoint);
-        const data = response.data;
+    try {
+      const response = await api.get('/v1/users/options');
+      const data = response.data;
 
-        const userList = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.data?.data)
-          ? data.data.data
-          : Array.isArray(data?.data)
-          ? data.data
-          : Array.isArray(data?.users)
-          ? data.users
-          : [];
+      const userList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.users)
+        ? data.users
+        : [];
 
-        if (userList.length > 0) {
-          setUsers(userList);
-          setIsLoadingUsers(false);
-          return;
-        }
-      } catch (err) {
-        // Silently continue to next endpoint
-      }
+      setUsers(userList);
+    } catch (err) {
+      console.warn('TransferOrReturnForm: Failed to load user options:', err);
+    } finally {
+      setIsLoadingUsers(false);
     }
-    setIsLoadingUsers(false);
   }, []);
 
   useEffect(() => {
@@ -688,26 +677,26 @@ export default function TransferOrReturnForm({
               </div>
             </div>
 
-          <div className="space-y-2">
-          <Label htmlFor="asset_search" className="text-xs font-semibold flex items-center gap-1.5">
-            <Package className="h-3.5 w-3.5 text-primary" />
-            Select Serialized Asset <span className="text-destructive">*</span>
-          </Label>
-          <AssetSearch
-            id="asset_search"
-            assets={serializedAssets}
-            assetId={form.serialized_asset_id}
-            onSelectAsset={(id) => handleAssetChange(id)}
-            transferType={form.transfer_type}
-            placeholder="Search by asset name, SN, or property number..."
-          />
-          {form.transfer_type === 'RETURN' && (
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-              <AlertCircle className="h-3 w-3 text-amber-500 shrink-0" />
-              Assets marked as <b>[Available]</b> are already in warehouse stock and cannot be returned.
-            </p>
-          )}
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="asset_search" className="text-xs font-semibold flex items-center gap-1.5">
+                <Package className="h-3.5 w-3.5 text-primary" />
+                Select Serialized Asset <span className="text-destructive">*</span>
+              </Label>
+              <AssetSearch
+                id="asset_search"
+                assets={serializedAssets}
+                assetId={form.serialized_asset_id}
+                onSelectAsset={(id) => handleAssetChange(id)}
+                transferType={form.transfer_type}
+                placeholder="Search by asset name, SN, or property number..."
+              />
+              {form.transfer_type === 'RETURN' && (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3 text-amber-500 shrink-0" />
+                  Assets marked as <b>[Available]</b> are already in warehouse stock and cannot be returned.
+                </p>
+              )}
+            </div>
 
             {/* User Selectors Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t">

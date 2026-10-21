@@ -155,7 +155,6 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
 
-  // Sync input string when itemId is selected or reset externally
   useEffect(() => {
     if (!itemId) {
       setSearchTerm('');
@@ -170,7 +169,6 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
     }
   }, [itemId, items]);
 
-  // Click outside listener
   useEffect(() => {
     function handleClickOutside(event) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
@@ -181,7 +179,6 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter items matching query against multiple fields
   const filteredItems = (items || []).filter((item) => {
     if (!searchTerm.trim()) return true;
     const q = searchTerm.toLowerCase().trim();
@@ -209,7 +206,6 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
     setSearchTerm(val);
     setIsOpen(true);
 
-    // Auto-match exact name or formatted label
     const exactMatch = items.find((i) => {
       const label = getItemLabel(i).toLowerCase();
       const name = (i.name || '').toLowerCase();
@@ -263,7 +259,6 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
         )}
       </div>
 
-      {/* Recommendations Dropdown */}
       {isOpen && (
         <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-lg max-h-64 overflow-y-auto">
           {filteredItems.length > 0 ? (
@@ -307,7 +302,6 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
                       </div>
                     </div>
 
-                    {/* Additional specifications & details */}
                     <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-0.5">
                       {categoryName && <span>Cat: {categoryName}</span>}
                       {item.type && <span>Type: {item.type}</span>}
@@ -347,20 +341,26 @@ export default function ReceiveForm({
   const isAsset = selectedItem?.tracking_type === 'asset';
   const quantity = Number(receiveForm.quantity) || 0;
 
+  // Set default has_serial_number to true if not defined
+  const hasSerialNumber = receiveForm.has_serial_number ?? true;
+
   useEffect(() => {
     setSerials([]);
-  }, [receiveForm.item_id, receiveForm.quantity]);
+  }, [receiveForm.item_id, receiveForm.quantity, hasSerialNumber]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!receiveForm.item_id) return;
-    if (isAsset && serials.length !== quantity) return;
+    
+    // Check serial number length requirement ONLY if serial number tracking is enabled
+    if (isAsset && hasSerialNumber && serials.length !== quantity) return;
 
     const payload = isAsset
       ? {
           ...receiveForm,
           has_property_number: Boolean(receiveForm.has_property_number),
-          serial_numbers: serials,
+          has_serial_number: Boolean(hasSerialNumber),
+          serial_numbers: hasSerialNumber ? serials : [],
         }
       : receiveForm;
 
@@ -371,6 +371,7 @@ export default function ReceiveForm({
         arrival_date: '',
         quantity: '',
         has_property_number: false,
+        has_serial_number: true,
         model: '',
         manufacturer_name: '',
         country_of_origin: '',
@@ -469,6 +470,31 @@ export default function ReceiveForm({
                   </FieldDescription>
                 </Field>
 
+                {/* Switch for Serial Number Tracking */}
+                <Field className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id="has_serial_number"
+                      checked={hasSerialNumber}
+                      onCheckedChange={(checked) =>
+                        setReceiveForm({
+                          ...receiveForm,
+                          has_serial_number: checked,
+                        })
+                      }
+                    />
+                    <FieldLabel
+                      htmlFor="has_serial_number"
+                      className="cursor-pointer font-medium"
+                    >
+                      Track Serial Number
+                    </FieldLabel>
+                  </div>
+                  <FieldDescription>
+                    Turn on to require entering or scanning serial numbers per unit. Turn off for assets without serial numbers.
+                  </FieldDescription>
+                </Field>
+
                 <Field>
                   <FieldLabel htmlFor="model">Model</FieldLabel>
                   <Input
@@ -512,7 +538,8 @@ export default function ReceiveForm({
                   />
                 </Field>
 
-                {quantity > 0 && (
+                {/* Render Serial Scanner only if quantity > 0 AND serial tracking is turned ON */}
+                {quantity > 0 && hasSerialNumber && (
                   <Field>
                     <FieldLabel>Serial Numbers <span className="text-destructive">*</span></FieldLabel>
                     <SerialNumberScanner
@@ -530,7 +557,7 @@ export default function ReceiveForm({
         <Button
           type="submit"
           className="mt-4"
-          disabled={isAsset && serials.length !== quantity}
+          disabled={isAsset && hasSerialNumber && serials.length !== quantity}
         >
           Process Inbound Stock
         </Button>

@@ -13,10 +13,6 @@ use Illuminate\Support\Facades\Log;
 /**
  * Combined "create catalog item + receive stock" workflow, for use when no
  * dedicated supply/receiving personnel exist to run the two-step process.
- *
- * Deliberately duplicates item-code and stock-record generation logic from
- * ItemController / InventoryController rather than calling into them, so
- * this workflow stays fully independent and those two stay untouched.
  */
 class QuickReceiveController extends Controller
 {
@@ -40,8 +36,6 @@ class QuickReceiveController extends Controller
             'quantity' => 'required|integer|min:1',
         ]);
 
-        // Resolve the item + its tracking_type BEFORE the stock-specific
-        // validation pass, since that pass branches on tracking_type.
         $item = $envelope['item_mode'] === 'existing'
             ? Item::findOrFail($envelope['item_id'])
             : null;
@@ -50,14 +44,21 @@ class QuickReceiveController extends Controller
         $assetFields = null;
 
         if ($trackingType === 'asset') {
+            $hasSerial = $request->boolean('has_serial_number', true);
+
             $assetFields = $request->validate([
                 'has_property_number' => 'required|boolean',
-                'serial_numbers' => 'required|array|size:' . $envelope['quantity'],
-                'serial_numbers.*' => 'required|string|max:255|distinct|unique:serialized_assets,serial_number',
+                'has_serial_number' => 'sometimes|boolean',
+                'serial_numbers' => $hasSerial
+                    ? 'required|array|size:' . $envelope['quantity']
+                    : 'nullable|array',
+                'serial_numbers.*' => 'nullable|string|max:255|distinct|unique:serialized_assets,serial_number',
                 'model' => 'nullable|string|max:255',
                 'manufacturer_name' => 'nullable|string|max:255',
                 'country_of_origin' => 'nullable|string|max:255',
             ]);
+            
+            $assetFields['has_serial_number'] = $hasSerial;
         }
 
         $arrivalDate = $envelope['arrival_date'] ?? date('Y-m-d');
@@ -68,7 +69,6 @@ class QuickReceiveController extends Controller
         try {
             return DB::transaction(function () use ($envelope, $assetFields, $item, $trackingType, $year, $month, $day, $arrivalDate) {
 
-                // Isolate tracking-type specific attributes
                 $reorderLevel = ($trackingType === 'consumable') 
                     ? ($envelope['reorder_level'] ?? 5) 
                     : 1;
@@ -123,7 +123,7 @@ class QuickReceiveController extends Controller
                     ], 201);
                 }
 
-                // Asset branch
+                // --- Asset branch ---
                 $nextSeq = 1;
                 if ($assetFields['has_property_number'] ?? false) {
                     $lastProperty = SerializedAsset::whereNotNull('property_number')
@@ -136,26 +136,30 @@ class QuickReceiveController extends Controller
                 }
 
                 $createdAssets = [];
-                if (!empty($assetFields['serial_numbers'])) {
-                    foreach ($assetFields['serial_numbers'] as $serial) {
-                        $propertyNumber = null;
-                        if ($assetFields['has_property_number'] ?? false) {
-                            $propertyNumber = sprintf("DOH NIR-%s-%04d", $year, $nextSeq);
-                            $nextSeq++;
-                        }
+                $quantity = (int) $envelope['quantity'];
+                $hasSerials = $assetFields['has_serial_number'] ?? true;
+                $serialList = $assetFields['serial_numbers'] ?? [];
 
-                        $createdAssets[] = SerializedAsset::create([
-                            'item_id' => $item->id,
-                            'serial_number' => $serial,
-                            'property_number' => $propertyNumber,
-                            'model' => $assetFields['model'] ?? null,
-                            'manufacturer_name' => $assetFields['manufacturer_name'] ?? null,
-                            'country_of_origin' => $assetFields['country_of_origin'] ?? null,
-                            'unit_cost' => $envelope['unit_cost'],
-                            'status' => 'Available',
-                            'quantity_on_hand' => 1,
-                        ]);
+                for ($i = 0; $i < $quantity; $i++) {
+                    $propertyNumber = null;
+                    if ($assetFields['has_property_number'] ?? false) {
+                        $propertyNumber = sprintf("DOH NIR-%s-%04d", $year, $nextSeq);
+                        $nextSeq++;
                     }
+
+                    $serial = $hasSerials ? ($serialList[$i] ?? null) : null;
+
+                    $createdAssets[] = SerializedAsset::create([
+                        'item_id' => $item->id,
+                        'serial_number' => $serial,
+                        'property_number' => $propertyNumber,
+                        'model' => $assetFields['model'] ?? null,
+                        'manufacturer_name' => $assetFields['manufacturer_name'] ?? null,
+                        'country_of_origin' => $assetFields['country_of_origin'] ?? null,
+                        'unit_cost' => $envelope['unit_cost'],
+                        'status' => 'Available',
+                        'quantity_on_hand' => 1,
+                    ]);
                 }
 
                 if ($envelope['item_mode'] === 'existing' && !empty($estimatedUsefulLife)) {
@@ -174,9 +178,6 @@ class QuickReceiveController extends Controller
         }
     }
 
-    /**
-     * Mirrors ItemController::store()'s item_code generation logic.
-     */
     private function generateItemCode(Category $category): string
     {
         $year = date('Y');
@@ -222,6 +223,7 @@ class QuickReceiveController extends Controller
             'main.estimated_useful_life' => 'nullable|string|max:255',
             'main.unit_cost' => 'required|numeric|min:0',
             'main.has_property_number' => 'required|boolean',
+            'main.has_serial_number' => 'sometimes|boolean',
             'main.model' => 'nullable|string|max:255',
             'main.manufacturer_name' => 'nullable|string|max:255',
             'main.country_of_origin' => 'nullable|string|max:255',
@@ -238,18 +240,21 @@ class QuickReceiveController extends Controller
             'peripherals.*.estimated_useful_life' => 'nullable|string|max:255',
             'peripherals.*.unit_cost' => 'required|numeric|min:0',
             'peripherals.*.has_property_number' => 'required|boolean',
+            'peripherals.*.has_serial_number' => 'sometimes|boolean',
             'peripherals.*.model' => 'nullable|string|max:255',
             'peripherals.*.manufacturer_name' => 'nullable|string|max:255',
             'peripherals.*.country_of_origin' => 'nullable|string|max:255',
         ]);
 
-        // Every asset gets a serial number — validated separately since its
-        // 'size' rule depends on sets, which is also in the payload.
         $sets = $validated['sets'];
+        $mainHasSerial = $request->boolean('main.has_serial_number', true);
+
         $serialRules = $request->validate([
-            'main.serial_numbers' => 'required|array|size:' . $sets,
-            'main.serial_numbers.*' => 'required|string|max:255|distinct|unique:serialized_assets,serial_number',
-            'peripherals.*.serial_numbers' => 'nullable|array|size:' . $sets,
+            'main.serial_numbers' => $mainHasSerial 
+                ? 'required|array|size:' . $sets 
+                : 'nullable|array',
+            'main.serial_numbers.*' => 'nullable|string|max:255|distinct|unique:serialized_assets,serial_number',
+            'peripherals.*.serial_numbers' => 'nullable|array',
             'peripherals.*.serial_numbers.*' => 'nullable|string|max:255|distinct|unique:serialized_assets,serial_number',
         ]);
 
@@ -263,7 +268,7 @@ class QuickReceiveController extends Controller
         $year = date('Y', strtotime($arrivalDate));
 
         try {
-            return DB::transaction(function () use ($validated, $serialRules, $sets, $year) {
+            return DB::transaction(function () use ($validated, $serialRules, $sets, $year, $mainHasSerial) {
                 $mainInput = $validated['main'];
                 $mainItem = $this->resolveItem($mainInput);
 
@@ -277,9 +282,11 @@ class QuickReceiveController extends Controller
                         $mainSeq++;
                     }
 
+                    $serial = $mainHasSerial ? ($serialRules['main']['serial_numbers'][$i] ?? null) : null;
+
                     $createdMain[] = SerializedAsset::create([
                         'item_id' => $mainItem->id,
-                        'serial_number' => $serialRules['main']['serial_numbers'][$i],
+                        'serial_number' => $serial,
                         'property_number' => $propertyNumber,
                         'model' => $mainInput['model'] ?? null,
                         'manufacturer_name' => $mainInput['manufacturer_name'] ?? null,
@@ -289,6 +296,7 @@ class QuickReceiveController extends Controller
                         'quantity_on_hand' => 1,
                     ]);
                 }
+                
                 if (!empty($mainInput['estimated_useful_life'])) {
                     $mainItem->update(['estimated_useful_life' => $mainInput['estimated_useful_life']]);
                 }
@@ -296,6 +304,7 @@ class QuickReceiveController extends Controller
                 $createdPeripherals = [];
                 foreach ($validated['peripherals'] ?? [] as $pIndex => $peripheralInput) {
                     $peripheralItem = $this->resolveItem($peripheralInput);
+                    $pHasSerial = $peripheralInput['has_serial_number'] ?? true;
                     $peripheralSerials = $serialRules['peripherals'][$pIndex]['serial_numbers'] ?? [];
 
                     $pSeq = $this->nextPropertySequence($peripheralInput['has_property_number'], $year);
@@ -307,9 +316,11 @@ class QuickReceiveController extends Controller
                             $pSeq++;
                         }
 
+                        $pSerial = $pHasSerial ? ($peripheralSerials[$i] ?? null) : null;
+
                         $createdPeripherals[] = SerializedAsset::create([
                             'item_id' => $peripheralItem->id,
-                            'serial_number' => $peripheralSerials[$i] ?? null,
+                            'serial_number' => $pSerial,
                             'property_number' => $propertyNumber,
                             'model' => $peripheralInput['model'] ?? null,
                             'manufacturer_name' => $peripheralInput['manufacturer_name'] ?? null,
@@ -337,10 +348,6 @@ class QuickReceiveController extends Controller
         }
     }
 
-    /**
-     * Shared by store() and storeBundle() — resolves an existing item or
-     * creates a new one, same item_code generation as generateItemCode().
-     */
     private function resolveItem(array $componentInput): Item
     {
         if ($componentInput['item_mode'] === 'existing') {

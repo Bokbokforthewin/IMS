@@ -147,14 +147,13 @@ function getItemLabel(item) {
   return `${item.name}${brandStr}`;
 }
 
-// --- Responsive Auto-Matching Item Search Bar (Fixed Typing Issue) ---
+// --- Responsive Auto-Matching Item Search Bar ---
 function ItemSearch({ items = [], itemId, onSelectItem }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
   const isTypingRef = useRef(false);
 
-  // Sync input string when itemId changes externally (e.g. initial load or form reset)
   useEffect(() => {
     if (isTypingRef.current) return;
 
@@ -168,7 +167,6 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
     }
   }, [itemId, items]);
 
-  // Click outside listener
   useEffect(() => {
     function handleClickOutside(event) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
@@ -179,7 +177,6 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter items matching query against multiple fields
   const filteredItems = (items || []).filter((item) => {
     if (!searchTerm.trim()) return true;
     const q = searchTerm.toLowerCase().trim();
@@ -208,7 +205,6 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
     setSearchTerm(val);
     setIsOpen(true);
 
-    // Auto-match exact name or formatted label
     const exactMatch = items.find((i) => {
       const label = getItemLabel(i).toLowerCase();
       const name = (i.name || '').toLowerCase();
@@ -222,7 +218,6 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
       onSelectItem('');
     }
 
-    // Reset typing flag right after state queue
     setTimeout(() => {
       isTypingRef.current = false;
     }, 0);
@@ -269,7 +264,6 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
         )}
       </div>
 
-      {/* Recommendations Dropdown */}
       {isOpen && (
         <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-lg max-h-64 overflow-y-auto">
           {filteredItems.length > 0 ? (
@@ -313,7 +307,6 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
                       </div>
                     </div>
 
-                    {/* Additional specifications & details */}
                     <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-0.5">
                       {categoryName && <span>Cat: {categoryName}</span>}
                       {item.type && <span>Type: {item.type}</span>}
@@ -344,6 +337,7 @@ function emptyComponent() {
     item_id: '',
     unit_cost: '',
     has_property_number: false,
+    has_serial_number: true, // Default ON
     model: '',
     manufacturer_name: '',
     country_of_origin: '',
@@ -353,8 +347,8 @@ function emptyComponent() {
 
 // --- Component Fields Row for Main or Peripheral Assets ---
 function ComponentFields({ label, items, value, onChange, sets }) {
-  // Only pass asset-tracked items into the search
   const assetItems = (items || []).filter((i) => i.tracking_type === 'asset');
+  const fieldKey = label.replace(/\s+/g, '_').toLowerCase();
 
   return (
     <FieldGroup>
@@ -367,7 +361,7 @@ function ComponentFields({ label, items, value, onChange, sets }) {
         />
       </Field>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4 items-center">
         <Field>
           <FieldLabel>Unit Cost (₱) <span className="text-destructive">*</span></FieldLabel>
           <Input
@@ -379,19 +373,41 @@ function ComponentFields({ label, items, value, onChange, sets }) {
             onChange={(e) => onChange({ ...value, unit_cost: e.target.value })}
           />
         </Field>
-        <Field orientation="horizontal" className="flex items-center gap-3">
+
+        <Field orientation="horizontal" className="flex items-center gap-3 pt-4">
           <Switch
-            id={`has_property_number_${label.replace(/\s+/g, '_').toLowerCase()}`}
+            id={`has_property_number_${fieldKey}`}
             checked={value.has_property_number}
             onCheckedChange={(checked) =>
               onChange({ ...value, has_property_number: checked })
             }
           />
           <FieldLabel
-            htmlFor={`has_property_number_${label.replace(/\s+/g, '_').toLowerCase()}`}
-            className="cursor-pointer font-medium"
+            htmlFor={`has_property_number_${fieldKey}`}
+            className="cursor-pointer font-medium text-xs sm:text-sm"
           >
             Assign Property Number
+          </FieldLabel>
+        </Field>
+
+        {/* Toggle Serial Number Tracking */}
+        <Field orientation="horizontal" className="flex items-center gap-3 pt-4">
+          <Switch
+            id={`has_serial_number_${fieldKey}`}
+            checked={value.has_serial_number}
+            onCheckedChange={(checked) =>
+              onChange({
+                ...value,
+                has_serial_number: checked,
+                serial_numbers: checked ? value.serial_numbers : [],
+              })
+            }
+          />
+          <FieldLabel
+            htmlFor={`has_serial_number_${fieldKey}`}
+            className="cursor-pointer font-medium text-xs sm:text-sm"
+          >
+            Track Serial Number
           </FieldLabel>
         </Field>
       </div>
@@ -424,9 +440,9 @@ function ComponentFields({ label, items, value, onChange, sets }) {
         </Field>
       </div>
 
-      {sets > 0 && (
+      {sets > 0 && value.has_serial_number && (
         <Field>
-          <FieldLabel>Serial Numbers *</FieldLabel>
+          <FieldLabel>Serial Numbers <span className="text-destructive">*</span></FieldLabel>
           <SerialNumberScanner
             quantity={sets}
             serials={value.serial_numbers}
@@ -466,10 +482,13 @@ export default function ReceiveBundleForm({ items, handleApiCall, onSuccess }) {
     const numSets = Number(sets) || 0;
 
     if (numSets < 1) return;
-    if (main.serial_numbers.length !== numSets) return;
 
+    // Validate main serial numbers if serial tracking is turned ON
+    if (main.has_serial_number && main.serial_numbers.length !== numSets) return;
+
+    // Validate peripheral serial numbers if serial tracking is turned ON
     for (const p of peripherals) {
-      if (p.serial_numbers.length !== numSets) return;
+      if (p.has_serial_number && p.serial_numbers.length !== numSets) return;
     }
 
     const payload = {

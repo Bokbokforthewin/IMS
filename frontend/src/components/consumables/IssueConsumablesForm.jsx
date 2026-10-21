@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { CalendarIcon, Search, Check, X } from 'lucide-react';
 import api from '../../api/client';
 
@@ -31,6 +31,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
+import { useAuth } from '@/context/AuthContext';
 
 // --- Date Helpers ---
 function formatDateDisplay(date) {
@@ -150,7 +152,9 @@ function IssuanceDatePicker({ value, onChange }) {
 function getUserLabel(user) {
   if (!user) return '';
   const desig = user.designation ? ` — ${user.designation}` : '';
-  const dept = user.unit || user.division ? ` (${[user.unit, user.division].filter(Boolean).join(' / ')})` : '';
+  const unitStr = user.unit?.name || user.unit;
+  const divStr = user.division?.name || user.division;
+  const dept = unitStr || divStr ? ` (${[unitStr, divStr].filter(Boolean).join(' / ')})` : '';
   return `${user.name}${desig}${dept}`;
 }
 
@@ -173,7 +177,7 @@ function UserSearch({ users = [], userId, onSelectUser }) {
         }
       }
     }
-  }, [userId, users]);
+  }, [userId, users, isOpen]);
 
   // Click outside listener
   useEffect(() => {
@@ -187,30 +191,32 @@ function UserSearch({ users = [], userId, onSelectUser }) {
   }, []);
 
   // Filter users based on input query
-  const filteredUsers = (users || []).filter((user) => {
-    if (!searchTerm.trim()) return true;
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm.trim()) return users;
     const q = searchTerm.toLowerCase().trim();
-    const name = (user.name || '').toLowerCase();
-    const designation = (user.designation || '').toLowerCase();
-    const unit = (user.unit || '').toLowerCase();
-    const division = (user.division || '').toLowerCase();
-    const email = (user.email || '').toLowerCase();
 
-    return (
-      name.includes(q) ||
-      designation.includes(q) ||
-      unit.includes(q) ||
-      division.includes(q) ||
-      email.includes(q)
-    );
-  });
+    return (users || []).filter((user) => {
+      const name = (user.name || '').toLowerCase();
+      const designation = (user.designation?.name || user.designation || '').toLowerCase();
+      const unit = (user.unit?.name || user.unit || '').toLowerCase();
+      const division = (user.division?.name || user.division || '').toLowerCase();
+      const email = (user.email || '').toLowerCase();
+
+      return (
+        name.includes(q) ||
+        designation.includes(q) ||
+        unit.includes(q) ||
+        division.includes(q) ||
+        email.includes(q)
+      );
+    });
+  }, [users, searchTerm]);
 
   const handleInputChange = (e) => {
     const val = e.target.value;
     setSearchTerm(val);
     setIsOpen(true);
 
-    // Auto-match exact name or formatted label
     const exactMatch = users.find((u) => {
       const label = getUserLabel(u).toLowerCase();
       const name = (u.name || '').toLowerCase();
@@ -270,7 +276,9 @@ function UserSearch({ users = [], userId, onSelectUser }) {
             <ul className="py-1 divide-y divide-border/40 text-sm">
               {filteredUsers.map((u) => {
                 const isSelected = String(u.id) === String(userId);
-                const dept = [u.unit, u.division].filter(Boolean).join(' / ');
+                const unitStr = u.unit?.name || u.unit;
+                const divStr = u.division?.name || u.division;
+                const dept = [unitStr, divStr].filter(Boolean).join(' / ');
 
                 return (
                   <li
@@ -287,7 +295,7 @@ function UserSearch({ users = [], userId, onSelectUser }) {
                         {u.name}
                         {u.designation && (
                           <span className="ml-1 text-xs text-muted-foreground font-normal">
-                            — {u.designation}
+                            — {u.designation?.name || u.designation}
                           </span>
                         )}
                       </span>
@@ -315,6 +323,8 @@ function UserSearch({ users = [], userId, onSelectUser }) {
 }
 
 export default function IssueConsumablesForm({ item, handleApiCall, onSuccess }) {
+  const { user: currentUser } = useAuth();
+
   const [form, setForm] = useState({
     item_id: item?.id || '',
     quantity_requested: '',
@@ -329,22 +339,23 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
   const [successMessage, setSuccessMessage] = useState(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
-  // Fetch users using authenticated client
+  // Fetch options list via central Axios instance
   const fetchUsers = useCallback(async () => {
     try {
-      const response = await api.get('/v1/users');
-      const json = response.data;
+      const response = await api.get('/v1/users/options');
+      const data = response.data;
 
-      let userList = [];
-      if (Array.isArray(json)) {
-        userList = json;
-      } else if (json && Array.isArray(json.data)) {
-        userList = json.data;
-      }
+      const userList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.users)
+        ? data.users
+        : [];
 
       setUsers(userList);
     } catch (err) {
-      console.error('Failed to load users:', err);
+      console.error('Failed to load user options:', err);
       setUsers([]);
     }
   }, []);
@@ -353,12 +364,31 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
     fetchUsers();
   }, [fetchUsers]);
 
+  // Combine user list with current session user as fallback
+  const combinedUsers = useMemo(() => {
+    if (!currentUser?.id) return users;
+    const exists = users.some((u) => String(u.id) === String(currentUser.id));
+    if (!exists) {
+      return [
+        {
+          id: currentUser.id,
+          name: currentUser.name || 'Current User',
+          unit: currentUser.unit,
+          designation: currentUser.designation,
+          division: currentUser.division,
+        },
+        ...users,
+      ];
+    }
+    return users;
+  }, [users, currentUser]);
+
   // Keep item_id in sync when item prop updates
   useEffect(() => {
     setForm((f) => ({ ...f, item_id: item?.id || '' }));
   }, [item]);
 
-  const selectedUser = users.find((u) => String(u.id) === String(form.issued_to_id));
+  const selectedUser = combinedUsers.find((u) => String(u.id) === String(form.issued_to_id));
 
   // Pre-validate form before opening confirmation modal
   const handlePreSubmit = (e) => {
@@ -441,18 +471,17 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
       <form onSubmit={handlePreSubmit}>
         <FieldGroup className="space-y-4">
 
-           {/* Searchable Issued To Employee Field */}
+          {/* Searchable Issued To Employee Field */}
           <Field>
             <FieldLabel htmlFor="issued_to_id">
               Issued To <span className="text-destructive">*</span>
             </FieldLabel>
             <UserSearch
-              users={users}
+              users={combinedUsers}
               userId={form.issued_to_id}
               onSelectUser={(id) => setForm({ ...form, issued_to_id: id })}
             />
           </Field>
-
 
           {/* Quantity Field */}
           <Field>

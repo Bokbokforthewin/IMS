@@ -9,6 +9,10 @@ import {
   Loader2,
   Calendar,
   Filter,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 
 import {
@@ -17,6 +21,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -45,6 +50,10 @@ export default function TransferHistoryTable({ refreshKey }) {
   const [errorMessage, setErrorMessage] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
+
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const fetchTransfers = useCallback(async () => {
     setIsLoading(true);
@@ -81,7 +90,12 @@ export default function TransferHistoryTable({ refreshKey }) {
     fetchTransfers();
   }, [fetchTransfers, refreshKey]);
 
-  // Filtered transfers based on search input & type dropdown
+  // Reset to first page when search terms or type filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, typeFilter, pageSize]);
+
+  // Cleaned and robust search filter
   const filteredTransfers = useMemo(() => {
     return transfers.filter((t) => {
       // Type filter
@@ -89,36 +103,82 @@ export default function TransferHistoryTable({ refreshKey }) {
         return false;
       }
 
-      // Search term filter
       const term = searchTerm.trim().toLowerCase();
       if (!term) return true;
 
-      const docNo = (t.document_number || '').toLowerCase();
+      // Document Number
+      const docNo = (t.document_number || `ptr-${t.id}` || '').toLowerCase();
       const type = (t.transfer_type || '').toLowerCase();
+
+      // Asset & Item attributes
       const itemName = (t.serialized_asset?.item?.name || '').toLowerCase();
+      const itemBrand = (t.serialized_asset?.item?.brand || '').toLowerCase();
       const serialNo = (t.serialized_asset?.serial_number || '').toLowerCase();
       const propNo = (t.serialized_asset?.property_number || '').toLowerCase();
-      const fromName = (t.transferred_from?.name || t.user?.name || '').toLowerCase();
-      const toName = (t.transferred_to?.name || t.recipient?.name || '').toLowerCase();
+      const model = (t.serialized_asset?.model || '').toLowerCase();
+      const categoryName = (t.serialized_asset?.item?.category?.name || '').toLowerCase();
+
+      // Resolved Sender / Receiver User Objects
+      const fromUser = t.transferred_from || t.transferredFrom || t.user;
+      const toUser = t.transferred_to || t.transferredTo || t.recipient;
+
+      // User Names
+      const fromName = (fromUser?.name || '').toLowerCase();
+      const toName = (toUser?.name || '').toLowerCase();
+
+      // User Unit, Designation, Division (Direct string columns on User model)
+      const fromUnit = (fromUser?.unit || '').toLowerCase();
+      const toUnit = (toUser?.unit || '').toLowerCase();
+
+      const fromDesignation = (fromUser?.designation || '').toLowerCase();
+      const toDesignation = (toUser?.designation || '').toLowerCase();
+
+      const fromDivision = (fromUser?.division || '').toLowerCase();
+      const toDivision = (toUser?.division || '').toLowerCase();
+
+      // Transaction Details
       const description = (t.description || '').toLowerCase();
       const reason = (t.reason || '').toLowerCase();
+      const remarks = (t.remarks || '').toLowerCase();
+      const date = (t.transfer_date || '').toLowerCase();
 
       return (
         docNo.includes(term) ||
         type.includes(term) ||
         itemName.includes(term) ||
+        itemBrand.includes(term) ||
         serialNo.includes(term) ||
         propNo.includes(term) ||
+        model.includes(term) ||
+        categoryName.includes(term) ||
         fromName.includes(term) ||
         toName.includes(term) ||
+        fromUnit.includes(term) ||
+        toUnit.includes(term) ||
+        fromDesignation.includes(term) ||
+        toDesignation.includes(term) ||
+        fromDivision.includes(term) ||
+        toDivision.includes(term) ||
         description.includes(term) ||
-        reason.includes(term)
+        reason.includes(term) ||
+        remarks.includes(term) ||
+        date.includes(term)
       );
     });
   }, [transfers, searchTerm, typeFilter]);
 
+  // Calculate pagination bounds
+  const totalItems = filteredTransfers.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  // Slice paginated data for display
+  const paginatedTransfers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredTransfers.slice(startIndex, startIndex + pageSize);
+  }, [filteredTransfers, currentPage, pageSize]);
+
   return (
-    <Card className="shadow-sm border-primary/20">
+    <Card className="shadow-sm border-primary/20 flex flex-col">
       <CardHeader className="border-b bg-muted/20 pb-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -126,9 +186,6 @@ export default function TransferHistoryTable({ refreshKey }) {
               <History className="h-4 w-4 text-primary" />
               Return & Transfer History Logs
             </CardTitle>
-            <CardDescription className="text-xs">
-              Audit trails and transaction records for all equipment returns and property transfers.
-            </CardDescription>
           </div>
           <Button
             variant="outline"
@@ -148,7 +205,7 @@ export default function TransferHistoryTable({ refreshKey }) {
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search by doc no, asset, serial no, employee name..."
+              placeholder="Search by doc no, asset, unit, division, designation, employee..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8 h-8 text-xs"
@@ -171,7 +228,7 @@ export default function TransferHistoryTable({ refreshKey }) {
         </div>
       </CardHeader>
 
-      <CardContent className="p-0">
+      <CardContent className="p-0 flex-1">
         {errorMessage && (
           <div className="p-4 m-4 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0" />
@@ -202,7 +259,7 @@ export default function TransferHistoryTable({ refreshKey }) {
                     </div>
                   </td>
                 </tr>
-              ) : filteredTransfers.length === 0 ? (
+              ) : paginatedTransfers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center gap-1.5">
@@ -221,7 +278,7 @@ export default function TransferHistoryTable({ refreshKey }) {
                   </td>
                 </tr>
               ) : (
-                filteredTransfers.map((t) => {
+                paginatedTransfers.map((t) => {
                   const isReturn = t.transfer_type === 'RETURN';
                   const fromUser = t.transferred_from?.name || t.user?.name || 'N/A';
                   const toUser = t.transferred_to?.name || t.recipient?.name || 'N/A';
@@ -262,7 +319,7 @@ export default function TransferHistoryTable({ refreshKey }) {
                         <div className="text-[10px] text-muted-foreground space-x-1.5">
                           <span>SN: <strong className="font-mono">{serialNo}</strong></span>
                           {propertyNo && (
-                            <span>• PN: <strong className="font-mono">{propertyNo}</strong></span>
+                            <span>PN: <strong className="font-mono">{propertyNo}</strong></span>
                           )}
                         </div>
                       </td>
@@ -301,6 +358,96 @@ export default function TransferHistoryTable({ refreshKey }) {
           </table>
         </div>
       </CardContent>
+
+      {/* Nova Preset Footer / ShadcnUI Pagination Bar */}
+      {!isLoading && totalItems > 0 && (
+        <CardFooter className="border-t bg-muted/10 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+          {/* Row Count Info */}
+          <div className="flex items-center gap-2">
+            <span>
+              Showing{' '}
+              <strong className="font-medium text-foreground">
+                {Math.min((currentPage - 1) * pageSize + 1, totalItems)}
+              </strong>{' '}
+              to{' '}
+              <strong className="font-medium text-foreground">
+                {Math.min(currentPage * pageSize, totalItems)}
+              </strong>{' '}
+              of <strong className="font-medium text-foreground">{totalItems}</strong> entries
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Rows Per Page Selector */}
+            <div className="flex items-center gap-2">
+              <span className="whitespace-nowrap">Rows per page</span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(val) => setPageSize(Number(val))}
+              >
+                <SelectTrigger className="h-8 w-[70px] text-xs bg-background">
+                  <SelectValue placeholder={pageSize} />
+                </SelectTrigger>
+                <SelectContent className="z-50 text-xs">
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Current Page Indicator */}
+            <div className="flex items-center justify-center font-medium min-w-[80px]">
+              Page {currentPage} of {totalPages}
+            </div>
+
+            {/* Navigation Controls */}
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                title="First Page"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                title="Previous Page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                title="Next Page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                title="Last Page"
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardFooter>
+      )}
     </Card>
   );
 }

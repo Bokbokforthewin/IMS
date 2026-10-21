@@ -23,7 +23,9 @@ function emptyForm() {
     unit_of_measure: '', reorder_level: '5', tracking_type: 'consumable',
     estimated_useful_life: '',
     unit_cost: '', arrival_date: '', quantity: '',
-    has_property_number: false, model: '', manufacturer_name: '', country_of_origin: '',
+    has_property_number: false,
+    has_serial_number: true, // Default set to true
+    model: '', manufacturer_name: '', country_of_origin: '',
   };
 }
 
@@ -40,7 +42,7 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
   const isAsset = trackingType === 'asset';
   const quantity = Number(form.quantity) || 0;
 
-  useEffect(() => { setSerials([]); }, [form.quantity, form.item_id, form.item_mode]);
+  useEffect(() => { setSerials([]); }, [form.quantity, form.item_id, form.item_mode, form.has_serial_number]);
 
   const categoryOptions = (categories || []).map((c) => ({ value: String(c.id), label: c.name }));
 
@@ -50,7 +52,9 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
     e.preventDefault();
     if (form.item_mode === 'new' && !form.category_id) return;
     if (form.item_mode === 'existing' && !form.item_id) return;
-    if (isAsset && serials.length !== quantity) return;
+    
+    // Only require matching serial count if tracking serials is turned on
+    if (isAsset && form.has_serial_number && serials.length !== quantity) return;
 
     setSubmitting(true);
     const payload = {
@@ -71,7 +75,8 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
       ...(isAsset
         ? {
             has_property_number: form.has_property_number,
-            serial_numbers: serials,
+            has_serial_number: form.has_serial_number,
+            serial_numbers: form.has_serial_number ? serials : [],
             model: form.model || null,
             manufacturer_name: form.manufacturer_name || null,
             country_of_origin: form.country_of_origin || null,
@@ -256,10 +261,17 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
                 <Card>
                   <CardHeader><CardTitle className="text-base">Asset Details</CardTitle></CardHeader>
                   <CardContent className="space-y-4">
-                    <Field orientation="horizontal">
-                      <Switch checked={form.has_property_number} onCheckedChange={(c) => update({ has_property_number: c })} />
-                      <FieldLabel>Assign Property Number</FieldLabel>
-                    </Field>
+                    <div className="flex items-center space-x-6">
+                      <Field orientation="horizontal">
+                        <Switch checked={form.has_property_number} onCheckedChange={(c) => update({ has_property_number: c })} />
+                        <FieldLabel>Assign Property Number</FieldLabel>
+                      </Field>
+
+                      <Field orientation="horizontal">
+                        <Switch checked={form.has_serial_number} onCheckedChange={(c) => update({ has_serial_number: c })} />
+                        <FieldLabel>Track Serial Numbers</FieldLabel>
+                      </Field>
+                    </div>
 
                     <div className="grid grid-cols-3 gap-4">
                       <Field><FieldLabel>Model</FieldLabel><Input value={form.model} onChange={(e) => update({ model: e.target.value })} /></Field>
@@ -267,7 +279,7 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
                       <Field><FieldLabel>Country of Origin</FieldLabel><Input value={form.country_of_origin} onChange={(e) => update({ country_of_origin: e.target.value })} /></Field>
                     </div>
 
-                    {quantity > 0 && (
+                    {form.has_serial_number && quantity > 0 && (
                       <Field>
                         <FieldLabel>Serial Numbers *</FieldLabel>
                         <SerialNumberScanner quantity={quantity} serials={serials} onChange={setSerials} />
@@ -279,7 +291,10 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
             </FieldGroup>
           </FieldSet>
 
-          <Button type="submit" disabled={submitting || (isAsset && serials.length !== quantity)}>
+          <Button 
+            type="submit" 
+            disabled={submitting || (isAsset && form.has_serial_number && serials.length !== quantity)}
+          >
             {submitting ? 'Processing...' : 'Save Item & Receive Stock'}
           </Button>
         </form>

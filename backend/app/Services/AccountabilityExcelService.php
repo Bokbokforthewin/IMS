@@ -13,7 +13,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class AccountabilityExcelService
 {
     // Page geometry, used ONLY to estimate how many item rows fit on a page.
-    // Letter portrait is the smallest common paper, so the estimate stays safe for A4/Legal too.
     protected const PAPER_WIDTH_IN = 8.5;
     protected const PAPER_HEIGHT_IN = 11.0;
     protected const MARGIN_LEFT_IN = 0.4;
@@ -22,18 +21,15 @@ class AccountabilityExcelService
     protected const MARGIN_BOTTOM_IN = 0.6;
     protected const FOOTER_MARGIN_IN = 0.25;
 
-    // Only fill this fraction of the estimated page. The cushion stops Excel from
-    // inserting its own automatic break just ahead of ours (which would leave a near-empty page).
     protected const PAGE_FILL_RATIO = 0.92;
 
-    // Fixed row heights in points, so the page estimate is exact rather than guessed.
-    protected const PAR_TOP_BLOCK_HEIGHT = 130;  // rows 1-8: appendix, title, entity, fund cluster, description
-    protected const PAR_HEADER_HEIGHT = 24;      // column heading row (repeats on every page)
-    protected const PAR_TAIL_HEIGHT = 150;       // total row + signature block
+    protected const PAR_TOP_BLOCK_HEIGHT = 130;
+    protected const PAR_HEADER_HEIGHT = 24;
+    protected const PAR_TAIL_HEIGHT = 150;
 
-    protected const ICS_TOP_BLOCK_HEIGHT = 100;  // rows 1-6
-    protected const ICS_HEADER_HEIGHT = 40;      // two merged heading rows (repeat on every page)
-    protected const ICS_TAIL_HEIGHT = 165;       // total row + signature block
+    protected const ICS_TOP_BLOCK_HEIGHT = 100;
+    protected const ICS_HEADER_HEIGHT = 40;
+    protected const ICS_TAIL_HEIGHT = 165;
 
     protected array $thinBorder = [
         'borders' => [
@@ -78,14 +74,8 @@ class AccountabilityExcelService
         return (float) max(30, ($lineCount * 15) + 10);
     }
 
-    /**
-     * Estimates how many points of sheet content fit on one printed page, based on
-     * the actual column widths. Because the sheet is fit-to-width, wider columns shrink
-     * the print scale, which lets MORE rows fit vertically, so this adapts if you tweak widths.
-     */
     protected function calculatePageBudget(array $columnWidths): float
     {
-        // Excel column width (characters) -> pixels -> points
         $contentWidthPt = array_sum(array_map(fn ($w) => (7 * $w + 5) * 0.75, $columnWidths));
         $printableWidthPt = (self::PAPER_WIDTH_IN - self::MARGIN_LEFT_IN - self::MARGIN_RIGHT_IN) * 72;
         $scale = min(1.0, $printableWidthPt / $contentWidthPt);
@@ -95,12 +85,6 @@ class AccountabilityExcelService
         return floor(($printableHeightPt / $scale) * self::PAGE_FILL_RATIO);
     }
 
-    /**
-     * Splits item rows into pages.
-     *
-     * @param float[] $rowHeights  height of each item row, in order
-     * @return int[][]             list of pages; each page is a list of item indexes
-     */
     protected function planPages(
         array $rowHeights,
         float $budget,
@@ -130,8 +114,6 @@ class AccountabilityExcelService
             return [[]];
         }
 
-        // The total row + signature block must never be split from the items or stranded alone.
-        // If they don't fit under the last item row, move that last item onto a fresh page with them.
         $lastKey = array_key_last($pages);
         $lastPage = $pages[$lastKey];
         $lastCapacity = ($lastKey === 0) ? $budget - $firstPageOverhead : $budget - $otherPageOverhead;
@@ -146,10 +128,6 @@ class AccountabilityExcelService
         return $pages;
     }
 
-    /**
-     * Applies manual page breaks, repeating column headings, and the page-number footer.
-     * The footer and repeated headings only apply when the document spans more than one page.
-     */
     protected function applyPrintLayout(
         Worksheet $sheet,
         array $pages,
@@ -160,7 +138,6 @@ class AccountabilityExcelService
     ): void {
         $pageCount = count($pages);
 
-        // Break AFTER the last item row of every page except the final one.
         for ($p = 0; $p < $pageCount - 1; $p++) {
             $page = $pages[$p];
             $lastIndexOnPage = $page[array_key_last($page)];
@@ -169,8 +146,6 @@ class AccountabilityExcelService
 
         if ($pageCount > 1) {
             $sheet->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd($repeatFromRow, $repeatToRow);
-
-            // '&' is a control character in header/footer strings, so literal ampersands are doubled.
             $doc = str_replace('&', '&&', $documentNumber);
             $sheet->getHeaderFooter()->setOddFooter('&L' . $doc . '&CPage &P of &N');
         }
@@ -181,16 +156,54 @@ class AccountabilityExcelService
         $asset = $line->serializedAsset;
         $item = $asset->item;
 
-        $prefix = $totalLines > 1 ? sprintf('%02d. ', $index + 1) : '';
-        $lines = [$prefix . $item->name];
+        $lines = [];
 
         if (!empty($asset->manufacturer_name)) {
             $lines[] = "Name of Manufacturer: {$asset->manufacturer_name}";
         }
 
-        $brandModel = trim(($item->brand ?? '') . '/' . ($asset->model ?? ''), '/ ');
-        if ($brandModel !== '') {
-            $lines[] = "Brand and Model: {$brandModel}";
+        if (!empty($asset->model)) {
+            $lines[] = "Model: {$asset->model}";
+        }
+
+        if (!empty($asset->country_of_origin)) {
+            $lines[] = "Country of Origin: {$asset->country_of_origin}";
+        }
+        if (!empty($asset->serial_number)) {
+            $lines[] = "SN: {$asset->serial_number}";
+        }
+        if (!empty($item->estimated_useful_life)) {
+            $lines[] = "Estimated Useful Life: {$item->estimated_useful_life}";
+        }
+        if (!empty($item->specifications)) {
+            $lines[] = $item->specifications;
+        }
+
+        $secondaryUser = $asset->currentHolder ?? $asset->secondaryUser ?? null;
+        if ($secondaryUser && !empty($secondaryUser->name)) {
+            $lines[] = "End User: {$secondaryUser->name}";
+        }
+
+        if (!empty($asset->attached_to)) {
+            $lines[] = "Bundled with property no.: {$asset->attached_to}";
+        }
+
+        return implode("\n", $lines);
+    }
+
+    protected function buildIcsLineDescription($line, $index, $totalLines): string
+    {
+        $asset = $line->serializedAsset;
+        $item = $asset->item;
+
+        $lines = [];
+
+        if (!empty($asset->manufacturer_name)) {
+            $lines[] = "Name of Manufacturer: {$asset->manufacturer_name}";
+        }
+
+        if (!empty($asset->model)) {
+            $lines[] = "Model: {$asset->model}";
         }
 
         if (!empty($asset->country_of_origin)) {
@@ -228,8 +241,7 @@ class AccountabilityExcelService
             ->setTop(self::MARGIN_TOP_IN)->setBottom(self::MARGIN_BOTTOM_IN)
             ->setFooter(self::FOOTER_MARGIN_IN);
 
-        // Change column widths here — the page estimate below follows automatically.
-        $widths = ['A' => 14, 'B' => 14, 'C' => 45, 'D' => 20, 'E' => 14, 'F' => 16];
+        $widths = ['A' => 12, 'B' => 22, 'C' => 38, 'D' => 20, 'E' => 14, 'F' => 16];
         foreach ($widths as $col => $w) {
             $sheet->getColumnDimension($col)->setWidth($w);
         }
@@ -270,7 +282,6 @@ class AccountabilityExcelService
             ->setVertical(Alignment::VERTICAL_CENTER);
         $sheet->getStyle("A{$headerRow}:F{$headerRow}")->applyFromArray($this->thinBorder);
 
-        // --- Plan the pages before writing rows, so every row height is known up front ---
         $lines = $receipt->lines->values();
         $totalLines = $lines->count();
 
@@ -295,26 +306,35 @@ class AccountabilityExcelService
 
         foreach ($lines as $index => $line) {
             $asset = $line->serializedAsset;
+            $item = $asset->item;
             $unitCost = (float) $asset->unit_cost * $line->quantity;
             $grandTotal += $unitCost;
             $lineRows[$index] = $row;
 
+            $itemName = $item->name ?? 'N/A';
+            $brand = $item->brand ?? '';
+            $unitLabel = $brand !== '' ? "{$brand}\n{$itemName}" : $itemName;
+
             $sheet->setCellValue("A{$row}", $line->quantity);
-            $sheet->setCellValue("B{$row}", $asset->item->unit_of_measure ?? 'Unit');
+            $sheet->setCellValue("B{$row}", $unitLabel);
             $sheet->setCellValue("C{$row}", $descriptions[$index]);
             $sheet->setCellValue("D{$row}", $asset->property_number ?? 'N/A');
             $sheet->setCellValue("E{$row}", $asset->created_at?->format('n/j/Y'));
             $sheet->setCellValue("F{$row}", $unitCost);
             $sheet->getStyle("F{$row}")->getNumberFormat()->setFormatCode('#,##0.00');
 
+            $sheet->getStyle("B{$row}")->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP)->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("C{$row}")->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
-            foreach (['A', 'B', 'D', 'E', 'F'] as $col) {
+            foreach (['A', 'D', 'E', 'F'] as $col) {
                 $sheet->getStyle("{$col}{$row}")->getAlignment()
                     ->setVertical(Alignment::VERTICAL_TOP)
                     ->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
 
             $sheet->getStyle("A{$row}:F{$row}")->applyFromArray($this->thinBorder);
+            $sheet->getStyle("B{$row}")->getBorders()->getRight()->setBorderStyle(Border::BORDER_THIN);
+            $sheet->getStyle("C{$row}")->getBorders()->getLeft()->setBorderStyle(Border::BORDER_THIN);
+
             $sheet->getRowDimension($row)->setRowHeight($rowHeights[$index]);
 
             $row++;
@@ -328,7 +348,21 @@ class AccountabilityExcelService
         $sheet->setCellValue("F{$row}", $grandTotal);
         $sheet->getStyle("F{$row}")->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle("F{$row}")->getFont()->setBold(true);
-        $sheet->getStyle("A{$row}:F{$row}")->applyFromArray($this->thinBorder);
+
+        $sheet->getStyle("A{$row}:F{$row}")->applyFromArray([
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['argb' => 'FF000000'],
+                ],
+                'bottom' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['argb' => 'FF000000'],
+                ],
+            ],
+        ]);
+        $sheet->getStyle("B{$row}")->getBorders()->getRight()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle("C{$row}")->getBorders()->getLeft()->setBorderStyle(Border::BORDER_THIN);
 
         $row += 2;
         $labelRow = $row;
@@ -396,8 +430,8 @@ class AccountabilityExcelService
             ->setTop(self::MARGIN_TOP_IN)->setBottom(self::MARGIN_BOTTOM_IN)
             ->setFooter(self::FOOTER_MARGIN_IN);
 
-        // Change column widths here — the page estimate below follows automatically.
-        $widths = ['A' => 14, 'B' => 14, 'C' => 12, 'D' => 12, 'E' => 38, 'F' => 16, 'G' => 14];
+        // Column widths configured specifically for the 7-column ICS sheet layout
+        $widths = ['A' => 12, 'B' => 22, 'C' => 14, 'D' => 14, 'E' => 32, 'F' => 18, 'G' => 16];
         foreach ($widths as $col => $w) {
             $sheet->getColumnDimension($col)->setWidth($w);
         }
@@ -454,14 +488,13 @@ class AccountabilityExcelService
             ->setWrapText(true);
         $sheet->getStyle("A{$headerTop}:G{$headerSub}")->applyFromArray($this->thinBorder);
 
-        // --- Plan the pages before writing rows, so every row height is known up front ---
         $lines = $receipt->lines->values();
         $totalLines = $lines->count();
 
         $descriptions = [];
         $rowHeights = [];
         foreach ($lines as $index => $line) {
-            $descriptions[$index] = $this->buildLineDescription($line, $index, $totalLines);
+            $descriptions[$index] = $this->buildIcsLineDescription($line, $index, $totalLines);
             $rowHeights[$index] = $this->calculateRowHeight($descriptions[$index], $widths['E']);
         }
 
@@ -485,8 +518,12 @@ class AccountabilityExcelService
             $grandTotal += $totalCost;
             $lineRows[$index] = $row;
 
+            $itemName = $item->name ?? 'N/A';
+            $brand = $item->brand ?? '';
+            $unitLabel = $brand !== '' ? "{$brand}\n{$itemName}" : $itemName;
+
             $sheet->setCellValue("A{$row}", $line->quantity);
-            $sheet->setCellValue("B{$row}", $item->unit_of_measure ?? 'Unit');
+            $sheet->setCellValue("B{$row}", $unitLabel);
             $sheet->setCellValue("C{$row}", $unitCost);
             $sheet->setCellValue("D{$row}", $totalCost);
             $sheet->setCellValue("E{$row}", $descriptions[$index]);
@@ -494,20 +531,28 @@ class AccountabilityExcelService
             $sheet->setCellValue("G{$row}", $item->estimated_useful_life ?? 'N/A');
 
             $sheet->getStyle("C{$row}:D{$row}")->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle("B{$row}")->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP)->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("E{$row}")->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
+            $sheet->getStyle("F{$row}")->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
+            $sheet->getStyle("G{$row}")->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
 
-            foreach (['A', 'B', 'C', 'D', 'F', 'G'] as $col) {
+            foreach (['A', 'C', 'D', 'F', 'G'] as $col) {
                 $sheet->getStyle("{$col}{$row}")->getAlignment()
                     ->setVertical(Alignment::VERTICAL_TOP)
                     ->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
 
+            // Apply thin border across all row cells and enforce B/C divider
             $sheet->getStyle("A{$row}:G{$row}")->applyFromArray($this->thinBorder);
+            $sheet->getStyle("B{$row}")->getBorders()->getRight()->setBorderStyle(Border::BORDER_THIN);
+            $sheet->getStyle("C{$row}")->getBorders()->getLeft()->setBorderStyle(Border::BORDER_THIN);
+
             $sheet->getRowDimension($row)->setRowHeight($rowHeights[$index]);
 
             $row++;
         }
 
+        // --- Total Row ---
         $sheet->mergeCells("A{$row}:C{$row}");
         $sheet->setCellValue("A{$row}", 'Total:');
         $sheet->getStyle("A{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
@@ -516,7 +561,22 @@ class AccountabilityExcelService
         $sheet->setCellValue("D{$row}", $grandTotal);
         $sheet->getStyle("D{$row}")->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle("D{$row}")->getFont()->setBold(true);
-        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray($this->thinBorder);
+
+        // Apply complete borders around the Total Row and enforce column B-C divider
+        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['argb' => 'FF000000'],
+                ],
+                'bottom' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['argb' => 'FF000000'],
+                ],
+            ],
+        ]);
+        $sheet->getStyle("B{$row}")->getBorders()->getRight()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle("C{$row}")->getBorders()->getLeft()->setBorderStyle(Border::BORDER_THIN);
 
         $row += 2;
         $labelRow = $row;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import api from '../../api/client'; // Import configured central Axios instance
 import {
   User,
   UserCheck,
@@ -48,9 +49,6 @@ import {
 } from '@/components/ui/popover';
 
 import { useAuth } from '@/context/AuthContext';
-
-// Primary endpoint with permission-bypass fallback routes
-const ENDPOINTS = ['/api/users/options', '/api/users', '/api/v1/users'];
 
 // --- Helper Functions ---
 function getCost(item) {
@@ -211,13 +209,23 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter users based on query
+  // Filter users based on name, unit, designation, and division
   const filteredUsers = useMemo(() => {
     if (!searchTerm.trim()) return users;
     const q = searchTerm.toLowerCase().trim();
+
     return users.filter((user) => {
       const name = (user.name || '').toLowerCase();
-      return name.includes(q);
+      const unit = (user.unit?.name || user.unit || '').toLowerCase();
+      const designation = (user.designation?.name || user.designation || '').toLowerCase();
+      const division = (user.division?.name || user.division || '').toLowerCase();
+
+      return (
+        name.includes(q) ||
+        unit.includes(q) ||
+        designation.includes(q) ||
+        division.includes(q)
+      );
     });
   }, [users, searchTerm]);
 
@@ -283,19 +291,32 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
             <ul className="py-1 divide-y divide-border/40 text-xs">
               {filteredUsers.map((u) => {
                 const isSelected = String(u.id) === String(userId);
+                const unitStr = u.unit?.name || u.unit;
+                const desigStr = u.designation?.name || u.designation;
+                const divStr = u.division?.name || u.division;
 
                 return (
                   <li
                     key={u.id}
                     onClick={() => handleSelectOption(u)}
-                    className={`flex items-center justify-between p-2 cursor-pointer transition-colors ${
+                    className={`flex flex-col gap-0.5 p-2 cursor-pointer transition-colors ${
                       isSelected
                         ? 'bg-accent text-accent-foreground font-medium'
                         : 'hover:bg-muted/80'
                     }`}
                   >
-                    <span className="font-semibold">{u.name}</span>
-                    {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">{u.name}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                    </div>
+
+                    {(unitStr || desigStr || divStr) && (
+                      <div className="text-[10px] text-muted-foreground flex flex-wrap gap-x-1.5 gap-y-0.5">
+                        {desigStr && <span>{desigStr}</span>}
+                        {unitStr && <span>• {unitStr}</span>}
+                        {divStr && <span>({divStr})</span>}
+                      </div>
+                    )}
                   </li>
                 );
               })}
@@ -320,7 +341,7 @@ export default function DeliveryForm({
   onBack,
   onNext,
 }) {
-  const { user: currentUser, token } = useAuth();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
@@ -355,56 +376,30 @@ export default function DeliveryForm({
     return initialMap;
   });
 
-  // Fetch users with API route fallback options
+  // Fetch user list options directly via central Axios instance (api/client.js)
   const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
-    let fetchErrors = [];
+    try {
+      // Axios baseURL is '/api', so '/v1/users/options' resolves to '/api/v1/users/options'
+      const response = await api.get('/v1/users/options');
+      const data = response.data;
 
-    for (const endpoint of ENDPOINTS) {
-      try {
-        const headers = {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        };
+      // Resolve payload whether returned directly or nested under data/users keys
+      const userList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.users)
+        ? data.users
+        : [];
 
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const res = await fetch(endpoint, {
-          headers,
-          credentials: 'include',
-        });
-
-        if (!res.ok) {
-          fetchErrors.push(`${endpoint} returned status ${res.status}`);
-          continue;
-        }
-
-        const data = await res.json();
-        const userList = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.data?.data)
-          ? data.data.data
-          : Array.isArray(data?.data)
-          ? data.data
-          : Array.isArray(data?.users)
-          ? data.users
-          : [];
-
-        if (userList.length > 0) {
-          setUsers(userList);
-          setIsLoadingUsers(false);
-          return;
-        }
-      } catch (err) {
-        fetchErrors.push(`${endpoint} failed with network error: ${err.message}`);
-      }
+      setUsers(userList);
+    } catch (err) {
+      console.warn('DeliveryForm: Failed to fetch user options:', err);
+    } finally {
+      setIsLoadingUsers(false);
     }
-
-    console.warn('DeliveryForm: Falling back to active session user context.', fetchErrors);
-    setIsLoadingUsers(false);
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     fetchUsers();
@@ -419,6 +414,9 @@ export default function DeliveryForm({
         {
           id: currentUser.id,
           name: currentUser.name || 'Current User',
+          unit: currentUser.unit,
+          designation: currentUser.designation,
+          division: currentUser.division,
         },
         ...users,
       ];
@@ -518,7 +516,7 @@ export default function DeliveryForm({
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Cart items list */}
         <div className="space-y-3">
-          {cart.map((item, index) => {
+          {cart.map((item) => {
             const itemCost = getCost(item);
             const validTargets = attachTargets.filter((t) => t.key !== item.key);
             const selectedSecondaryUser = itemUsers[item.key] || '';
@@ -526,7 +524,6 @@ export default function DeliveryForm({
             return (
               <Card 
                 key={item.key} 
-                /* focus-within:z-30 ensures the card being interacted with pops above all other cards */
                 className="shadow-xs overflow-visible relative transition-all focus-within:z-30 hover:z-20"
               >
                 <CardContent className="p-4 overflow-visible">

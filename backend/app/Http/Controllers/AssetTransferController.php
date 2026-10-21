@@ -13,9 +13,13 @@ class AssetTransferController extends Controller
     public function index()
     {
         try {
-            $transfers = AssetTransfer::with(['serializedAsset.item.category', 'transferredFrom', 'transferredTo'])
-                ->orderBy('created_at', 'desc')
-                ->get();
+            $transfers = AssetTransfer::with([
+                'serializedAsset.item.category',
+                'transferredFrom',
+                'transferredTo',
+            ])
+            ->orderBy('created_at', 'desc')
+            ->get();
 
             return response()->json($transfers, 200);
         } catch (\Exception $e) {
@@ -29,7 +33,7 @@ class AssetTransferController extends Controller
         $validatedData = $request->validate([
             'serialized_asset_id' => 'required|exists:serialized_assets,id',
             'transfer_type'       => 'required|in:RETURN,TRANSFER',
-            'user_id'             => 'required|exists:users,id', // transferring FROM (current holder)
+            'user_id'             => 'required|exists:users,id', // transferring FROM
             'transfered_to'       => 'required|exists:users,id', // transferring TO
             'description'         => 'required|string|max:255',
             'reason'              => 'required|string|max:255',
@@ -84,11 +88,15 @@ class AssetTransferController extends Controller
                 } else {
                     $asset->update([
                         'status'            => 'Assigned',
-                        'current_holder_id' => $validatedData['transfered_to'], // Reassigned to new user
+                        'current_holder_id' => $validatedData['transfered_to'], // Reassigned
                     ]);
                 }
 
-                $transfer->load(['serializedAsset.item.category', 'transferredFrom', 'transferredTo']);
+                $transfer->load([
+                    'serializedAsset.item.category',
+                    'transferredFrom',
+                    'transferredTo'
+                ]);
 
                 return response()->json([
                     'message'         => "Asset successfully processed under {$documentNumber}",

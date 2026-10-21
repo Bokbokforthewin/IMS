@@ -68,6 +68,30 @@ class UserController extends Controller
     }
 
     /**
+     * Get lightweight user list for dropdown select options.
+     */
+    public function options(): \Illuminate\Http\JsonResponse
+    {
+        try {
+            $users = User::select([
+                    'id',
+                    'name',
+                    'email',
+                    'unit',
+                    'division',
+                    'designation',
+                ])
+                ->orderBy('name', 'asc')
+                ->get();
+
+            return response()->json($users, 200);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to fetch user options: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to load user options.'], 500);
+        }
+    }
+
+    /**
      * Update user roles.
      */
     public function updateRoles(Request $request, User $user)

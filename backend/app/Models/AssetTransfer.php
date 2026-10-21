@@ -20,6 +20,12 @@ class AssetTransfer extends Model
         return $this->belongsTo(SerializedAsset::class, 'serialized_asset_id');
     }
 
+    // Alias for 'user' to ensure compatibility with generic frontend lookups
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
     // The employee the asset is currently held by / being transferred FROM
     public function transferredFrom(): BelongsTo
     {

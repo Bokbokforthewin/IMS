@@ -22,14 +22,20 @@ export default function Header() {
   // Safe fallback parsing for strings
   const userName = typeof user?.name === "string" ? user.name : "User";
 
-  const getUserRole = () => {
-    if (!user) return "Employee";
+   const getUserRole = () => {
+    if (!user) return "DOH NIR CHD Employee";
+    
+    if (typeof user.designation === "string" && user.designation.trim() !== "") {
+      return user.designation;
+    }
+    
     const firstRole = Array.isArray(user.roles) ? user.roles[0] : user.roles;
     if (typeof firstRole === "string") return firstRole;
     if (typeof firstRole === "object" && firstRole !== null && firstRole.name) return firstRole.name;
-    if (typeof user.designation === "string") return user.designation;
+    
     if (typeof user.unit === "string") return user.unit;
-    return "Employee";
+    
+    return "DOH NIR CHD Employee";
   };
 
   const userRole = getUserRole();

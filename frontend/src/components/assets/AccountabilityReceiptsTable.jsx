@@ -160,7 +160,13 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
 
     const query = searchQuery.toLowerCase();
     return bundles.filter((bundle) => {
-      const primaryUserName = bundle.user?.name?.toLowerCase() || '';
+      // Primary User attributes
+      const primaryUser = bundle.user;
+      const primaryUserName = primaryUser?.name?.toLowerCase() || '';
+      const primaryUserUnit = (primaryUser?.unit?.name || primaryUser?.unit || '').toLowerCase();
+      const primaryUserDesignation = (primaryUser?.designation?.name || primaryUser?.designation || '').toLowerCase();
+      const primaryUserDivision = (primaryUser?.division?.name || primaryUser?.division || '').toLowerCase();
+
       const remarksMatches = bundle.remarks?.toLowerCase().includes(query);
       const dateMatches = bundle.date_issued?.toLowerCase().includes(query);
 
@@ -171,25 +177,34 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
       );
 
       const lineMatches = bundle.allLines.some((line) => {
-        const itemName = line.serialized_asset?.item?.name?.toLowerCase() || '';
-        const serialNo = line.serialized_asset?.serial_number?.toLowerCase() || '';
-        const propertyNo = line.serialized_asset?.property_number?.toLowerCase() || '';
-        const secondaryReceiver = (
-          line.serialized_asset?.current_holder?.name ||
-          line.serialized_asset?.currentHolder?.name ||
-          ''
-        ).toLowerCase();
+        const asset = line.serialized_asset;
+        const itemName = asset?.item?.name?.toLowerCase() || '';
+        const serialNo = asset?.serial_number?.toLowerCase() || '';
+        const propertyNo = asset?.property_number?.toLowerCase() || '';
+
+        // Secondary Receiver / Current Holder
+        const holder = asset?.current_holder || asset?.currentHolder || line.user;
+        const secondaryReceiverName = (holder?.name || '').toLowerCase();
+        const secondaryUnit = (holder?.unit?.name || holder?.unit || '').toLowerCase();
+        const secondaryDesignation = (holder?.designation?.name || holder?.designation || '').toLowerCase();
+        const secondaryDivision = (holder?.division?.name || holder?.division || '').toLowerCase();
 
         return (
           itemName.includes(query) ||
           serialNo.includes(query) ||
           propertyNo.includes(query) ||
-          secondaryReceiver.includes(query)
+          secondaryReceiverName.includes(query) ||
+          secondaryUnit.includes(query) ||
+          secondaryDesignation.includes(query) ||
+          secondaryDivision.includes(query)
         );
       });
 
       return (
         primaryUserName.includes(query) ||
+        primaryUserUnit.includes(query) ||
+        primaryUserDesignation.includes(query) ||
+        primaryUserDivision.includes(query) ||
         remarksMatches ||
         dateMatches ||
         receiptMatches ||
@@ -210,11 +225,11 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
         </div>
 
         {/* Search Bar */}
-        <div className="relative w-full sm:w-72">
+        <div className="relative w-full sm:w-80">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search primary/secondary receiver, doc #, asset, SN..."
+            placeholder="Search receiver, unit, designation, division, doc #, SN..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-8"

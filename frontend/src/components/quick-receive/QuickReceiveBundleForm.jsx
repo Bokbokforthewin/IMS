@@ -13,6 +13,7 @@ function emptyComponent() {
     item_mode: 'new', item_id: '', category_id: '',
     name: '', brand: '', specifications: '', type: '', unit_of_measure: '',
     unit_cost: '', has_property_number: false,
+    has_serial_number: true, // Default set to true
     model: '', manufacturer_name: '', country_of_origin: '', estimated_useful_life: '',
     serial_numbers: [],
   };
@@ -27,14 +28,18 @@ export default function QuickReceiveBundleForm({ categories, items, handleApiCal
 
   const setsNum = Number(sets) || 0;
 
+  // Validation checks if serial_numbers match setsNum ONLY when has_serial_number is enabled
+  const isComponentValid = (c) => {
+    const basicValid = (c.item_mode === 'existing' && c.item_id) || 
+                       (c.item_mode === 'new' && c.category_id && c.name && c.unit_of_measure);
+    const serialValid = !c.has_serial_number || c.serial_numbers.length === setsNum;
+    return basicValid && c.unit_cost && serialValid;
+  };
+
   const isReady =
     setsNum > 0 &&
-    ((main.item_mode === 'existing' && main.item_id) || (main.item_mode === 'new' && main.category_id && main.name && main.unit_of_measure)) &&
-    main.unit_cost && main.serial_numbers.length === setsNum &&
-    peripherals.every((p) =>
-      ((p.item_mode === 'existing' && p.item_id) || (p.item_mode === 'new' && p.category_id && p.name && p.unit_of_measure)) &&
-      p.unit_cost && p.serial_numbers.length === setsNum
-    ) &&
+    isComponentValid(main) &&
+    peripherals.every(isComponentValid) &&
     (peripherals.length === 0 || main.has_property_number);
 
   const buildPayload = (component) => ({
@@ -49,10 +54,11 @@ export default function QuickReceiveBundleForm({ categories, items, handleApiCal
     estimated_useful_life: component.estimated_useful_life || null,
     unit_cost: component.unit_cost,
     has_property_number: component.has_property_number,
+    has_serial_number: component.has_serial_number,
     model: component.model || null,
     manufacturer_name: component.manufacturer_name || null,
     country_of_origin: component.country_of_origin || null,
-    serial_numbers: component.serial_numbers,
+    serial_numbers: component.has_serial_number ? component.serial_numbers : [],
   });
 
   const handleSubmit = (e) => {
@@ -174,10 +180,21 @@ function ComponentFields({ label, items, categories, value, onChange, sets }) {
           <FieldLabel>Unit Cost (₱) *</FieldLabel>
           <Input type="number" step="0.01" min="0" required value={value.unit_cost} onChange={(e) => onChange({ ...value, unit_cost: e.target.value })} />
         </Field>
-        <Field orientation="horizontal">
-          <Switch checked={value.has_property_number} onCheckedChange={(c) => onChange({ ...value, has_property_number: c })} />
-          <FieldLabel>Assign Property Number</FieldLabel>
-        </Field>
+
+        <div className="flex items-center space-x-6">
+          <Field orientation="horizontal">
+            <Switch checked={value.has_property_number} onCheckedChange={(c) => onChange({ ...value, has_property_number: c })} />
+            <FieldLabel>Assign Property Number</FieldLabel>
+          </Field>
+
+          <Field orientation="horizontal">
+            <Switch 
+              checked={value.has_serial_number} 
+              onCheckedChange={(c) => onChange({ ...value, has_serial_number: c, serial_numbers: c ? value.serial_numbers : [] })} 
+            />
+            <FieldLabel>Track Serial Numbers</FieldLabel>
+          </Field>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -193,7 +210,7 @@ function ComponentFields({ label, items, categories, value, onChange, sets }) {
         </Field>
       )}
 
-      {sets > 0 && (
+      {value.has_serial_number && sets > 0 && (
         <Field>
           <FieldLabel>Serial Numbers * ({sets} needed)</FieldLabel>
           <SerialNumberScanner quantity={sets} serials={value.serial_numbers} onChange={(serials) => onChange({ ...value, serial_numbers: serials })} />
