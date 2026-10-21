@@ -158,6 +158,10 @@ class AccountabilityExcelService
 
         $lines = [];
 
+        if (!empty($asset->brand)) {
+            $lines[] = "Brand: {$asset->item->brand}";
+        }
+
         if (!empty($asset->manufacturer_name)) {
             $lines[] = "Name of Manufacturer: {$asset->manufacturer_name}";
         }
@@ -197,6 +201,10 @@ class AccountabilityExcelService
         $item = $asset->item;
 
         $lines = [];
+
+        if (!empty($asset->brand)) {
+            $lines[] = "Brand: {$asset->item->brand}";
+        }
 
         if (!empty($asset->manufacturer_name)) {
             $lines[] = "Name of Manufacturer: {$asset->manufacturer_name}";
@@ -312,8 +320,8 @@ class AccountabilityExcelService
             $lineRows[$index] = $row;
 
             $itemName = $item->name ?? 'N/A';
-            $brand = $item->brand ?? '';
-            $unitLabel = $brand !== '' ? "{$brand}\n{$itemName}" : $itemName;
+            $category = $item->category->name ?? '';
+            $unitLabel = $category !== '' ? "{$category}\n{$itemName}" : $itemName;
 
             $sheet->setCellValue("A{$row}", $line->quantity);
             $sheet->setCellValue("B{$row}", $unitLabel);
@@ -519,8 +527,8 @@ class AccountabilityExcelService
             $lineRows[$index] = $row;
 
             $itemName = $item->name ?? 'N/A';
-            $brand = $item->brand ?? '';
-            $unitLabel = $brand !== '' ? "{$brand}\n{$itemName}" : $itemName;
+            $category = $item->category->name ?? '';
+            $unitLabel = $category !== '' ? "{$category}\n{$itemName}" : $itemName;
 
             $sheet->setCellValue("A{$row}", $line->quantity);
             $sheet->setCellValue("B{$row}", $unitLabel);

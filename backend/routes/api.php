@@ -18,6 +18,7 @@ use App\Http\Controllers\PermissionMatrixController;
 use App\Http\Controllers\QuickReceiveController;
 use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ReportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -177,6 +178,16 @@ Route::prefix('v1')
 
             Route::get('/asset-transfers', [AssetTransferController::class, 'index']);
             Route::post('/asset-transfers', [AssetTransferController::class, 'store']);
+        });
+
+        /*
+        |------------------------------------------------------------------
+        | Reports 
+        |------------------------------------------------------------------
+        */
+
+        Route::middleware('permission:view reports')->group(function () {
+            Route::get('/reports', [ReportController::class, 'generateReport']);
         });
 
     });

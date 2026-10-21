@@ -67,6 +67,11 @@ export default function Layout({
       label: "Audit Trail",
       permission: "view audit trail",
     },
+    {
+      key: "reports",
+      label: "Reports",
+      permission: "view reports",
+    },
   ];
 
   const visibleTabs = navItems.filter((item) =>

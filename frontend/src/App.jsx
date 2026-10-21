@@ -20,6 +20,7 @@ import TransferReturnPage from "./pages/TransferReturnPage";
 import UserManagementPage from "./pages/UserManagementPage";
 import AuditPage from "./pages/AuditPage";
 import QuickReceivePage from "./pages/QuickReceivePage";
+import ReportsPage from "./pages/ReportsPage";
 
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
@@ -274,6 +275,18 @@ export default function App() {
         <AuditPage
           activeTab={activeTab}
           api={api}
+          handleApiCall={handleApiCall}
+          refreshData={fetchData}
+        />
+      );
+    }
+
+    if (activeTab.startsWith("reports")) {
+      if (!hasPermission("view reports")) return <AccessDenied />;
+
+      return (
+        <ReportsPage
+          activeTab={activeTab}
           handleApiCall={handleApiCall}
           refreshData={fetchData}
         />

@@ -168,10 +168,14 @@ class ImportLegacyInventory extends Command
         $transferStickers = [];
         $receiptGroups = [];
         foreach ($merged as $sticker => $row) {
-            if ($row['status'] !== 'Assigned' || $row['end_user'] === '') continue;
+            if ($row['status'] !== 'Assigned') continue;
 
-            $key = Str::lower($row['end_user']) . '|' . $row['date_issued'];
-            $receiptGroups[$key]['end_user'] ??= $row['end_user'];
+            // Use management_receipt as the primary user if present, otherwise fall back to end_user
+            $primaryUser = $row['management_receipt'] !== '' ? $row['management_receipt'] : $row['end_user'];
+            if ($primaryUser === '') continue;
+
+            $key = Str::lower($primaryUser) . '|' . $row['date_issued'];
+            $receiptGroups[$key]['end_user'] ??= $primaryUser;
             // "Management Receipt" = the memorandum receipt holder (unit head)
             $receiptGroups[$key]['mr_holder'] ??= $row['management_receipt'];
             $receiptGroups[$key]['date'] ??= $row['date_issued'];

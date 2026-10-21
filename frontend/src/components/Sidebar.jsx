@@ -10,7 +10,9 @@ import {
   ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
-  ShieldCheck,
+  Baby,
+  ReceiptText,
+  ShieldCogCorner,
 } from "lucide-react";
 
 import {
@@ -43,6 +45,14 @@ const menuItems = [
     label: "Dashboard",
     icon: LayoutDashboard,
     subItems: [{ id: "dashboard-overview", label: "Overview" }],
+  },
+  {
+    id: "reports",
+    label: "Reports",
+    icon: ReceiptText,
+    subItems: [
+      { id: "reports", label: "Reports" },
+    ],
   },
   {
     id: "quick-receive",
@@ -103,7 +113,7 @@ const menuItems = [
   {
     id: "admin",
     label: "Admin Panel",
-    icon: ShieldCheck,
+    icon: Baby,
     subItems: [
       { id: "admin-users", label: "User Management" },
     ],
@@ -111,11 +121,11 @@ const menuItems = [
   {
     id: "audit",
     label: "Audit Trail",
-    icon: ShieldCheck,
+    icon: ShieldCogCorner,
     subItems: [
       { id: "audit-logs", label: "Audit Logs" },
     ],
-  }
+  },
 ];
 
 function SidebarCollapseButton() {
