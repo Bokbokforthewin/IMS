@@ -151,6 +151,30 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
     }
   };
 
+  // Authenticated Bulk PDF Tag Download
+  const handleDownloadBulkTags = async (bundleLines) => {
+    try {
+      // Extract all asset IDs from the current bundle's lines
+      const assetIds = bundleLines
+        .map((line) => line.serialized_asset?.id)
+        .filter(Boolean); // Remove undefined/null
+
+      if (assetIds.length === 0) return;
+
+      const response = await api.post(
+        `/v1/accountability/bulk-tags-pdf`,
+        { asset_ids: assetIds },
+        { responseType: 'blob' }
+      );
+
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error('Failed to download bulk asset tags PDF:', err);
+    }
+  };
+
   // Group receipts into transaction bundles
   const bundles = useMemo(() => groupReceiptsIntoBundles(receipts), [receipts]);
 
@@ -284,6 +308,18 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                       <span className="text-xs font-medium text-muted-foreground mr-1 hidden sm:inline">
                         Downloads:
                       </span>
+                      
+                      {/* NEW BUTTON: Bulk Print All Tags in Bundle */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs gap-1.5 bg-background shadow-xs hover:bg-accent"
+                        onClick={() => handleDownloadBulkTags(bundle.allLines)}
+                      >
+                        <PackageOpen className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Print All Tags</span>
+                      </Button>
+
                       {bundle.receipts.map((rcpt) => (
                         <Button
                           key={rcpt.id}

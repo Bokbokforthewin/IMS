@@ -18,6 +18,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade'); // recipient
             $table->foreignId('issued_by_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('received_mr_by_id')->nullable()->constrained('users')->nullOnDelete();
+            // $table->enum('receipt_status', ['Signed', 'Distributed', 'Pending'])->default('Pending'); for now, we don't need this
             $table->date('date_issued');
             $table->text('remarks')->nullable();
             $table->timestamps();

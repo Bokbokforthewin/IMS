@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Services\AccountabilityExcelService;
 use App\Services\PropertyTagPdfService;
+use App\Services\BulkPropertyTagPdfService;
 
 class AccountabilityController extends Controller
 {
@@ -338,6 +339,18 @@ class AccountabilityController extends Controller
         $filename = "PropertyTag-{$serializedAsset->property_number}.pdf";
 
         return $pdf->download($filename);
+    }
+
+    public function bulkDownloadTags(Request $request, BulkPropertyTagPdfService $pdfService)
+    {
+        $request->validate([
+            'asset_ids' => 'required|array',
+            'asset_ids.*' => 'integer|exists:serialized_assets,id',
+        ]);
+
+        $pdf = $pdfService->generate($request->asset_ids);
+
+        return $pdf->download('bulk-property-tags.pdf');
     }
 
     /**

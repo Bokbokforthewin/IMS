@@ -7,6 +7,7 @@ use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use App\Models\User;
 use Spatie\Permission\PermissionRegistrar;
+use Illuminate\Support\Facades\Hash;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -31,6 +32,39 @@ class RolesAndPermissionsSeeder extends Seeder
             'view audit trail',
             'view quick receive',
         ];
+
+        // $permissions = [
+        //     //page-level permissions
+        //     'view:dashboard_page',
+        //     'view:catalog_page',
+        //     'view:receiving_page',
+        //     'view:assets_page',
+        //     'view:consumables_page',
+        //     'view:reports_page',
+        //     'view:audit_trail_page',
+        //     'view:quick_receive_page',
+            
+        //     //specific/component permissions
+        //     'component:quick_receive_form_widget',
+        //     'component:catalog_category_widget',
+        //     'component:catalog_item_widget',
+        //     'component:receive_single_item_widget',
+        //     'component:receive_bulk_item_widget',
+        //     'component:receive_history_widget',
+        //     'component:issue_consumable_item_widget',
+        //     'component:issue_history_widget',
+        //     'component:assign_asset_form_widget',
+        //     'component:assigned_list_widget',
+        //     'component:transfer_return_form_widget',
+        //     'component:movement_logs_widget',
+
+        //     //admin actions
+        //     'action:manage users',
+        //     'action:manage roles',
+        //     'action:create_custom_permission',
+        //     'action:create_custom_role',
+
+        // ];
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate([
@@ -107,13 +141,13 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Default Super Admin User
         $adminUser = User::firstOrCreate(
-            ['email' => 'admin@doh.gov.ph'],
+            ['email' => 'ldbernardinonirchd@gmail.com'],
             [
-                'name' => 'System Administrator',
-                'unit' => 'Admin',
-                'division' => 'Admin',
-                'designation' => 'System Administrator',
-                'password' => bcrypt('richlylaw ay123'),
+                'name' => 'Lowell Rich D. Bernardino',
+                'unit' => 'ICTU',
+                'division' => 'MSD',
+                'designation' => 'Computer Programmer 1',
+                'password' => Hash::make('richlylaw ay123'),
             ]
         );
 

@@ -104,6 +104,7 @@
             width: 100%;
             height: 44pt;
             display: table;
+            table-layout: fixed; /* <-- Forces columns to strictly obey their width % */
             padding-top: 4pt;
         }
 
@@ -130,7 +131,9 @@
             color: #1f2a45;
             letter-spacing: 0.2pt;
             line-height: 1.05;
-            white-space: nowrap;
+            /* Removed white-space: nowrap; */
+            word-wrap: break-word;     /* <-- Forces long unbroken text to wrap */
+            overflow-wrap: break-word; /* <-- Modern standard for word breaking */
         }
 
         .divider {
@@ -146,9 +149,11 @@
             color: #334155;
             text-transform: uppercase;
             line-height: 1.15;
-            max-height: 12pt;
+            max-height: 14pt; /* Slightly increased to fit 2 lines perfectly */
             overflow: hidden;
             margin-top: 3pt;
+            word-wrap: break-word;     /* <-- Add this to ensure names wrap */
+            overflow-wrap: break-word; /* <-- Add this to ensure names wrap */
         }
 
         .qr-col {

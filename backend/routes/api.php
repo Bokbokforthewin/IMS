@@ -174,6 +174,7 @@ Route::prefix('v1')
             Route::get('/accountability/receipts', [AccountabilityController::class, 'getReceipts']);
             Route::get('/accountability/receipts/{receipt}/download-excel', [AccountabilityController::class, 'downloadExcel']);
             Route::get('/accountability/serialized-assets/{serializedAsset}/download-tag-pdf', [AccountabilityController::class, 'downloadPropertyTagPdf']);
+            Route::post('/accountability/bulk-tags-pdf', [AccountabilityController::class, 'bulkDownloadTags']);
             Route::put('/inventory/serialized-assets/{serializedAsset}/status', [InventoryController::class, 'updateAssetStatus']);
 
             Route::get('/asset-transfers', [AssetTransferController::class, 'index']);
