@@ -70,14 +70,19 @@ export default function UserDirectoryTable() {
     setIsEditUserOpen(true);
   };
 
-  const closeEditUser = () => {
-    setIsEditUserOpen(false);
-    setSelectedEditUser(null);
-  };
-
   const filteredUsers = users.filter((user) => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return true;
+
+    // Safe Role Normalization
+    const userRoles = (user.roles || []).map((r) =>
+      typeof r === "string" ? r.toLowerCase() : r.name?.toLowerCase() || ""
+    );
+
+    // Safe Permission Normalization
+    const userPerms = (user.permissions || user.all_permissions || []).map((p) =>
+      typeof p === "string" ? p.toLowerCase() : p.name?.toLowerCase() || ""
+    );
 
     return (
       user.name?.toLowerCase().includes(query) ||
@@ -85,7 +90,8 @@ export default function UserDirectoryTable() {
       user.unit?.toLowerCase().includes(query) ||
       user.division?.toLowerCase().includes(query) ||
       user.designation?.toLowerCase().includes(query) ||
-      user.roles?.some((role) => role.name?.toLowerCase().includes(query))
+      userRoles.some((role) => role.includes(query)) ||
+      userPerms.some((perm) => perm.includes(query))
     );
   });
 
@@ -103,7 +109,7 @@ export default function UserDirectoryTable() {
               <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search users..."
+                placeholder="Search users, roles, or permissions..."
                 className="pl-8"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
@@ -150,15 +156,22 @@ export default function UserDirectoryTable() {
                   </TableRow>
                 ) : (
                   filteredUsers.map((user) => {
-                    const roles = user.roles || [];
-                    const directPermissions = user.permissions || [];
+                    // Normalize roles (Array of strings OR Array of objects)
+                    const roles = (user.roles || []).map((r) =>
+                      typeof r === "string" ? r : r.name
+                    );
+
+                    // Normalize direct permissions (Array of strings OR Array of objects)
+                    const directPermissions = (user.permissions || []).map((p) =>
+                      typeof p === "string" ? p : p.name
+                    );
 
                     return (
                       <TableRow key={user.id} className="hover:bg-muted/40">
                         {/* USER DETAILS */}
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-semibold">{user.name}</span>
+                            <span className="font-semibold text-foreground">{user.name}</span>
                             <span className="text-xs text-muted-foreground">{user.email}</span>
                           </div>
                         </TableCell>
@@ -166,9 +179,11 @@ export default function UserDirectoryTable() {
                         {/* ORGANIZATION */}
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="text-sm">{user.unit || "—"}</span>
-                            <span className="text-xs text-muted-foreground">{user.division || "—"}</span>
-                            <span className="text-xs text-muted-foreground">{user.designation || "—"}</span>
+                            <span className="text-sm font-medium">{user.unit || "—"}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {user.division ? `${user.division}` : "—"}
+                              {user.designation ? ` • ${user.designation}` : ""}
+                            </span>
                           </div>
                         </TableCell>
 
@@ -180,14 +195,14 @@ export default function UserDirectoryTable() {
                             </Badge>
                           ) : (
                             <div className="flex flex-wrap gap-1">
-                              {roles.map((role) => (
+                              {roles.map((roleName) => (
                                 <Badge
-                                  key={role.id}
+                                  key={roleName}
                                   variant="outline"
-                                  className="border-primary/20 bg-primary/5 text-primary"
+                                  className="border-primary/30 bg-primary/5 text-primary font-medium"
                                 >
                                   <Shield className="mr-1 size-3" />
-                                  <span className="capitalize">{role.name.replace(/_/g, " ")}</span>
+                                  <span className="capitalize">{roleName.replace(/_/g, " ")}</span>
                                 </Badge>
                               ))}
                             </div>
@@ -197,7 +212,9 @@ export default function UserDirectoryTable() {
                         {/* DIRECT PERMISSIONS */}
                         <TableCell className="text-center">
                           {directPermissions.length > 0 ? (
-                            <Badge variant="outline">{directPermissions.length}</Badge>
+                            <Badge variant="secondary" className="font-mono">
+                              +{directPermissions.length} direct
+                            </Badge>
                           ) : (
                             <span className="text-xs text-muted-foreground">0</span>
                           )}
@@ -216,11 +233,11 @@ export default function UserDirectoryTable() {
                               <DropdownMenuGroup>
                                 <DropdownMenuLabel>Account Options</DropdownMenuLabel>
                                 <DropdownMenuItem onClick={() => openEditUser(user)}>
-                                  <Pencil className="mr-2 size-4" />
+                                  <Pencil className="mr-2 size-4 text-muted-foreground" />
                                   Edit User Info
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => openUserAccess(user)}>
-                                  <UserCog className="mr-2 size-4" />
+                                  <UserCog className="mr-2 size-4 text-primary" />
                                   Manage User Access
                                 </DropdownMenuItem>
                               </DropdownMenuGroup>

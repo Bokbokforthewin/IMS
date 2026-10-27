@@ -54,94 +54,134 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
         </Button>
       </div>
 
-      {/* Main Table Container with Horizontal Scroll */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-x-auto">
-        <Table className="min-w-[1200px]">
-          <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead className="w-[90px]">Type</TableHead>
-              <TableHead>Item Details</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Code / Serial</TableHead>
-              <TableHead className="text-center">Qty</TableHead>
-              <TableHead className="text-right">Unit Cost</TableHead>
-              <TableHead className="text-right">Total Value</TableHead>
-              <TableHead>Date Issued</TableHead>
-              <TableHead>Recipient / Holder</TableHead>
-              <TableHead>Management Receipt</TableHead>
-              <TableHead>Issued By</TableHead>
-              <TableHead>Remarks</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={12} className="text-center py-16">
-                  <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="text-sm font-medium">Loading report records...</span>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : reportData.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={12} className="text-center py-16">
-                  <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                    <FolderSearch className="h-8 w-8 text-muted-foreground/50" />
-                    <p className="text-sm font-medium">No records match your selected report criteria.</p>
-                    <p className="text-xs text-muted-foreground/70">Try adjusting your date horizon or scope filters.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedData.map((row, idx) => (
-                <TableRow key={`${row.type}-${row.id}-${idx}`} className="hover:bg-muted/30 transition-colors">
-                  <TableCell>
-                    {row.type === "asset" ? (
-                      <Badge variant="outline" className="bg-blue-500/10 text-blue-700 border-blue-500/20 font-semibold text-[10px]">
-                        ASSET
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/20 font-semibold text-[10px]">
-                        CONSUMABLE
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium text-sm text-foreground">{row.item_name}</span>
-                      {row.brand && row.brand !== "N/A" && (
-                        <span className="text-xs text-muted-foreground">{row.brand}</span>
-                      )}
+      {/* Main Container */}
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="text-center py-16">
+            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="text-sm font-medium">Loading report records...</span>
+            </div>
+          </div>
+        ) : reportData.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+              <FolderSearch className="h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm font-medium">No records match your selected report criteria.</p>
+              <p className="text-xs text-muted-foreground/70">Try adjusting your date horizon or scope filters.</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table View (Hidden on Mobile) */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table className="min-w-[1200px]">
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="w-[90px]">Type</TableHead>
+                    <TableHead>Item Details</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Code / Serial</TableHead>
+                    <TableHead className="text-center">Qty</TableHead>
+                    <TableHead className="text-right">Unit Cost</TableHead>
+                    <TableHead className="text-right">Total Value</TableHead>
+                    <TableHead>Date Issued</TableHead>
+                    <TableHead>Recipient / Holder</TableHead>
+                    <TableHead>Management Receipt</TableHead>
+                    <TableHead>Issued By</TableHead>
+                    <TableHead>Remarks</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedData.map((row, idx) => (
+                    <TableRow key={`${row.type}-${row.id}-${idx}`} className="hover:bg-muted/30 transition-colors">
+                      <TableCell>
+                        {row.type === "asset" ? (
+                          <Badge className="flex items-center gap-1.5 mb-2">
+                            Asset
+                          </Badge>
+                        ) : (
+                          <Badge className="flex items-center gap-1.5 mb-2">
+                            Consumable
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm text-foreground">{row.item_name}</span>
+                          {row.brand && row.brand !== "N/A" && (
+                            <span className="text-xs text-muted-foreground">{row.brand}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{row.category}</TableCell>
+                      <TableCell className="font-mono text-xs text-foreground/80">{row.code_or_serial}</TableCell>
+                      <TableCell className="text-center font-semibold text-sm">{row.quantity}</TableCell>
+                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                        {formatCurrency(row.unit_cost)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs font-semibold text-foreground">
+                        {formatCurrency(row.total_cost)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                        {row.date || "—"}
+                      </TableCell>
+                      <TableCell className="text-xs font-medium text-foreground">{row.recipient_or_holder}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{row.management_receipt}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{row.issued_by}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={row.remarks}>
+                        {row.remarks}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Card Stack View (Shown on Mobile, Hidden on Desktop) */}
+            <div className="block md:hidden divide-y">
+              {paginatedData.map((row, idx) => (
+                <div key={`mob-${row.type}-${row.id}-${idx}`} className="p-4 space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        {row.type === "asset" ? (
+                          <Badge className="flex items-center gap-1.5 mb-2">
+                            ASSET
+                          </Badge>
+                        ) : (
+                          <Badge className="flex items-center gap-1.5 mb-2">
+                            CONSUMABLE
+                          </Badge>
+                        )}
+                        <span className="text-xs font-mono text-muted-foreground">{row.code_or_serial}</span>
+                      </div>
+                      <h4 className="font-semibold text-sm text-foreground">{row.item_name}</h4>
                     </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{row.category}</TableCell>
-                  <TableCell className="font-mono text-xs text-foreground/80">{row.code_or_serial}</TableCell>
-                  <TableCell className="text-center font-semibold text-sm">{row.quantity}</TableCell>
-                  <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                    {formatCurrency(row.unit_cost)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-xs font-semibold text-foreground">
-                    {formatCurrency(row.total_cost)}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                    {row.date || "—"}
-                  </TableCell>
-                  <TableCell className="text-xs font-medium text-foreground">{row.recipient_or_holder}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{row.management_receipt}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{row.issued_by}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={row.remarks}>
-                    {row.remarks}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                    <div className="text-right font-mono text-sm font-semibold text-foreground">
+                      {formatCurrency(row.total_cost)}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-1">
+                    <div>
+                      <span className="block text-[10px] uppercase font-semibold">Holder / Recipient</span>
+                      <span className="text-foreground font-medium">{row.recipient_or_holder}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] uppercase font-semibold">Date</span>
+                      <span>{row.date || "—"}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Pagination Footer */}
         {!loading && reportData.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/20">
+          <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t bg-muted/20 gap-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Rows per page</span>
               <Select
@@ -155,10 +195,10 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
                   <SelectValue placeholder={pageSize} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="5">5</SelectItem>
                   <SelectItem value="10">10</SelectItem>
                   <SelectItem value="20">20</SelectItem>
                   <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
                 </SelectContent>
               </Select>
             </div>

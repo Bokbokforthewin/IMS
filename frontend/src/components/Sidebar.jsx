@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Logo from "./Logo.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import {
   LayoutDashboard,
   Boxes,
@@ -39,91 +40,103 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
-const menuItems = [
+const rawMenuItems = [
   {
     id: "dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
-    subItems: [{ id: "dashboard-overview", label: "Overview" }],
+    permission: "view:dashboard_page",
+    subItems: [
+      { id: "dashboard-overview", label: "Overview", permission: "view:dashboard_page" },
+    ],
   },
   {
     id: "reports",
     label: "Reports",
     icon: ReceiptText,
+    permission: "view:reports_page",
     subItems: [
-      { id: "reports", label: "Reports" },
+      { id: "reports-overview", label: "Reports", permission: "view:reports_page" },
     ],
   },
   {
     id: "quick-receive",
     label: "Quick Receive",
     icon: PackageCheck,
+    permission: "view:quick_receive_page",
     subItems: [
-      {id: "catalog-categories", label: "Categories"},
-      { id: "quick-receive-form", label: "Quick Receive Form" },
-      {id: "receive-history", label: "Received History"},
+      { id: "quick-receive-categories", label: "Categories", permission: "component:quick_category_widget" },
+      { id: "quick-receive-form", label: "Quick Receive Form", permission: "component:quick_receive_form_widget" },
+      { id: "quick-receive-history", label: "Received History", permission: "component:quick_receive_history_widget" },
     ],
   },
   {
     id: "catalog",
     label: "Catalog",
     icon: Boxes,
+    permission: "view:catalog_page",
     subItems: [
-      { id: "catalog-categories", label: "Categories" },
-      { id: "catalog-items", label: "Items" },
+      { id: "catalog-categories", label: "Categories", permission: "component:catalog_category_widget" },
+      { id: "catalog-items", label: "Items", permission: "component:catalog_item_widget" },
     ],
   },
   {
     id: "receive",
     label: "Receive Stock",
     icon: PackageCheck,
+    permission: "view:receiving_page",
     subItems: [
-      { id: "receive-single", label: "Single Item" },
-      { id: "receive-bundle", label: "Bundle / Set" },
-      { id: "receive-history", label: "Received History" },
+      { id: "receive-single", label: "Single Item", permission: "component:receive_single_item_widget" },
+      { id: "receive-bundle", label: "Bundle / Set", permission: "component:receive_bulk_item_widget" },
+      { id: "receive-history", label: "Received History", permission: "component:receive_history_widget" },
     ],
   },
   {
     id: "consumables",
     label: "Issue Consumables",
     icon: PackageOpen,
+    permission: "view:consumables_page",
     subItems: [
-      { id: "consumables-issue", label: "Issue Item" },
-      { id: "consumables-history", label: "Issue History" },
+      { id: "consumables-issue", label: "Issue Item", permission: "component:issue_consumable_item_widget" },
+      { id: "consumables-history", label: "Issue History", permission: "component:issue_history_widget" },
     ],
   },
   {
     id: "accountability",
     label: "Assign Asset",
     icon: ClipboardCheck,
+    permission: "view:assets_page",
     subItems: [
-      { id: "accountability-assign", label: "Assign Form" },
-      { id: "accountability-list", label: "Assigned List" },
+      { id: "accountability-assign", label: "Assign Form", permission: "component:assign_asset_form_widget" },
+      { id: "accountability-list", label: "Assigned List", permission: "component:assigned_list_widget" },
     ],
   },
   {
     id: "transfer-return",
     label: "Transfers & Returns",
     icon: ArrowLeftRight,
+    permission: "view:assets_page",
     subItems: [
-      { id: "transfer-return-form", label: "Transfer / Return" },
-      { id: "transfer-return-history", label: "Movement Logs" },
+      { id: "transfer-return-form", label: "Transfer / Return", permission: "component:transfer_return_form_widget" },
+      { id: "transfer-return-history", label: "Movement Logs", permission: "component:movement_logs_widget" },
     ],
   },
   {
     id: "admin",
     label: "Admin Panel",
     icon: Baby,
+    permission: "action:manage users",
     subItems: [
-      { id: "admin-users", label: "User Management" },
+      { id: "admin-users", label: "User Management", permission: "action:manage users" },
     ],
   },
   {
     id: "audit",
     label: "Audit Trail",
     icon: ShieldCogCorner,
+    permission: "view:audit_trail_page",
     subItems: [
-      { id: "audit-logs", label: "Audit Logs" },
+      { id: "audit-logs", label: "Audit Logs", permission: "view:audit_trail_page" },
     ],
   },
 ];
@@ -155,16 +168,40 @@ function SidebarCollapseButton() {
 export default function Sidebar({ 
   activeTab, 
   setActiveTab, 
-  visibleTabs = [], // 1. Recieve visibleTabs as a prop
   appConfig: propConfig 
 }) {
+  const { hasPermission, settings } = useAuth();
   const { toggleSidebar } = useSidebar();
   const [openMenus, setOpenMenus] = useState({});
   const [appConfig, setAppConfig] = useState(propConfig || null);
 
-  // 2. Filter menuItems based on allowed keys in visibleTabs
-  const allowedKeys = new Set(visibleTabs.map((tab) => tab.key));
-  const filteredMenuItems = menuItems.filter((item) => allowedKeys.has(item.id));
+  const simplified = settings?.simplified_encoding_workflow;
+
+  // Filter menu hierarchy dynamically
+  const filteredMenuItems = rawMenuItems
+    .filter((item) => {
+      // System setting check for simplified workflow
+      if (simplified && (item.id === "catalog" || item.id === "receive")) return false;
+      if (!simplified && item.id === "quick-receive") return false;
+      return true;
+    })
+    .map((item) => {
+      const hasParentPerm = hasPermission(item.permission);
+      const allowedSubItems = (item.subItems || []).filter(
+        (subItem) => !subItem.permission || hasPermission(subItem.permission)
+      );
+
+      // Parent is allowed if page permission is granted OR at least one component widget is accessible
+      if (hasParentPerm || allowedSubItems.length > 0) {
+        return {
+          ...item,
+          subItems: allowedSubItems,
+        };
+      }
+
+      return null;
+    })
+    .filter(Boolean);
 
   useEffect(() => {
     if (propConfig) {
@@ -196,7 +233,6 @@ export default function Sidebar({
 
   return (
     <ShadcnSidebar collapsible="icon" variant="sidebar" className="border-r text-left">
-      {/* Header aligned left when expanded, centered when collapsed as icon */}
       <SidebarHeader className="flex h-14 items-center justify-between border-b px-3 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
         <div className="flex w-full items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
           <div className="flex items-center gap-2.5 overflow-hidden text-left group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
@@ -225,8 +261,7 @@ export default function Sidebar({
         </div>
       </SidebarHeader>
 
-      {/* Main Navigation Content */}
-     <SidebarContent className="text-left">
+      <SidebarContent className="text-left">
         <SidebarGroup className="text-left">
           <SidebarGroupLabel className="text-left text-xs font-medium text-muted-foreground">
             Inventory Management
@@ -234,7 +269,6 @@ export default function Sidebar({
 
           <SidebarGroupContent className="text-left">
             <SidebarMenu className="text-left">
-              {/* 3. Map over filteredMenuItems instead of menuItems */}
               {filteredMenuItems.map((item) => {
                 const Icon = item.icon;
                 const isParentActive = activeTab.startsWith(item.id);
@@ -246,7 +280,7 @@ export default function Sidebar({
                     open={isOpen}
                     onOpenChange={() => toggleMenu(item.id)}
                     className="group/collapsible w-full text-left"
-                    >
+                  >
                     <SidebarMenuItem className="text-left">
                       <CollapsibleTrigger asChild>
                         <SidebarMenuButton
@@ -304,7 +338,6 @@ export default function Sidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Footer Section */}
       <SidebarFooter className="border-t p-2 text-left">
         <SidebarMenu className="text-left">
           <SidebarMenuItem className="text-left">

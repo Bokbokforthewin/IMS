@@ -11,13 +11,14 @@ use App\Services\AuditLogger;
 class AuthController extends Controller
 {
     /**
-     * Format user response payload with roles and inherited permissions.
+     * Format user response payload with flat role and permission string arrays.
      */
     private function formatUser(User $user): array
     {
         return array_merge($user->toArray(), [
-            'roles' => $user->roles,
-            'permissions' => $user->getAllPermissions()->map(fn($p) => ['name' => $p->name]),
+            'roles' => $user->getRoleNames(),
+            'permissions' => $user->getAllPermissions()->pluck('name')->values()->toArray(),
+            'all_permissions' => $user->getAllPermissions()->pluck('name')->values()->toArray(),
         ]);
     }
 
@@ -78,13 +79,11 @@ class AuthController extends Controller
         $user = User::where('email', $validated['email'])->first();
 
         if (!$user || !Hash::check($validated['password'], $user->password)) {
-            // Log failed attempt before returning
             AuditLogger::log('failed_login');
             
             return response()->json(['message' => 'Invalid email or password.'], 401);
         }
 
-        // Log successful login before returning
         AuditLogger::log('login', $user);
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -98,7 +97,7 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        AuditLogger::log('logout', $request->user()); // Log first
+        AuditLogger::log('logout', $request->user());
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out successfully.'], 200);

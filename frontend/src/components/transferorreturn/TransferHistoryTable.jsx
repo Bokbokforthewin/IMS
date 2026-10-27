@@ -300,11 +300,10 @@ export default function TransferHistoryTable({ refreshKey }) {
                       {/* Type Badge */}
                       <td className="p-3 whitespace-nowrap">
                         <Badge
-                          variant="outline"
                           className={`text-[10px] px-2 py-0.5 font-semibold ${
                             isReturn
-                              ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30'
-                              : 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30'
+                              ? ''
+                              : ''
                           }`}
                         >
                           {t.transfer_type}

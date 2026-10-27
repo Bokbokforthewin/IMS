@@ -59,10 +59,10 @@ class PermissionMatrixController extends Controller
 
         $permissions = $validated['permissions'] ?? [];
 
-        // Safety check to prevent lockout
-        if ($role->name === 'super_admin' && !in_array('manage roles', $permissions, true)) {
+        // Updated safety check for namespaced permission string
+        if ($role->name === 'super_admin' && !in_array('action:manage roles', $permissions, true)) {
             return response()->json([
-                'error' => "Cannot remove 'manage roles' from the admin role.",
+                'error' => "Cannot remove 'action:manage roles' from the admin role.",
             ], 422);
         }
 
@@ -101,7 +101,7 @@ class PermissionMatrixController extends Controller
     }
 
     /**
-     * Store a new permission dynamically (e.g., 'print reports').
+     * Store a new permission dynamically (e.g., 'action:export_excel').
      */
     public function storePermission(Request $request)
     {

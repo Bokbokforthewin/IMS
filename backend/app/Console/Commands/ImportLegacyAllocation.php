@@ -14,12 +14,11 @@ use Illuminate\Support\Str;
 
 class ImportLegacyAllocation extends Command
 {
-    protected $signature = 'import:legacy-allocation
-        {compiled : Path to compiled_inventory_data.csv}
-        {allocation : Path to new_inventory_allocation.csv}
+    protected $signature = 'import:bacolod-inventory
+        {file : Path to Bacolod_Inventory.csv}
         {--dry-run : Show what would be imported without writing anything}';
 
-    protected $description = 'Import legacy allocation and compiled inventory data into the database.';
+    protected $description = 'Import Bacolod inventory and allocation data into the database from a single CSV file.';
 
     private const PLACEHOLDER_SERIALS = ['cpu clone', 'unknown', 'n/a', 'na', 'none'];
 
@@ -39,23 +38,16 @@ class ImportLegacyAllocation extends Command
 
     public function handle(): int
     {
-        $compiledPath = $this->argument('compiled');
-        $allocationPath = $this->argument('allocation');
+        $filePath = $this->argument('file');
         $dryRun = $this->option('dry-run');
 
-        if (!file_exists($compiledPath) || !file_exists($allocationPath)) {
-            $this->error('One or both CSV files were not found at the given paths.');
+        if (!file_exists($filePath)) {
+            $this->error("The file was not found at: {$filePath}");
             return self::FAILURE;
         }
 
-        $compiled = $this->readCsv($compiledPath);
-        $allocation = $this->readCsv($allocationPath);
-
-        $this->info('Read ' . count($compiled) . ' rows from compiled inventory.');
-        $this->info('Read ' . count($allocation) . ' rows from new allocation.');
-
-        $allRows = array_merge($compiled, $allocation);
-        $this->info('Total rows to process: ' . count($allRows));
+        $rows = $this->readCsv($filePath);
+        $this->info('Read ' . count($rows) . ' rows from Bacolod inventory file.');
 
         if ($dryRun) {
             $this->warn('DRY RUN - nothing was written.');
@@ -67,41 +59,35 @@ class ImportLegacyAllocation extends Command
             return self::SUCCESS;
         }
 
-        DB::transaction(function () use ($allRows) {
+        DB::transaction(function () use ($rows) {
             $processedProperties = [];
             $processedSerials = [];
 
-            // --- STEP 1: PRE-PROCESS & FILTER DUPLICATES ---
+            // --- STEP 1: PRE-PROCESS & ENSURE NO ROWS ARE SKIPPED ---
             $validRows = [];
-            foreach ($allRows as $index => $row) {
+            foreach ($rows as $index => $row) {
                 $propertyNumber = trim($row['Property Number'] ?? '');
                 $serialNumber = trim($row['Serial Number'] ?? '');
                 $lowerSerial = Str::lower($serialNumber);
                 $isPlaceholderSerial = in_array($lowerSerial, self::PLACEHOLDER_SERIALS, true);
                 
-                $isDuplicate = false;
+                // If property number is empty, missing, or a generic placeholder like "faded sticker", 
+                // generate a unique property number so it never triggers a duplicate or skip!
+                if ($propertyNumber === '' || Str::lower($propertyNumber) === 'faded sticker') {
+                    $generated = 'DOH-NIR-BAC-' . date('Y') . '-' . sprintf('%04d', $index + 1);
+                    $this->stats['warnings'][] = "Row {$index}: Property Number was '" . ($propertyNumber ?: 'empty') . "'. Assigned unique: {$generated}";
+                    $row['Property Number'] = $generated;
+                }
 
-                if ($propertyNumber !== '') {
-                    if (isset($processedProperties[$propertyNumber]) || SerializedAsset::where('property_number', $propertyNumber)->exists()) {
-                        $isDuplicate = true;
-                        $this->stats['warnings'][] = "Row {$index}: Property Number '{$propertyNumber}' already exists. Skipped.";
+                // If serial number is a duplicate or placeholder, but we want to import it anyway,
+                // we can append a unique identifier to the serial number instead of skipping it.
+                if ($serialNumber !== '' && !$isPlaceholderSerial) {
+                    if (SerializedAsset::where('serial_number', $serialNumber)->exists()) {
+                        $uniqueSerial = $serialNumber . '-' . ($row['Property Number'] ?? uniqid());
+                        $this->stats['warnings'][] = "Row {$index}: Serial Number '{$serialNumber}' already exists. Appended unique suffix: {$uniqueSerial}";
+                        $row['Serial Number'] = $uniqueSerial;
                     }
                 }
-
-                if (!$isDuplicate && $serialNumber !== '' && !$isPlaceholderSerial) {
-                    if (isset($processedSerials[$lowerSerial]) || SerializedAsset::where('serial_number', $serialNumber)->exists()) {
-                        $isDuplicate = true;
-                        $this->stats['warnings'][] = "Row {$index}: Serial Number '{$serialNumber}' already exists. Skipped.";
-                    }
-                }
-
-                if ($isDuplicate) {
-                    $this->stats['skipped_duplicates']++;
-                    continue;
-                }
-
-                if ($propertyNumber !== '') $processedProperties[$propertyNumber] = true;
-                if ($serialNumber !== '' && !$isPlaceholderSerial) $processedSerials[$lowerSerial] = true;
 
                 $validRows[] = $row;
             }
@@ -111,13 +97,17 @@ class ImportLegacyAllocation extends Command
 
             foreach ($validRows as $index => $row) {
                 $rawDesc = trim($row['Item Description'] ?? 'Unknown Item');
+                if ($rawDesc === '') {
+                    $rawDesc = 'Unknown Item';
+                }
+
                 $categoryName = explode(' ', $rawDesc)[0] ?: 'General';
                 if (strlen($categoryName) < 3) $categoryName = 'General';
 
                 // Ensure Category
                 $category = Category::firstOrCreate(
                     ['name' => $categoryName],
-                    ['description' => 'Imported from legacy allocation']
+                    ['description' => 'Imported from Bacolod inventory']
                 );
                 if ($category->wasRecentlyCreated) $this->stats['categories_created']++;
 
@@ -140,12 +130,12 @@ class ImportLegacyAllocation extends Command
                 );
                 if ($item->wasRecentlyCreated) $this->stats['items_created']++;
 
-                // --- STRICT USER RESOLUTION ---
-                $endUserName = trim($row['End User'] ?? $row['End-user'] ?? '');
+                // --- USER RESOLUTION ---
+                $endUserName = trim($row['End User'] ?? '');
                 $mrHolderName = trim($row['Name'] ?? '');
 
                 $endUserId = $endUserName !== '' ? $this->resolveUserId($endUserName) : null;
-                $mrHolderId = $this->resolveUserId($mrHolderName ?: 'Adrian Hort D. Ramos');
+                $mrHolderId = $mrHolderName !== '' ? $this->resolveUserId($mrHolderName) : $this->resolveUserId('Adrian Hort D. Ramos');
 
                 // Physical Asset Holder (current_holder_id): End User if available; falls back to MR Holder
                 $physicalHolderId = $endUserId ?? $mrHolderId;
@@ -167,12 +157,12 @@ class ImportLegacyAllocation extends Command
                     $finalSerialNumber = "{$serialNumber} - {$propertyNumber}";
                 }
 
-                $unitCost = floatval(str_replace(',', '', $row['Unit Price'] ?? '0'));
+                $unitCost = floatval(str_replace(',', '', $row['Unit Price'] ?? $row['Amount'] ?? '0'));
                 $quantity = intval($row['Quantity'] ?? 1);
-                $dateAcquired = $this->parseDate($row['Date Acquired']) ?? now();
+                $dateAcquired = $this->parseDate($row['Date Acquired'] ?? null) ?? now();
                 $status = ($physicalHolderId !== null || $mrHolderId !== null) ? 'Assigned' : 'Available';
 
-                // Asset physical holder (current_holder_id) is set to physicalHolderId (Jude Esperencilla)
+                // Create Serialized Asset
                 $asset = SerializedAsset::create([
                     'item_id' => $item->id,
                     'serial_number' => $finalSerialNumber,
@@ -182,9 +172,9 @@ class ImportLegacyAllocation extends Command
                     'country_of_origin' => null,
                     'unit_cost' => $unitCost,
                     'status' => $status,
-                    'current_holder_id' => $physicalHolderId, // Jude Esperencilla
+                    'current_holder_id' => $physicalHolderId,
                     'quantity_on_hand' => $quantity,
-                    'condition_remarks' => 'Imported from allocation files.',
+                    'condition_remarks' => 'Imported from Bacolod Inventory file.',
                     'created_at' => $dateAcquired,
                     'updated_at' => $dateAcquired,
                 ]);
@@ -199,8 +189,8 @@ class ImportLegacyAllocation extends Command
 
                     if (!isset($receiptGroups[$groupKey])) {
                         $receiptGroups[$groupKey] = [
-                            'user_id' => $mrHolderId,           // Mr. Ramos (Receipt primary owner)
-                            'received_mr_by_id' => $mrHolderId, // Mr. Ramos (MR Holder)
+                            'user_id' => $physicalHolderId ?? $mrHolderId,
+                            'received_mr_by_id' => $mrHolderId,
                             'date' => $dateAcquired,
                             'unit_cost' => $unitCost,
                             'lines' => [],
@@ -219,20 +209,19 @@ class ImportLegacyAllocation extends Command
             foreach ($receiptGroups as $group) {
                 $receiptType = $group['unit_cost'] >= 50000 ? 'PAR' : 'ICS';
 
-                // Base document unit prefix on MR Holder if available, else End User
                 $userForPrefix = User::find($group['received_mr_by_id'] ?? $group['user_id']);
-                $unitPrefix = ($userForPrefix && !empty($userForPrefix->unit)) 
+                $unitPrefix = ($userForPrefix && !empty($userForPrefix->unit) && trim($userForPrefix->unit) !== '') 
                     ? strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $userForPrefix->unit)) 
-                    : 'LEGACY';
+                    : 'BACOLOD';
 
                 $receipt = AccountabilityReceipt::create([
                     'receipt_type' => $receiptType,
                     'document_number' => $this->nextLegacyDocNumber($unitPrefix, $group['date']->format('Y')),
-                    'user_id' => $group['user_id'],                       // Jude Esperencilla
+                    'user_id' => $group['user_id'],
                     'issued_by_id' => null,
-                    'received_mr_by_id' => $group['received_mr_by_id'], // Mr. Ramos
+                    'received_mr_by_id' => $group['received_mr_by_id'],
                     'date_issued' => $group['date'],
-                    'remarks' => 'Imported from allocation.',
+                    'remarks' => 'Imported from Bacolod inventory.',
                 ]);
                 $this->stats['receipts_created']++;
 

@@ -87,7 +87,7 @@ export default function ItemPickerDialog({
           disabled={disabled}
           className="w-full justify-between font-normal text-left h-9 px-3"
         >
-          <span className="truncate">
+          <span className="truncate pr-2">
             {selectedItem
               ? `${selectedItem.name || selectedItem.item_name} ${
                   selectedItem.code || selectedItem.item_code
@@ -96,7 +96,7 @@ export default function ItemPickerDialog({
                 }`
               : placeholder}
           </span>
-          <div className="flex items-center gap-1 ml-2 shrink-0 opacity-50">
+          <div className="flex items-center gap-1.5 shrink-0 opacity-50">
             {selectedItem && (
               <X
                 className="h-4 w-4 hover:opacity-100 transition-opacity cursor-pointer"
@@ -108,66 +108,69 @@ export default function ItemPickerDialog({
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden gap-0">
-        <DialogHeader className="p-4 pb-2">
-          <DialogTitle className="text-lg font-semibold flex items-center gap-2">
-            <Package className="h-5 w-5 text-muted-foreground" />
-            Select Item
+      <DialogContent className="w-[92vw] sm:max-w-[550px] p-0 overflow-hidden gap-0 box-border rounded-xl">
+        {/* Header */}
+        <DialogHeader className="px-5 pt-5 pb-3 w-full overflow-hidden box-border">
+          <DialogTitle className="text-lg font-semibold flex items-center gap-2 min-w-0">
+            <Package className="h-5 w-5 text-muted-foreground shrink-0" />
+            <span className="truncate">Select Item</span>
           </DialogTitle>
         </DialogHeader>
 
         {/* Filter and Search Controls */}
-        <div className="p-4 pt-0 space-y-3 border-b">
-          <div className="relative">
+        <div className="px-5 pb-4 space-y-3 border-b w-full box-border overflow-hidden">
+          <div className="relative w-full">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search item name, code, SKU..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9"
+              className="pl-9 h-9 w-full box-border"
               autoFocus
             />
           </div>
 
           {categories.length > 0 && (
-            <div className="flex gap-1.5 overflow-x-auto pb-1 text-xs">
-              <button
-                type="button"
-                onClick={() => setSelectedCategory('ALL')}
-                className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-colors ${
-                  selectedCategory === 'ALL'
-                    ? 'bg-primary text-primary-foreground font-medium'
-                    : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
-                }`}
-              >
-                All Categories
-              </button>
-              {categories.map((cat) => (
+            <div className="w-full overflow-x-auto pb-1 max-w-full">
+              <div className="flex gap-1.5 text-xs">
                 <button
-                  key={cat.id}
                   type="button"
-                  onClick={() => setSelectedCategory(String(cat.id))}
-                  className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-colors ${
-                    String(selectedCategory) === String(cat.id)
+                  onClick={() => setSelectedCategory('ALL')}
+                  className={`px-3 py-1.5 rounded-full whitespace-nowrap transition-colors shrink-0 ${
+                    selectedCategory === 'ALL'
                       ? 'bg-primary text-primary-foreground font-medium'
                       : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
                   }`}
                 >
-                  {cat.name}
+                  All Categories
                 </button>
-              ))}
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(String(cat.id))}
+                    className={`px-3 py-1.5 rounded-full whitespace-nowrap transition-colors shrink-0 ${
+                      String(selectedCategory) === String(cat.id)
+                        ? 'bg-primary text-primary-foreground font-medium'
+                        : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
+                    }`}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
         {/* Items Scroll Area */}
-        <div className="max-h-[350px] overflow-y-auto p-2">
+        <div className="max-h-[350px] overflow-y-auto px-4 py-3 w-full box-border">
           {filteredItems.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
+            <div className="py-10 text-center text-sm text-muted-foreground">
               No items found matching your filter criteria.
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5 w-full">
               {filteredItems.map((item) => {
                 const isSelected = String(item.id) === String(value);
                 const categoryName =
@@ -180,31 +183,31 @@ export default function ItemPickerDialog({
                   <div
                     key={item.id}
                     onClick={() => handleSelect(item)}
-                    className={`flex items-center justify-between p-2.5 rounded-md cursor-pointer transition-colors ${
+                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors w-full box-border ${
                       isSelected
                         ? 'bg-accent text-accent-foreground font-medium'
                         : 'hover:bg-muted/60'
                     }`}
                   >
-                    <div className="flex flex-col min-w-0 pr-2">
-                      <div className="flex items-center gap-2">
+                    <div className="flex flex-col min-w-0 flex-1 pr-3 space-y-0.5">
+                      <div className="flex items-center gap-2 min-w-0">
                         <span className="truncate text-sm font-medium">
                           {item.name || item.item_name}
                         </span>
                         {categoryName && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
                             {categoryName}
                           </Badge>
                         )}
                       </div>
                       {(item.code || item.item_code || item.sku) && (
-                        <span className="text-xs text-muted-foreground truncate">
+                        <span className="text-xs text-muted-foreground truncate font-mono">
                           Code: {item.code || item.item_code || item.sku}
                         </span>
                       )}
                     </div>
 
-                    {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                    {isSelected && <Check className="h-4 w-4 text-primary shrink-0 ml-2" />}
                   </div>
                 );
               })}

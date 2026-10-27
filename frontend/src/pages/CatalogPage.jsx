@@ -9,11 +9,6 @@ import ItemTable from '../components/catalog/ItemTable.jsx';
 import EditCategoryModal from '../components/catalog/EditCategoryModal.jsx';
 import EditItemModal from '../components/catalog/EditItemModal.jsx';
 
-import '../components/catalog/CatalogPage.css';
-import '../components/catalog/CatalogForms.css';
-import '../components/catalog/CatalogTables.css';
-import '../components/catalog/CatalogModals.css';
-
 export default function CatalogPage({ 
   activeTab,
   categories, 

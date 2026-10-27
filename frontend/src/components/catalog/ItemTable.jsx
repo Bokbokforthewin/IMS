@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import './CatalogPage.css';
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -306,8 +305,6 @@ function ItemRow({ item, index, handleSaveItem, handleDeleteItem }) {
             <AlertDialogTrigger asChild>
               <Button
                 type="button"
-                className="btn-action btn-delete"
-                variant="destructive"
                 size="sm"
               >
                 Delete

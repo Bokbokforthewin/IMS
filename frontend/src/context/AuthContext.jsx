@@ -27,7 +27,7 @@ export function AuthProvider({ children }) {
       const res = await api.get('/v1/settings');
       setSettings(res.data);
     } catch {
-      // leave default if it fails — don't block the app over this
+      // leave default if it fails
     }
   };
 
@@ -47,7 +47,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem('auth_token', newToken);
       setToken(newToken);
       setUser(userData);
-      await fetchSettings(); // Fetch settings on successful login
+      await fetchSettings();
       return res.data;
     } catch (err) {
       throw new Error(err.response?.data?.error || err.response?.data?.message || 'Login failed');
@@ -62,7 +62,7 @@ export function AuthProvider({ children }) {
       localStorage.setItem('auth_token', newToken);
       setToken(newToken);
       setUser(userData);
-      await fetchSettings(); // Fetch settings on successful registration
+      await fetchSettings();
       return res.data;
     } catch (err) {
       const serverMessage = err.response?.data?.error || err.response?.data?.message;
@@ -80,8 +80,25 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const hasRole = (role) => user?.roles?.some((r) => r.name === role) ?? false;
-  const hasPermission = (perm) => user?.permissions?.some((p) => p.name === perm) ?? false;
+  // Safe role check handling string arrays OR object arrays
+  const hasRole = (role) => {
+    if (!user || !user.roles) return false;
+    return user.roles.some((r) => (typeof r === 'string' ? r : r.name) === role);
+  };
+
+  // Safe permission check with Super Admin override & normalization
+  const hasPermission = (perm) => {
+    if (!user) return false;
+
+    // 1. Instant Super Admin Bypass
+    if (hasRole('super_admin')) {
+      return true;
+    }
+
+    // 2. Safe string/object extraction
+    const rawPermissions = user.permissions || user.all_permissions || [];
+    return rawPermissions.some((p) => (typeof p === 'string' ? p : p?.name) === perm);
+  };
 
   return (
     <AuthContext.Provider

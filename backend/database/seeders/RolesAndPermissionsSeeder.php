@@ -19,52 +19,39 @@ class RolesAndPermissionsSeeder extends Seeder
         // Define target guard for API / Sanctum routes
         $guard = 'sanctum';
 
-        // Page-level permissions
         $permissions = [
-            'view dashboard',
-            'view catalog',
-            'view receiving',
-            'view assets',
-            'view consumables',
-            'view reports',
-            'manage users',
-            'manage roles',
-            'view audit trail',
-            'view quick receive',
-        ];
-
-        // $permissions = [
-        //     //page-level permissions
-        //     'view:dashboard_page',
-        //     'view:catalog_page',
-        //     'view:receiving_page',
-        //     'view:assets_page',
-        //     'view:consumables_page',
-        //     'view:reports_page',
-        //     'view:audit_trail_page',
-        //     'view:quick_receive_page',
+            // Page-level permissions
+            'view:dashboard_page',
+            'view:catalog_page',
+            'view:receiving_page',
+            'view:assets_page',
+            'view:consumables_page',
+            'view:reports_page',
+            'view:audit_trail_page',
+            'view:quick_receive_page',
             
-        //     //specific/component permissions
-        //     'component:quick_receive_form_widget',
-        //     'component:catalog_category_widget',
-        //     'component:catalog_item_widget',
-        //     'component:receive_single_item_widget',
-        //     'component:receive_bulk_item_widget',
-        //     'component:receive_history_widget',
-        //     'component:issue_consumable_item_widget',
-        //     'component:issue_history_widget',
-        //     'component:assign_asset_form_widget',
-        //     'component:assigned_list_widget',
-        //     'component:transfer_return_form_widget',
-        //     'component:movement_logs_widget',
+            // Component permissions (including quick receive widgets)
+            'component:quick_category_widget',
+            'component:quick_receive_form_widget',
+            'component:quick_receive_history_widget',
+            'component:catalog_category_widget',
+            'component:catalog_item_widget',
+            'component:receive_single_item_widget',
+            'component:receive_bulk_item_widget',
+            'component:receive_history_widget',
+            'component:issue_consumable_item_widget',
+            'component:issue_history_widget',
+            'component:assign_asset_form_widget',
+            'component:assigned_list_widget',
+            'component:transfer_return_form_widget',
+            'component:movement_logs_widget',
 
-        //     //admin actions
-        //     'action:manage users',
-        //     'action:manage roles',
-        //     'action:create_custom_permission',
-        //     'action:create_custom_role',
-
-        // ];
+            // Admin actions
+            'action:manage users',
+            'action:manage roles',
+            'action:create_custom_permission',
+            'action:create_custom_role',
+        ];
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate([
@@ -80,63 +67,88 @@ class RolesAndPermissionsSeeder extends Seeder
         ]);
         $superAdmin->syncPermissions(Permission::where('guard_name', $guard)->get());
 
-        // 2. Supply Officer: Dashboard, Catalog, Receiving, Assets, Consumables
+        // 2. Supply Officer: Operational pages and widgets
         $supplyOfficer = Role::firstOrCreate([
             'name' => 'supply_officer',
             'guard_name' => $guard,
         ]);
         $supplyOfficer->syncPermissions([
-            'view dashboard',
-            'view catalog',
-            'view receiving',
-            'view assets',
-            'view consumables',
-            'view audit trail',
-            'view quick receive',
+            'view:dashboard_page',
+            'view:catalog_page',
+            'view:receiving_page',
+            'view:assets_page',
+            'view:consumables_page',
+            'view:audit_trail_page',
+            'view:quick_receive_page',
+            'component:quick_category_widget',
+            'component:quick_receive_form_widget',
+            'component:quick_receive_history_widget',
+            'component:catalog_category_widget',
+            'component:catalog_item_widget',
+            'component:receive_single_item_widget',
+            'component:receive_bulk_item_widget',
+            'component:receive_history_widget',
+            'component:issue_consumable_item_widget',
+            'component:issue_history_widget',
+            'component:assign_asset_form_widget',
+            'component:assigned_list_widget',
+            'component:transfer_return_form_widget',
+            'component:movement_logs_widget',
         ]);
 
-        // 3. Unit Head: Dashboard, Consumables, Assets
+        // 3. Unit Head
         $unitHead = Role::firstOrCreate([
             'name' => 'unit_head',
             'guard_name' => $guard,
         ]);
         $unitHead->syncPermissions([
-            'view dashboard',
-            'view consumables',
-            'view assets',
-            'view audit trail',
+            'view:dashboard_page',
+            'view:consumables_page',
+            'view:assets_page',
+            'view:audit_trail_page',
+            'component:issue_consumable_item_widget',
+            'component:assigned_list_widget',
+            'component:movement_logs_widget',
         ]);
 
-        // 4. Division Chief: Dashboard, Consumables, Assets
+        // 4. Division Chief
         $divisionChief = Role::firstOrCreate([
             'name' => 'division_chief',
             'guard_name' => $guard,
         ]);
         $divisionChief->syncPermissions([
-            'view dashboard',
-            'view consumables',
-            'view assets',
-            'view audit trail',
+            'view:dashboard_page',
+            'view:consumables_page',
+            'view:assets_page',
+            'view:reports_page',
+            'view:audit_trail_page',
+            'component:assigned_list_widget',
+            'component:movement_logs_widget',
         ]);
 
-        // 5. Property Custodian: Dashboard, Consumables, Assets
+        // 5. Property Custodian
         $propertyCustodian = Role::firstOrCreate([
             'name' => 'property_custodian',
             'guard_name' => $guard,
         ]);
         $propertyCustodian->syncPermissions([
-            'view dashboard',
-            'view consumables',
-            'view assets',
+            'view:dashboard_page',
+            'view:catalog_page',
+            'view:assets_page',
+            'view:consumables_page',
+            'component:catalog_category_widget',
+            'component:catalog_item_widget',
+            'component:assign_asset_form_widget',
+            'component:assigned_list_widget',
         ]);
 
-        // 6. End-User: Dashboard only
+        // 6. End-User
         $endUser = Role::firstOrCreate([
             'name' => 'end_user',
             'guard_name' => $guard,
         ]);
         $endUser->syncPermissions([
-            'view dashboard',
+            'view:dashboard_page',
         ]);
 
         // Default Super Admin User
@@ -151,6 +163,6 @@ class RolesAndPermissionsSeeder extends Seeder
             ]
         );
 
-        $adminUser->assignRole($superAdmin);
+        $adminUser->syncRoles(['super_admin']);
     }
 }

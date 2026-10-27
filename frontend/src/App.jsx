@@ -159,7 +159,7 @@ export default function App() {
 
   const renderActivePage = () => {
     if (activeTab.startsWith("dashboard")) {
-      if (!hasPermission("view dashboard")) return <AccessDenied />;
+      if (!hasPermission("view:dashboard_page")) return <AccessDenied />;
 
       return (
         <DashboardPage
@@ -171,19 +171,21 @@ export default function App() {
       );
     }
 
-    if (activeTab.startsWith("quick-receive")) {
-      if (!hasPermission("view quick receive")) return <AccessDenied />;
+   if (activeTab.startsWith("quick-receive")) {
+      if (!hasPermission("view:quick_receive_page")) return <AccessDenied />;
       return (
         <QuickReceivePage
+          activeTab={activeTab}
           categories={categories}
           items={items}
           handleApiCall={handleApiCall}
+          refreshData={fetchData}
         />
       );
     }
 
     if (activeTab.startsWith("catalog")) {
-      if (!hasPermission("view catalog")) return <AccessDenied />;
+      if (!hasPermission("view:catalog_page")) return <AccessDenied />;
 
       return (
         <CatalogPage
@@ -200,7 +202,7 @@ export default function App() {
     }
 
     if (activeTab.startsWith("receive")) {
-      if (!hasPermission("view receiving")) return <AccessDenied />;
+      if (!hasPermission("view:receiving_page")) return <AccessDenied />;
 
       return (
         <ReceivePage
@@ -214,7 +216,7 @@ export default function App() {
     }
 
     if (activeTab.startsWith("consumables")) {
-      if (!hasPermission("view consumables")) return <AccessDenied />;
+      if (!hasPermission("view:consumables_page")) return <AccessDenied />;
 
       return (
         <ConsumablesPage
@@ -227,7 +229,7 @@ export default function App() {
     }
 
     if (activeTab.startsWith("accountability")) {
-      if (!hasPermission("view assets")) return <AccessDenied />;
+      if (!hasPermission("view:assets_page")) return <AccessDenied />;
 
       return (
         <AccountabilityPage
@@ -241,7 +243,7 @@ export default function App() {
     }
 
     if (activeTab.startsWith("transfer-return")) {
-      if (!hasPermission("view assets")) return <AccessDenied />;
+      if (!hasPermission("view:assets_page")) return <AccessDenied />;
 
       return (
         <TransferReturnPage
@@ -254,7 +256,7 @@ export default function App() {
     }
 
     if (activeTab.startsWith("admin")) {
-      if (!hasPermission("manage users")) return <AccessDenied />;
+      if (!hasPermission("action:manage users")) return <AccessDenied />;
 
       return (
         <UserManagementPage
@@ -266,10 +268,7 @@ export default function App() {
     }
 
     if (activeTab.startsWith("audit")) {
-      const canViewAudit =
-        hasPermission("view audit trail");
-
-      if (!canViewAudit) return <AccessDenied />;
+      if (!hasPermission("view:audit_trail_page")) return <AccessDenied />;
 
       return (
         <AuditPage
@@ -282,7 +281,7 @@ export default function App() {
     }
 
     if (activeTab.startsWith("reports")) {
-      if (!hasPermission("view reports")) return <AccessDenied />;
+      if (!hasPermission("view:reports_page")) return <AccessDenied />;
 
       return (
         <ReportsPage

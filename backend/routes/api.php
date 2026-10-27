@@ -30,7 +30,7 @@ use App\Http\Controllers\ReportController;
 Route::get('/app-config', [AppConfigController::class, 'index']);
 
 Route::prefix('v1')->group(function () {
-    // Public Auth Routes (Strict rate limiting applied to prevent brute-force)
+    // Public Auth Routes
     Route::prefix('auth')->middleware('throttle:login')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
@@ -64,13 +64,9 @@ Route::prefix('v1')
         */
         Route::get('/settings', [SystemSettingController::class, 'index']);
 
-        Route::middleware('permission:manage roles')->group(function () {
+        Route::middleware('permission:action:manage roles')->group(function () {
             Route::put('/settings', [SystemSettingController::class, 'update']);
             Route::post('/quick-receive-bundle', [QuickReceiveController::class, 'storeBundle']);
-        });
-
-        Route::middleware('permission:view quick receive')->group(function () {
-            Route::post('/quick-receive', [QuickReceiveController::class, 'store']);
         });
 
         /*
@@ -78,7 +74,7 @@ Route::prefix('v1')
         | Dashboard
         |------------------------------------------------------------------
         */
-        Route::middleware('permission:view dashboard')->group(function () {
+        Route::middleware('permission:view:dashboard_page')->group(function () {
             Route::get('/dashboard', [DashboardController::class, 'index']);
         });
 
@@ -89,7 +85,7 @@ Route::prefix('v1')
         */
         Route::get('/users/options', [UserController::class, 'options']);
 
-        Route::middleware('permission:manage users')->group(function () {
+        Route::middleware('permission:action:manage users')->group(function () {
             Route::get('/users', [UserController::class, 'index']);
             Route::post('/users', [UserController::class, 'store']);
             Route::get('/users/{user}', [UserController::class, 'show']);
@@ -107,11 +103,30 @@ Route::prefix('v1')
         | Role & Permission Matrix
         |------------------------------------------------------------------
         */
-        Route::middleware('permission:manage roles')->group(function () {
+        Route::middleware('permission:action:manage roles')->group(function () {
             Route::get('/permissions-matrix', [PermissionMatrixController::class, 'index']);
             Route::put('/permissions-matrix', [PermissionMatrixController::class, 'update']);
             Route::post('/roles', [PermissionMatrixController::class, 'storeRole']);
             Route::post('/permissions', [PermissionMatrixController::class, 'storePermission']);
+        });
+
+        /*
+        |------------------------------------------------------------------
+        | Shared Inventory Read Routes (Accessible via Receiving OR Quick Receive)
+        |------------------------------------------------------------------
+        */
+        Route::middleware('permission:view:receiving_page|view:quick_receive_page')->group(function () {
+            Route::get('/inventory/received-history', [InventoryController::class, 'receivedHistory']);
+            Route::get('/stock-batches', [InventoryController::class, 'indexStockBatches']);
+        });
+
+        /*
+        |------------------------------------------------------------------
+        | Quick Receive Page
+        |------------------------------------------------------------------
+        */
+        Route::middleware('permission:view:quick_receive_page')->group(function () {
+            Route::post('/quick-receive', [QuickReceiveController::class, 'store']);
         });
 
         /*
@@ -122,7 +137,7 @@ Route::prefix('v1')
         Route::get('/categories', [CategoryController::class, 'index']);
         Route::get('/items', [ItemController::class, 'index']);
 
-        Route::middleware('permission:view catalog')->group(function () {
+        Route::middleware('permission:view:catalog_page|view:quick_receive_page')->group(function () {
             Route::post('/categories', [CategoryController::class, 'store']);
             Route::put('/categories/{category}', [CategoryController::class, 'update']);
             Route::delete('/categories/{category}', [CategoryController::class, 'destroy']);
@@ -134,14 +149,12 @@ Route::prefix('v1')
 
         /*
         |------------------------------------------------------------------
-        | Receiving & Stock Management
+        | Receiving & Stock Management Mutations
         |------------------------------------------------------------------
         */
-        Route::middleware('permission:view receiving')->group(function () {
+        Route::middleware('permission:view:receiving_page|view:quick_receive_page')->group(function () {
             Route::post('/stocks/receive', [InventoryController::class, 'storeStock']);
             Route::post('/stocks/receive-bundle', [InventoryController::class, 'storeBundleStock']);
-            Route::get('/stock-batches', [InventoryController::class, 'indexStockBatches']);
-            Route::get('/inventory/received-history', [InventoryController::class, 'receivedHistory']);
 
             Route::put('/inventory/stock-batches/{stockBatch}', [InventoryController::class, 'updateStockBatch']);
             Route::delete('/inventory/stock-batches/{stockBatch}', [InventoryController::class, 'deleteStockBatch']);
@@ -154,7 +167,7 @@ Route::prefix('v1')
         | Consumables Management
         |------------------------------------------------------------------
         */
-        Route::middleware('permission:view consumables')->group(function () {
+        Route::middleware('permission:view:consumables_page')->group(function () {
             Route::post('/consumables/issue', [ConsumablesController::class, 'issueConsumables']);
             Route::get('/consumables/stock-status', [ConsumablesController::class, 'getStockStatus']);
             Route::get('/consumables/issuances', [ConsumablesController::class, 'indexIssuances']);
@@ -169,7 +182,7 @@ Route::prefix('v1')
         Route::get('/accountability/available-for-cart', [AccountabilityController::class, 'availableForCart']);
         Route::get('/accountability/serialized-assets/{serializedAsset}/attached', [AccountabilityController::class, 'attachedItems']);
 
-        Route::middleware('permission:view assets')->group(function () {
+        Route::middleware('permission:view:assets_page')->group(function () {
             Route::post('/accountability/issue-asset', [AccountabilityController::class, 'issueAsset']);
             Route::get('/accountability/receipts', [AccountabilityController::class, 'getReceipts']);
             Route::get('/accountability/receipts/{receipt}/download-excel', [AccountabilityController::class, 'downloadExcel']);
@@ -186,8 +199,7 @@ Route::prefix('v1')
         | Reports 
         |------------------------------------------------------------------
         */
-
-        Route::middleware('permission:view reports')->group(function () {
+        Route::middleware('permission:view:reports_page')->group(function () {
             Route::get('/reports', [ReportController::class, 'generateReport']);
         });
 
