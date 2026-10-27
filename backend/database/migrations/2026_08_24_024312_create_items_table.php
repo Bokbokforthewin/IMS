@@ -23,6 +23,7 @@ return new class extends Migration
             $table->integer('reorder_level')->default(5);
             $table->enum('tracking_type', ['asset', 'consumable'])->default('consumable');
             $table->string('estimated_useful_life')->nullable(); // e.g. "5 Years", "3 Years"
+            $table->string('image_path')->nullable(); // e.g., "assets/images/supp-paper-a4-2026-08.jpg"
             $table->timestamps();
         });
     }

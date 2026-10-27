@@ -9,6 +9,7 @@ use App\Models\SerializedAsset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Combined "create catalog item + receive stock" workflow, for use when no
@@ -30,6 +31,7 @@ class QuickReceiveController extends Controller
             'tracking_type' => 'required_if:item_mode,new|nullable|in:asset,consumable',
             'reorder_level' => 'nullable|integer|min:0',
             'estimated_useful_life' => 'nullable|string|max:255',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
 
             'unit_cost' => 'required|numeric|min:0',
             'arrival_date' => 'nullable|date',
@@ -66,8 +68,10 @@ class QuickReceiveController extends Controller
         $month = date('m', strtotime($arrivalDate));
         $day = date('d', strtotime($arrivalDate));
 
+        $uploadedImagePath = null;
+
         try {
-            return DB::transaction(function () use ($envelope, $assetFields, $item, $trackingType, $year, $month, $day, $arrivalDate) {
+            return DB::transaction(function () use ($request, $envelope, $assetFields, $item, $trackingType, $year, $month, $day, $arrivalDate, &$uploadedImagePath) {
 
                 $reorderLevel = ($trackingType === 'consumable') 
                     ? ($envelope['reorder_level'] ?? 5) 
@@ -79,6 +83,10 @@ class QuickReceiveController extends Controller
 
                 // --- Step 1: resolve or create the catalog item ---
                 if ($envelope['item_mode'] === 'new') {
+                    if ($request->hasFile('image')) {
+                        $uploadedImagePath = $request->file('image')->store('items', 'public');
+                    }
+
                     $category = Category::findOrFail($envelope['category_id']);
                     $item = Item::create([
                         'category_id' => $envelope['category_id'],
@@ -91,6 +99,7 @@ class QuickReceiveController extends Controller
                         'reorder_level' => $reorderLevel,
                         'tracking_type' => $envelope['tracking_type'],
                         'estimated_useful_life' => $estimatedUsefulLife,
+                        'image_path' => $uploadedImagePath,
                     ]);
                 }
 
@@ -118,7 +127,7 @@ class QuickReceiveController extends Controller
 
                     return response()->json([
                         'message' => "Item and stock recorded successfully ({$iarNumber}).",
-                        'item' => $item,
+                        'item' => $item->load('category'),
                         'batch' => $batch,
                     ], 201);
                 }
@@ -168,11 +177,15 @@ class QuickReceiveController extends Controller
 
                 return response()->json([
                     'message' => count($createdAssets) . ' asset unit(s) recorded under item "' . $item->name . '".',
-                    'item' => $item,
+                    'item' => $item->load('category'),
                     'assets' => $createdAssets,
                 ], 201);
             });
         } catch (\Exception $e) {
+            if ($uploadedImagePath && Storage::disk('public')->exists($uploadedImagePath)) {
+                Storage::disk('public')->delete($uploadedImagePath);
+            }
+
             Log::error('Quick receive failed: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to process: ' . $e->getMessage()], 500);
         }
@@ -227,6 +240,7 @@ class QuickReceiveController extends Controller
             'main.model' => 'nullable|string|max:255',
             'main.manufacturer_name' => 'nullable|string|max:255',
             'main.country_of_origin' => 'nullable|string|max:255',
+            'main.image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
 
             'peripherals' => 'nullable|array',
             'peripherals.*.item_mode' => 'required|in:new,existing',
@@ -244,6 +258,7 @@ class QuickReceiveController extends Controller
             'peripherals.*.model' => 'nullable|string|max:255',
             'peripherals.*.manufacturer_name' => 'nullable|string|max:255',
             'peripherals.*.country_of_origin' => 'nullable|string|max:255',
+            'peripherals.*.image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
         $sets = $validated['sets'];
@@ -267,10 +282,13 @@ class QuickReceiveController extends Controller
         $arrivalDate = $validated['arrival_date'] ?? date('Y-m-d');
         $year = date('Y', strtotime($arrivalDate));
 
+        $newlyUploadedPaths = [];
+
         try {
-            return DB::transaction(function () use ($validated, $serialRules, $sets, $year, $mainHasSerial) {
+            return DB::transaction(function () use ($request, $validated, $serialRules, $sets, $year, $mainHasSerial, &$newlyUploadedPaths) {
                 $mainInput = $validated['main'];
-                $mainItem = $this->resolveItem($mainInput);
+                $mainFile = $request->file('main.image');
+                $mainItem = $this->resolveItem($mainInput, $mainFile, $newlyUploadedPaths);
 
                 $mainSeq = $this->nextPropertySequence($mainInput['has_property_number'], $year);
                 $createdMain = [];
@@ -303,7 +321,8 @@ class QuickReceiveController extends Controller
 
                 $createdPeripherals = [];
                 foreach ($validated['peripherals'] ?? [] as $pIndex => $peripheralInput) {
-                    $peripheralItem = $this->resolveItem($peripheralInput);
+                    $peripheralFile = $request->file("peripherals.{$pIndex}.image");
+                    $peripheralItem = $this->resolveItem($peripheralInput, $peripheralFile, $newlyUploadedPaths);
                     $pHasSerial = $peripheralInput['has_serial_number'] ?? true;
                     $peripheralSerials = $serialRules['peripherals'][$pIndex]['serial_numbers'] ?? [];
 
@@ -343,18 +362,30 @@ class QuickReceiveController extends Controller
                 ], 201);
             });
         } catch (\Exception $e) {
+            foreach ($newlyUploadedPaths as $path) {
+                if (Storage::disk('public')->exists($path)) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+
             Log::error('Quick receive bundle failed: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to process bundle: ' . $e->getMessage()], 500);
         }
     }
 
-    private function resolveItem(array $componentInput): Item
+    private function resolveItem(array $componentInput, $file = null, array &$newlyUploadedPaths = []): Item
     {
         if ($componentInput['item_mode'] === 'existing') {
             return Item::findOrFail($componentInput['item_id']);
         }
 
         $category = Category::findOrFail($componentInput['category_id']);
+
+        $imagePath = null;
+        if ($file) {
+            $imagePath = $file->store('items', 'public');
+            $newlyUploadedPaths[] = $imagePath;
+        }
 
         return Item::create([
             'category_id' => $componentInput['category_id'],
@@ -367,6 +398,7 @@ class QuickReceiveController extends Controller
             'reorder_level' => 5,
             'tracking_type' => 'asset',
             'estimated_useful_life' => $componentInput['estimated_useful_life'] ?? null,
+            'image_path' => $imagePath,
         ]);
     }
 

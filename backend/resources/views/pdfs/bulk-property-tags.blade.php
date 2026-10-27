@@ -198,8 +198,8 @@
         <div class="wrapper">
             <div class="header">
                 <div class="header-logo">
-                    @if(!empty($logoDataUri))
-                        <img src="{{ $logoDataUri }}" alt="{{ config('app.organization') }}">
+                    @if(!empty($logoPath))
+                        <img src="{{ $logoPath }}" alt="{{ config('app.organization') }}">
                     @endif
                 </div>
                 <div class="header-text">
@@ -208,8 +208,8 @@
                     <div class="region">{{ config('app.region') }} Center of Health Development</div>
                 </div>
                 <div class="header-logo">
-                    @if(!empty($bagongPilipinasDataUri))
-                        <img src="{{ $bagongPilipinasDataUri }}" alt="{{ config('app.organization') }}">
+                    @if(!empty($bagongPilipinasPath))
+                        <img src="{{ $bagongPilipinasPath }}" alt="{{ config('app.organization') }}">
                     @endif
                 </div>
             </div>
@@ -223,9 +223,9 @@
                 </div>
 
                 <div class="qr-col">
-                    @if(!empty($tag['qrDataUri']))
+                    @if(!empty($tag['qrFilePath']))
                         <div class="qr-container">
-                            <img src="{{ $tag['qrDataUri'] }}" alt="Property QR Code">
+                            <img src="{{ $tag['qrFilePath'] }}" alt="Property QR Code">
                         </div>
                     @endif
                 </div>

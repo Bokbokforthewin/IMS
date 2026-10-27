@@ -9,6 +9,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Button } from '@/components/ui/button';
+import ImageCaptureInput from '@/components/ImageCaptureInput.jsx';
 
 // --- Responsive Auto-Matching Category Search Bar ---
 function CategorySearch({ categories = [], categoryId, onSelectCategory }) {
@@ -141,19 +142,31 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
     e.preventDefault();
     if (!itemForm.category_id) return;
 
-    const payload = {
-      category_id: itemForm.category_id,
-      name: itemForm.name,
-      brand: itemForm.brand || null,
-      specifications: itemForm.specifications || null,
-      type: itemForm.type || null,
-      unit_of_measure: itemForm.unit_of_measure,
-      reorder_level: isConsumable ? (Number(itemForm.reorder_level) || 5) : 5,
-      tracking_type: trackingType,
-      estimated_useful_life: isAsset ? (itemForm.estimated_useful_life || null) : null,
-    };
+    // Build FormData payload to support file upload
+    const formData = new FormData();
+    formData.append('category_id', itemForm.category_id);
+    formData.append('name', itemForm.name);
+    if (itemForm.brand) formData.append('brand', itemForm.brand);
+    if (itemForm.specifications) formData.append('specifications', itemForm.specifications);
+    if (itemForm.type) formData.append('type', itemForm.type);
+    formData.append('unit_of_measure', itemForm.unit_of_measure);
+    formData.append('tracking_type', trackingType);
 
-    handleApiCall('/items', payload, () => setItemForm({
+    if (isConsumable) {
+      formData.append('reorder_level', Number(itemForm.reorder_level) || 5);
+    } else {
+      formData.append('reorder_level', 5);
+      if (itemForm.estimated_useful_life) {
+        formData.append('estimated_useful_life', itemForm.estimated_useful_life);
+      }
+    }
+
+    // Attach photo file if present
+    if (itemForm.image) {
+      formData.append('image', itemForm.image);
+    }
+
+    handleApiCall('/items', formData, () => setItemForm({
       category_id: '',
       name: '',
       brand: '',
@@ -163,6 +176,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
       reorder_level: '5',
       tracking_type: 'consumable',
       estimated_useful_life: '',
+      image: null,
     }));
   };
 
@@ -247,6 +261,14 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
           </Field>
         </div>
 
+        {/* Camera Capture & File Upload Input */}
+        <div className="pt-2">
+          <ImageCaptureInput
+            onImageSelected={(file) => setItemForm({ ...itemForm, image: file })}
+            currentImageUrl={itemForm.image ? URL.createObjectURL(itemForm.image) : null}
+          />
+        </div>
+
         <FieldSet className="w-full mt-4 pt-4 border-t">
           <FieldLegend variant="label" className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-muted-foreground" />
@@ -259,14 +281,14 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
           >
             <Field orientation="horizontal">
               <RadioGroupItem value="asset" id="track-asset" />
-              <FieldLabel htmlFor="track-asset" className="font-normal">
+              <FieldLabel htmlFor="track-asset" className="font-normal cursor-pointer">
                 Asset <span className="text-muted-foreground text-sm">(Equipment requiring serials / property numbers)</span>
               </FieldLabel>
             </Field>
 
             <Field orientation="horizontal">
               <RadioGroupItem value="consumable" id="track-consumable" />
-              <FieldLabel htmlFor="track-consumable" className="font-normal">
+              <FieldLabel htmlFor="track-consumable" className="font-normal cursor-pointer">
                 Consumable <span className="text-muted-foreground text-sm">(Quantity-based inventory supplies)</span>
               </FieldLabel>
             </Field>
@@ -308,7 +330,7 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
       </FieldGroup>
 
       <Button type="submit" className="mt-6 flex items-center gap-2">
-        <Save className="w-4 h-4" /> Save
+        <Save className="w-4 h-4" /> Save Item
       </Button>
     </form>
   );

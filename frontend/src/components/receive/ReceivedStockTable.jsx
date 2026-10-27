@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
-import api from '@/api/client'; // Import your centralized Axios client
+import api from '@/api/client';
 import EditReceivedItemModal from './EditReceivedItemModal.jsx';
 import DeleteReceivedItemModal from './DeleteReceivedItemModal.jsx';
 
@@ -13,11 +13,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Search, RotateCcw, Calendar as CalendarIcon } from 'lucide-react';
+import { Search, RotateCcw, Calendar as CalendarIcon, Package, Eye } from 'lucide-react';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -27,7 +26,6 @@ import {
   AlertDialogContent,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
@@ -36,9 +34,6 @@ function money(n) {
   return `₱${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 }
 
-/**
- * Groups received-history rows into primary rows and child rows
- */
 function groupHistory(history) {
   const byReference = {};
   history.forEach(row => {
@@ -70,8 +65,8 @@ export default function ReceivedStockTable({ refreshKey }) {
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('ALL'); // 'ALL' | 'Asset' | 'Consumable'
-  const [dateRange, setDateRange] = useState(undefined); // { from: Date, to: Date } | undefined
+  const [typeFilter, setTypeFilter] = useState('ALL');
+  const [dateRange, setDateRange] = useState(undefined);
 
   const [editingRow, setEditingRow] = useState(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -130,13 +125,11 @@ export default function ReceivedStockTable({ refreshKey }) {
 
   const grouped = groupHistory(history);
 
-  // Filter grouped items based on text search, type, and date range
   const filteredGrouped = grouped.filter(({ primary, children }) => {
-    // 1. Filter by Item Type
     if (typeFilter !== 'ALL') {
       const isTypeMatch = (row) => {
         if (typeFilter === 'Asset') return row.type === 'Asset';
-        if (typeFilter === 'Consumable') return row.type !== 'Asset'; // Handles 'Consumable', 'Stock', 'Inventory', etc.
+        if (typeFilter === 'Consumable') return row.type !== 'Asset';
         return true;
       };
 
@@ -146,7 +139,6 @@ export default function ReceivedStockTable({ refreshKey }) {
       if (!primaryMatch && !childMatch) return false;
     }
 
-    // 2. Filter by Date Range
     if (dateRange?.from || dateRange?.to) {
       const rowDateStr = primary.received_at || primary.created_at;
       if (!rowDateStr) return false;
@@ -166,7 +158,6 @@ export default function ReceivedStockTable({ refreshKey }) {
       }
     }
 
-    // 3. Search Query Filter (Text, Codes, Specs, or Formatted Dates)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
 
@@ -194,7 +185,6 @@ export default function ReceivedStockTable({ refreshKey }) {
 
   return (
     <div className="receive-panel">
-      {/* Title & Filter Bar Controls */}
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <h2 className="receive-panel__title text-xl font-bold tracking-tight">
@@ -208,9 +198,8 @@ export default function ReceivedStockTable({ refreshKey }) {
           )}
         </div>
 
-        {/* Toolbar: Search, Type Filter, Date Range Popover */}
+        {/* Toolbar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {/* Search Input */}
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -222,7 +211,6 @@ export default function ReceivedStockTable({ refreshKey }) {
             />
           </div>
 
-          {/* Type Filter Select */}
           <div className="relative">
             <select
               value={typeFilter}
@@ -235,7 +223,6 @@ export default function ReceivedStockTable({ refreshKey }) {
             </select>
           </div>
 
-          {/* Date Range Picker Popover */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -271,10 +258,10 @@ export default function ReceivedStockTable({ refreshKey }) {
         </div>
       </div>
 
-      {loadingHistory && <p className="receive-table__loading text-muted-foreground">Loading...</p>}
+      {loadingHistory && <p className="text-muted-foreground">Loading...</p>}
 
       {!loadingHistory && grouped.length === 0 && (
-        <p className="receive-table__empty text-muted-foreground">No received records found.</p>
+        <p className="text-muted-foreground">No received records found.</p>
       )}
 
       {!loadingHistory && grouped.length > 0 && filteredGrouped.length === 0 && (
@@ -287,50 +274,74 @@ export default function ReceivedStockTable({ refreshKey }) {
       )}
 
       {!loadingHistory && filteredGrouped.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {filteredGrouped.map(({ primary, children }) => {
             const isBundled = children.length > 0;
+            const imageUrl = primary.item_image_url || primary.image_url || primary.item?.image_url;
 
             return (
-              <Card key={`${primary.type}-${primary.id}`} className="flex flex-col justify-between">
-                <CardHeader>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <Badge variant={primary.type === 'Asset' ? 'default' : 'secondary'}>
+              <Card key={`${primary.type}-${primary.id}`} className="group flex flex-col justify-between overflow-hidden rounded-2xl border shadow-sm transition-all hover:shadow-md">
+                {/* Hero Image Header Section (Flat Card Style) */}
+                <div className="relative aspect-4/3 w-full bg-muted/40 overflow-hidden border-b flex items-center justify-center">
+                  {imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt={primary.item_name}
+                      className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 text-muted-foreground/50">
+                      <Package className="size-10 stroke-[1.5]" />
+                      <span className="text-[11px] font-medium uppercase tracking-wider">No Image</span>
+                    </div>
+                  )}
+
+                  {/* Overlaid Badges */}
+                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                    <Badge variant={primary.type === 'Asset' ? 'default' : 'secondary'} className="shadow-xs">
                       {primary.type}
                     </Badge>
-                    {isBundled && <Badge variant="outline">Bundled</Badge>}
+                    {isBundled && (
+                      <Badge variant="outline" className="bg-background/90 backdrop-blur-xs shadow-xs">
+                        Bundled ({children.length})
+                      </Badge>
+                    )}
                   </div>
-                  <CardTitle className="text-base">{primary.item_name}</CardTitle>
-                  <CardDescription>
+                </div>
+
+                <CardHeader className="p-4 pb-2">
+                  <CardTitle className="text-base font-bold line-clamp-1">{primary.item_name}</CardTitle>
+                  <p className="text-xs font-mono text-muted-foreground truncate">
                     {primary.item_code} &middot; Ref: {primary.reference_no || 'N/A'}
-                  </CardDescription>
+                  </p>
                 </CardHeader>
 
-                <CardContent className="flex-1">
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                    <dt className="text-muted-foreground">Date</dt>
-                    <dd className="text-right">
+                <CardContent className="px-4 py-2 flex-1">
+                  <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                    <dt className="text-muted-foreground">Received Date</dt>
+                    <dd className="text-right font-medium">
                       {primary.received_at ? new Date(primary.received_at).toLocaleDateString() : 'N/A'}
                     </dd>
 
                     <dt className="text-muted-foreground">Quantity</dt>
-                    <dd className="text-right">
+                    <dd className="text-right font-medium">
                       {primary.quantity} {primary.unit_of_measure || ''}
                     </dd>
 
-                    <dt className="text-muted-foreground font-medium">Total Cost</dt>
-                    <dd className="text-right font-semibold">{money(primary.total_cost)}</dd>
+                    <dt className="text-muted-foreground font-medium pt-1">Total Cost</dt>
+                    <dd className="text-right font-bold text-sm text-foreground pt-1">{money(primary.total_cost)}</dd>
                   </dl>
 
                   {isBundled && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      + {children.map(c => c.item_name).join(', ')}
+                    <p className="text-[11px] text-muted-foreground mt-2 truncate border-t pt-1.5">
+                      <span className="font-semibold text-foreground">Includes:</span> {children.map(c => c.item_name).join(', ')}
                     </p>
                   )}
                 </CardContent>
 
-                <CardFooter>
-                  <Button variant="outline" className="w-full" onClick={() => openDetails({ primary, children })}>
+                <CardFooter className="p-4 pt-2">
+                  <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" onClick={() => openDetails({ primary, children })}>
+                    <Eye className="size-3.5" />
                     View Details
                   </Button>
                 </CardFooter>
@@ -351,90 +362,111 @@ export default function ReceivedStockTable({ refreshKey }) {
           </AlertDialogHeader>
 
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-            {allDetailRows.map(row => (
-              <div key={`${row.type}-${row.id}`} className="border rounded-md p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="font-medium">{row.item_name}</div>
-                  <Badge variant={row.type === 'Asset' ? 'default' : 'secondary'}>{row.type}</Badge>
+            {allDetailRows.map(row => {
+              const rowImageUrl = row.item_image_url || row.image_url || row.item?.image_url;
+
+              return (
+                <div key={`${row.type}-${row.id}`} className="border rounded-md p-3 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="size-16 rounded-lg border bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                      {rowImageUrl ? (
+                        <img
+                          src={rowImageUrl}
+                          alt={row.item_name}
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        <Package className="size-8 text-muted-foreground/60" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="font-medium text-sm truncate">{row.item_name}</div>
+                        <Badge variant={row.type === 'Asset' ? 'default' : 'secondary'}>{row.type}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono">{row.item_code}</p>
+                    </div>
+                  </div>
+
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm border-t pt-2">
+                    <dt className="text-muted-foreground">Item Code</dt>
+                    <dd className="text-right font-mono text-xs">{row.item_code}</dd>
+
+                    <dt className="text-muted-foreground">Reference No.</dt>
+                    <dd className="text-right font-mono text-xs">{row.reference_no || 'N/A'}</dd>
+
+                    {row.serial_number && (
+                      <>
+                        <dt className="text-muted-foreground">Serial Number</dt>
+                        <dd className="text-right font-mono text-xs">{row.serial_number}</dd>
+                      </>
+                    )}
+
+                    {row.model && (
+                      <>
+                        <dt className="text-muted-foreground">Model</dt>
+                        <dd className="text-right">{row.model}</dd>
+                      </>
+                    )}
+
+                    {row.manufacturer_name && (
+                      <>
+                        <dt className="text-muted-foreground">Manufacturer</dt>
+                        <dd className="text-right">{row.manufacturer_name}</dd>
+                      </>
+                    )}
+
+                    {row.country_of_origin && (
+                      <>
+                        <dt className="text-muted-foreground">Country of Origin</dt>
+                        <dd className="text-right">{row.country_of_origin}</dd>
+                      </>
+                    )}
+
+                    {row.estimated_useful_life && (
+                      <>
+                        <dt className="text-muted-foreground">Estimated Useful Life</dt>
+                        <dd className="text-right">{row.estimated_useful_life}</dd>
+                      </>
+                    )}
+
+                    <dt className="text-muted-foreground">Quantity</dt>
+                    <dd className="text-right">{row.quantity} {row.unit_of_measure || ''}</dd>
+
+                    <dt className="text-muted-foreground">Unit Cost</dt>
+                    <dd className="text-right">{money(row.unit_cost)}</dd>
+
+                    <dt className="text-muted-foreground font-medium">Total Cost</dt>
+                    <dd className="text-right font-semibold">{money(row.total_cost)}</dd>
+
+                    <dt className="text-muted-foreground">Date Received</dt>
+                    <dd className="text-right">
+                      {row.received_at ? new Date(row.received_at).toLocaleDateString() : 'N/A'}
+                    </dd>
+                  </dl>
+
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => { setIsDetailsOpen(false); openEdit(row); }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="flex-1"
+                      onClick={() => { setIsDetailsOpen(false); openDelete(row); }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                  <dt className="text-muted-foreground">Item Code</dt>
-                  <dd className="text-right">{row.item_code}</dd>
-
-                  <dt className="text-muted-foreground">Reference No.</dt>
-                  <dd className="text-right">{row.reference_no || 'N/A'}</dd>
-
-                  {row.serial_number && (
-                    <>
-                      <dt className="text-muted-foreground">Serial Number</dt>
-                      <dd className="text-right">{row.serial_number}</dd>
-                    </>
-                  )}
-
-                  {row.model && (
-                    <>
-                      <dt className="text-muted-foreground">Model</dt>
-                      <dd className="text-right">{row.model}</dd>
-                    </>
-                  )}
-
-                  {row.manufacturer_name && (
-                    <>
-                      <dt className="text-muted-foreground">Manufacturer</dt>
-                      <dd className="text-right">{row.manufacturer_name}</dd>
-                    </>
-                  )}
-
-                  {row.country_of_origin && (
-                    <>
-                      <dt className="text-muted-foreground">Country of Origin</dt>
-                      <dd className="text-right">{row.country_of_origin}</dd>
-                    </>
-                  )}
-
-                  {row.estimated_useful_life && (
-                    <>
-                      <dt className="text-muted-foreground">Estimated Useful Life</dt>
-                      <dd className="text-right">{row.estimated_useful_life}</dd>
-                    </>
-                  )}
-
-                  <dt className="text-muted-foreground">Quantity</dt>
-                  <dd className="text-right">{row.quantity} {row.unit_of_measure || ''}</dd>
-
-                  <dt className="text-muted-foreground">Unit Cost</dt>
-                  <dd className="text-right">{money(row.unit_cost)}</dd>
-
-                  <dt className="text-muted-foreground font-medium">Total Cost</dt>
-                  <dd className="text-right font-semibold">{money(row.total_cost)}</dd>
-
-                  <dt className="text-muted-foreground">Date Received</dt>
-                  <dd className="text-right">
-                    {row.received_at ? new Date(row.received_at).toLocaleDateString() : 'N/A'}
-                  </dd>
-                </dl>
-
-                <div className="flex gap-2 mt-3">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => { setIsDetailsOpen(false); openEdit(row); }}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="flex-1"
-                    onClick={() => { setIsDetailsOpen(false); openDelete(row); }}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <AlertDialogFooter>

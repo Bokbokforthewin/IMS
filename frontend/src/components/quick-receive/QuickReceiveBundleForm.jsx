@@ -7,15 +7,17 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import SerialNumberScanner from '../receive/SerialNumberScanner.jsx';
 import ItemPickerDialog from '@/components/ItemPickerDialog.jsx';
+import ImageCaptureInput from '@/components/ImageCaptureInput.jsx';
 
 function emptyComponent() {
   return {
     item_mode: 'new', item_id: '', category_id: '',
     name: '', brand: '', specifications: '', type: '', unit_of_measure: '',
     unit_cost: '', has_property_number: false,
-    has_serial_number: true, // Default set to true
+    has_serial_number: true,
     model: '', manufacturer_name: '', country_of_origin: '', estimated_useful_life: '',
     serial_numbers: [],
+    image: null,
   };
 }
 
@@ -28,7 +30,6 @@ export default function QuickReceiveBundleForm({ categories, items, handleApiCal
 
   const setsNum = Number(sets) || 0;
 
-  // Validation checks if serial_numbers match setsNum ONLY when has_serial_number is enabled
   const isComponentValid = (c) => {
     const basicValid = (c.item_mode === 'existing' && c.item_id) || 
                        (c.item_mode === 'new' && c.category_id && c.name && c.unit_of_measure);
@@ -79,8 +80,8 @@ export default function QuickReceiveBundleForm({ categories, items, handleApiCal
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <FieldGroup className="grid grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit} className="space-y-6 max-w-7xl mx-auto px-2 sm:px-4">
+      <FieldGroup className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field>
           <FieldLabel>Number of Sets *</FieldLabel>
           <Input type="number" min="1" required value={sets} onChange={(e) => setSets(e.target.value)} />
@@ -93,8 +94,8 @@ export default function QuickReceiveBundleForm({ categories, items, handleApiCal
       </FieldGroup>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Main Unit</CardTitle></CardHeader>
-        <CardContent>
+        <CardHeader className="px-4 sm:px-6"><CardTitle className="text-base">Main Unit</CardTitle></CardHeader>
+        <CardContent className="px-4 sm:px-6">
           <ComponentFields label="Main Item" items={items} categories={categories} value={main} onChange={setMain} sets={setsNum} />
           {peripherals.length > 0 && !main.has_property_number && (
             <p className="text-sm text-destructive mt-2">Peripherals need the main unit to have a property number.</p>
@@ -104,11 +105,11 @@ export default function QuickReceiveBundleForm({ categories, items, handleApiCal
 
       {peripherals.map((p, index) => (
         <Card key={index}>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row items-center justify-between px-4 sm:px-6">
             <CardTitle className="text-base">Peripheral #{index + 1}</CardTitle>
             <Button type="button" variant="ghost" size="sm" onClick={() => setPeripherals(peripherals.filter((_, i) => i !== index))}>Remove</Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 sm:px-6">
             <ComponentFields
               label={`Peripheral #${index + 1}`}
               items={items} categories={categories} value={p} sets={setsNum}
@@ -118,28 +119,30 @@ export default function QuickReceiveBundleForm({ categories, items, handleApiCal
         </Card>
       ))}
 
-      <Button type="button" variant="outline" onClick={() => setPeripherals([...peripherals, emptyComponent()])} disabled={setsNum <= 0}>
-        + Add Peripheral
-      </Button>
+      <div className="flex flex-col sm:flex-row gap-4">
+        <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setPeripherals([...peripherals, emptyComponent()])} disabled={setsNum <= 0}>
+          + Add Peripheral
+        </Button>
 
-      <Button type="submit" disabled={!isReady || submitting}>
-        {submitting ? 'Processing...' : 'Process Bundle Delivery'}
-      </Button>
+        <Button type="submit" className="w-full sm:w-auto min-w-[200px]" disabled={!isReady || submitting}>
+          {submitting ? 'Processing...' : 'Process Bundle Delivery'}
+        </Button>
+      </div>
     </form>
   );
 }
 
 function ComponentFields({ label, items, categories, value, onChange, sets }) {
   return (
-    <FieldGroup>
-      <RadioGroup value={value.item_mode} onValueChange={(v) => onChange({ ...value, item_mode: v, item_id: '' })}>
-        <Field orientation="horizontal">
+    <FieldGroup className="space-y-4">
+      <RadioGroup value={value.item_mode} onValueChange={(v) => onChange({ ...value, item_mode: v, item_id: '' })} className="flex flex-col sm:flex-row gap-3 sm:gap-6">
+        <Field orientation="horizontal" className="space-x-2">
           <RadioGroupItem value="new" id={`bundle-mode-new-${label}`} />
-          <FieldLabel htmlFor={`bundle-mode-new-${label}`} className="font-normal">New catalog item</FieldLabel>
+          <FieldLabel htmlFor={`bundle-mode-new-${label}`} className="font-normal cursor-pointer">New catalog item</FieldLabel>
         </Field>
-        <Field orientation="horizontal">
+        <Field orientation="horizontal" className="space-x-2">
           <RadioGroupItem value="existing" id={`bundle-mode-existing-${label}`} />
-          <FieldLabel htmlFor={`bundle-mode-existing-${label}`} className="font-normal">Existing catalog item</FieldLabel>
+          <FieldLabel htmlFor={`bundle-mode-existing-${label}`} className="font-normal cursor-pointer">Existing catalog item</FieldLabel>
         </Field>
       </RadioGroup>
 
@@ -160,7 +163,7 @@ function ComponentFields({ label, items, categories, value, onChange, sets }) {
             <FieldLabel>Category *</FieldLabel>
             <select
               required
-              className="border rounded-md h-9 px-2 w-full bg-background"
+              className="border rounded-md h-9 px-2 w-full bg-background text-xs"
               value={value.category_id}
               onChange={(e) => onChange({ ...value, category_id: e.target.value })}
             >
@@ -168,36 +171,42 @@ function ComponentFields({ label, items, categories, value, onChange, sets }) {
               {(categories || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </Field>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field><FieldLabel>Item Name *</FieldLabel><Input required value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} /></Field>
             <Field><FieldLabel>Unit of Measure *</FieldLabel><Input required value={value.unit_of_measure} onChange={(e) => onChange({ ...value, unit_of_measure: e.target.value })} /></Field>
           </div>
+
+          {/* ADDED: Image Capture & Upload Field */}
+          <ImageCaptureInput
+            onImageSelected={(file) => onChange({ ...value, image: file })}
+            currentImageUrl={value.image ? URL.createObjectURL(value.image) : null}
+          />
         </>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
         <Field>
           <FieldLabel>Unit Cost (₱) *</FieldLabel>
           <Input type="number" step="0.01" min="0" required value={value.unit_cost} onChange={(e) => onChange({ ...value, unit_cost: e.target.value })} />
         </Field>
 
-        <div className="flex items-center space-x-6">
-          <Field orientation="horizontal">
+        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 pt-2 sm:pt-6">
+          <Field orientation="horizontal" className="space-x-3">
             <Switch checked={value.has_property_number} onCheckedChange={(c) => onChange({ ...value, has_property_number: c })} />
-            <FieldLabel>Assign Property Number</FieldLabel>
+            <FieldLabel className="cursor-pointer">Assign Property Number</FieldLabel>
           </Field>
 
-          <Field orientation="horizontal">
+          <Field orientation="horizontal" className="space-x-3">
             <Switch 
               checked={value.has_serial_number} 
               onCheckedChange={(c) => onChange({ ...value, has_serial_number: c, serial_numbers: c ? value.serial_numbers : [] })} 
             />
-            <FieldLabel>Track Serial Numbers</FieldLabel>
+            <FieldLabel className="cursor-pointer">Track Serial Numbers</FieldLabel>
           </Field>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field><FieldLabel>Model</FieldLabel><Input value={value.model} onChange={(e) => onChange({ ...value, model: e.target.value })} /></Field>
         <Field><FieldLabel>Manufacturer</FieldLabel><Input value={value.manufacturer_name} onChange={(e) => onChange({ ...value, manufacturer_name: e.target.value })} /></Field>
         <Field><FieldLabel>Country of Origin</FieldLabel><Input value={value.country_of_origin} onChange={(e) => onChange({ ...value, country_of_origin: e.target.value })} /></Field>

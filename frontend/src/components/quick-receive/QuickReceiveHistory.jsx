@@ -11,11 +11,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Search, RotateCcw, Calendar as CalendarIcon } from 'lucide-react';
+import { Search, RotateCcw, Calendar as CalendarIcon, Package, Eye } from 'lucide-react';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -75,10 +74,10 @@ export default function QuickReceiveHistory({ refreshKey }) {
   const [detailsGroup, setDetailsGroup] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-    const fetchHistory = useCallback(async () => {
+  const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const res = await api.get('v1/inventory/received-history?per_page=50');
+      const res = await api.get('/v1/inventory/received-history?per_page=50');
       
       const payload = res.data;
       const dataList = Array.isArray(payload)
@@ -259,85 +258,165 @@ export default function QuickReceiveHistory({ refreshKey }) {
       )}
 
       {!loadingHistory && filteredGrouped.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {filteredGrouped.map(({ primary, children }) => (
-            <Card
-              key={`${primary.type}-${primary.id}`}
-              className="flex flex-col justify-between"
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Badge variant={primary.type === 'Asset' ? 'default' : 'secondary'}>
-                    {primary.type}
-                  </Badge>
-                  {children.length > 0 && <Badge variant="outline">Bundled</Badge>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {filteredGrouped.map(({ primary, children }) => {
+            const isBundled = children.length > 0;
+            const imageUrl = primary.item_image_url || primary.image_url || primary.item?.image_url;
+
+            return (
+              <Card
+                key={`${primary.type}-${primary.id}`}
+                className="group flex flex-col justify-between overflow-hidden rounded-2xl border shadow-sm transition-all hover:shadow-md"
+              >
+                {/* Large Hero Card Image Header */}
+                <div className="relative aspect-4/3 w-full bg-muted/40 overflow-hidden border-b flex items-center justify-center">
+                  {imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt={primary.item_name}
+                      className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 text-muted-foreground/50">
+                      <Package className="size-10 stroke-[1.5]" />
+                      <span className="text-[11px] font-medium uppercase tracking-wider">No Image</span>
+                    </div>
+                  )}
+
+                  {/* Overlaid Badges */}
+                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                    <Badge variant={primary.type === 'Asset' ? 'default' : 'secondary'} className="shadow-xs text-[10px]">
+                      {primary.type}
+                    </Badge>
+                    {isBundled && (
+                      <Badge variant="outline" className="bg-background/90 backdrop-blur-xs shadow-xs text-[10px]">
+                        Bundled ({children.length})
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-                <CardTitle className="text-base">{primary.item_name}</CardTitle>
-                <CardDescription className="text-xs">
-                  {primary.item_code} &middot; Ref: {primary.reference_no || 'N/A'}
-                </CardDescription>
-              </CardHeader>
 
-              <CardContent className="flex-1 py-2">
-                <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
-                  <dt className="text-muted-foreground">Date</dt>
-                  <dd className="text-right">
-                    {primary.received_at
-                      ? new Date(primary.received_at).toLocaleDateString()
-                      : 'N/A'}
-                  </dd>
+                <CardHeader className="p-4 pb-2">
+                  <CardTitle className="text-base font-bold line-clamp-1">{primary.item_name}</CardTitle>
+                  <p className="text-xs font-mono text-muted-foreground truncate">
+                    {primary.item_code} &middot; Ref: {primary.reference_no || 'N/A'}
+                  </p>
+                </CardHeader>
 
-                  <dt className="text-muted-foreground">Qty</dt>
-                  <dd className="text-right">
-                    {primary.quantity} {primary.unit_of_measure || ''}
-                  </dd>
-
-                  <dt className="text-muted-foreground font-medium">Total Cost</dt>
-                  <dd className="text-right font-semibold">
-                    {money(primary.total_cost)}
-                  </dd>
-                </dl>
-              </CardContent>
-
-              <CardFooter className="pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={() => openDetails({ primary, children })}
-                >
-                  View Details
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                <CardFooter className="p-4 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-1.5 text-xs"
+                    onClick={() => openDetails({ primary, children })}
+                  >
+                    <Eye className="size-3.5" />
+                    View Details
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
       )}
 
       {/* Details Dialog */}
       <AlertDialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <AlertDialogContent className="max-w-xl">
+        <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>{detailsGroup?.primary?.item_name}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {detailsGroup?.primary?.item_name}
+              {detailsGroup?.children.length > 0 && ` + ${detailsGroup.children.length} bundled item(s)`}
+            </AlertDialogTitle>
           </AlertDialogHeader>
 
-          <div className="space-y-3 max-h-[50vh] overflow-y-auto">
-            {allDetailRows.map((row) => (
-              <div key={`${row.type}-${row.id}`} className="border rounded-md p-3 text-xs space-y-1">
-                <div className="flex items-center justify-between font-semibold">
-                  <span>{row.item_name}</span>
-                  <Badge variant={row.type === 'Asset' ? 'default' : 'secondary'}>
-                    {row.type}
-                  </Badge>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+            {allDetailRows.map((row) => {
+              const rowImageUrl = row.item_image_url || row.image_url || row.item?.image_url;
+
+              return (
+                <div key={`${row.type}-${row.id}`} className="border rounded-md p-3 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="size-16 rounded-lg border bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                      {rowImageUrl ? (
+                        <img
+                          src={rowImageUrl}
+                          alt={row.item_name}
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        <Package className="size-8 text-muted-foreground/60" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="font-medium text-sm truncate">{row.item_name}</div>
+                        <Badge variant={row.type === 'Asset' ? 'default' : 'secondary'}>{row.type}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono">{row.item_code}</p>
+                    </div>
+                  </div>
+
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm border-t pt-2">
+                    <dt className="text-muted-foreground">Item Code</dt>
+                    <dd className="text-right font-mono text-xs">{row.item_code}</dd>
+
+                    <dt className="text-muted-foreground">Reference No.</dt>
+                    <dd className="text-right font-mono text-xs">{row.reference_no || 'N/A'}</dd>
+
+                    {row.serial_number && (
+                      <>
+                        <dt className="text-muted-foreground">Serial Number</dt>
+                        <dd className="text-right font-mono text-xs">{row.serial_number}</dd>
+                      </>
+                    )}
+
+                    {row.model && (
+                      <>
+                        <dt className="text-muted-foreground">Model</dt>
+                        <dd className="text-right">{row.model}</dd>
+                      </>
+                    )}
+
+                    {row.manufacturer_name && (
+                      <>
+                        <dt className="text-muted-foreground">Manufacturer</dt>
+                        <dd className="text-right">{row.manufacturer_name}</dd>
+                      </>
+                    )}
+
+                    {row.country_of_origin && (
+                      <>
+                        <dt className="text-muted-foreground">Country of Origin</dt>
+                        <dd className="text-right">{row.country_of_origin}</dd>
+                      </>
+                    )}
+
+                    {row.estimated_useful_life && (
+                      <>
+                        <dt className="text-muted-foreground">Estimated Useful Life</dt>
+                        <dd className="text-right">{row.estimated_useful_life}</dd>
+                      </>
+                    )}
+
+                    <dt className="text-muted-foreground">Quantity</dt>
+                    <dd className="text-right">{row.quantity} {row.unit_of_measure || ''}</dd>
+
+                    <dt className="text-muted-foreground">Unit Cost</dt>
+                    <dd className="text-right">{money(row.unit_cost)}</dd>
+
+                    <dt className="text-muted-foreground font-medium">Total Cost</dt>
+                    <dd className="text-right font-semibold">{money(row.total_cost)}</dd>
+
+                    <dt className="text-muted-foreground">Date Received</dt>
+                    <dd className="text-right">
+                      {row.received_at ? new Date(row.received_at).toLocaleDateString() : 'N/A'}
+                    </dd>
+                  </dl>
                 </div>
-                <div className="grid grid-cols-2 gap-1 text-muted-foreground">
-                  <span>Code: {row.item_code}</span>
-                  <span className="text-right">Ref: {row.reference_no || 'N/A'}</span>
-                  <span>Qty: {row.quantity}</span>
-                  <span className="text-right">Total: {money(row.total_cost)}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <AlertDialogFooter>

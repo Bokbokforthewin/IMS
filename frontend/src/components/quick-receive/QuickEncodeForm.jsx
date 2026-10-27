@@ -13,6 +13,7 @@ import {
 import SerialNumberScanner from '../receive/SerialNumberScanner.jsx';
 import ItemPickerDialog from '@/components/ItemPickerDialog.jsx';
 import QuickReceiveBundleForm from './QuickReceiveBundleForm.jsx';
+import ImageCaptureInput from '@/components/ImageCaptureInput.jsx';
 
 function emptyForm() {
   return {
@@ -24,13 +25,14 @@ function emptyForm() {
     estimated_useful_life: '',
     unit_cost: '', arrival_date: '', quantity: '',
     has_property_number: false,
-    has_serial_number: true, // Default set to true
+    has_serial_number: true,
     model: '', manufacturer_name: '', country_of_origin: '',
+    image: null, // File object for catalog item photo
   };
 }
 
 export default function QuickEncodeForm({ categories, items, handleApiCall }) {
-  const [receiveMode, setReceiveMode] = useState('single'); // 'single' | 'bundle'
+  const [receiveMode, setReceiveMode] = useState('single');
   const [form, setForm] = useState(emptyForm());
   const [serials, setSerials] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -53,51 +55,58 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
     if (form.item_mode === 'new' && !form.category_id) return;
     if (form.item_mode === 'existing' && !form.item_id) return;
     
-    // Only require matching serial count if tracking serials is turned on
     if (isAsset && form.has_serial_number && serials.length !== quantity) return;
 
     setSubmitting(true);
-    const payload = {
-      item_mode: form.item_mode,
-      item_id: form.item_mode === 'existing' ? form.item_id : undefined,
-      category_id: form.item_mode === 'new' ? form.category_id : undefined,
-      name: form.item_mode === 'new' ? form.name : undefined,
-      brand: form.brand || null,
-      specifications: form.specifications || null,
-      type: form.type || null,
-      unit_of_measure: form.item_mode === 'new' ? form.unit_of_measure : undefined,
-      tracking_type: form.item_mode === 'new' ? form.tracking_type : undefined,
-      reorder_level: form.item_mode === 'new' ? Number(form.reorder_level) : undefined,
-      estimated_useful_life: form.estimated_useful_life || null,
-      unit_cost: form.unit_cost,
-      arrival_date: form.arrival_date || undefined,
-      quantity: form.quantity,
-      ...(isAsset
-        ? {
-            has_property_number: form.has_property_number,
-            has_serial_number: form.has_serial_number,
-            serial_numbers: form.has_serial_number ? serials : [],
-            model: form.model || null,
-            manufacturer_name: form.manufacturer_name || null,
-            country_of_origin: form.country_of_origin || null,
-          }
-        : {}),
-    };
 
-    handleApiCall('/quick-receive', payload, () => {
+    // Build FormData payload to support file upload
+    const formData = new FormData();
+    formData.append('item_mode', form.item_mode);
+    if (form.item_mode === 'existing') formData.append('item_id', form.item_id);
+    if (form.item_mode === 'new') {
+      formData.append('category_id', form.category_id);
+      formData.append('name', form.name);
+      formData.append('unit_of_measure', form.unit_of_measure);
+      formData.append('tracking_type', form.tracking_type);
+      formData.append('reorder_level', Number(form.reorder_level));
+      if (form.image) formData.append('image', form.image);
+    }
+
+    if (form.brand) formData.append('brand', form.brand);
+    if (form.specifications) formData.append('specifications', form.specifications);
+    if (form.type) formData.append('type', form.type);
+    if (form.estimated_useful_life) formData.append('estimated_useful_life', form.estimated_useful_life);
+    
+    formData.append('unit_cost', form.unit_cost);
+    if (form.arrival_date) formData.append('arrival_date', form.arrival_date);
+    formData.append('quantity', form.quantity);
+
+    if (isAsset) {
+      formData.append('has_property_number', form.has_property_number ? '1' : '0');
+      formData.append('has_serial_number', form.has_serial_number ? '1' : '0');
+      if (form.model) formData.append('model', form.model);
+      if (form.manufacturer_name) formData.append('manufacturer_name', form.manufacturer_name);
+      if (form.country_of_origin) formData.append('country_of_origin', form.country_of_origin);
+      
+      if (form.has_serial_number) {
+        serials.forEach((sn, idx) => formData.append(`serial_numbers[${idx}]`, sn));
+      }
+    }
+
+    handleApiCall('/quick-receive', formData, () => {
       setForm(emptyForm());
       setSerials([]);
     }).finally(() => setSubmitting(false));
   };
 
   return (
-    <div className="space-y-6">
-      {/* Radio Selector at top of QuickEncodeForm */}
+    <div className="space-y-6 max-w-7xl mx-auto px-2 sm:px-4">
+      {/* Receiving Mode Toggle */}
       <Card className="bg-muted/20 border">
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 px-4 sm:px-6">
           <CardTitle className="text-base font-semibold">Receiving Mode</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           <RadioGroup
             value={receiveMode}
             onValueChange={setReceiveMode}
@@ -140,7 +149,6 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
         </CardContent>
       </Card>
 
-      {/* Conditionally Render Single Form OR Imported Bundle Form */}
       {receiveMode === 'bundle' ? (
         <QuickReceiveBundleForm
           categories={categories}
@@ -153,15 +161,15 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
             <RadioGroup
               value={form.item_mode}
               onValueChange={(v) => update({ item_mode: v, item_id: '', category_id: '' })}
-              className="mb-4"
+              className="mb-4 flex flex-col sm:flex-row gap-3 sm:gap-6"
             >
-              <Field orientation="horizontal">
+              <Field orientation="horizontal" className="space-x-2">
                 <RadioGroupItem value="new" id="mode-new" />
-                <FieldLabel htmlFor="mode-new" className="font-normal">New item</FieldLabel>
+                <FieldLabel htmlFor="mode-new" className="font-normal cursor-pointer">New item</FieldLabel>
               </Field>
-              <Field orientation="horizontal">
+              <Field orientation="horizontal" className="space-x-2">
                 <RadioGroupItem value="existing" id="mode-existing" />
-                <FieldLabel htmlFor="mode-existing" className="font-normal">Existing item (just receiving more stock)</FieldLabel>
+                <FieldLabel htmlFor="mode-existing" className="font-normal cursor-pointer">Existing item (just receiving more stock)</FieldLabel>
               </Field>
             </RadioGroup>
 
@@ -176,7 +184,7 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
                 />
               </Field>
             ) : (
-              <FieldGroup>
+              <FieldGroup className="space-y-4">
                 <Field>
                   <FieldLabel>Category *</FieldLabel>
                   <Select items={categoryOptions} value={form.category_id} onValueChange={(v) => update({ category_id: v })}>
@@ -189,7 +197,7 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
                   </Select>
                 </Field>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field>
                     <FieldLabel>Item Name *</FieldLabel>
                     <Input required value={form.name} onChange={(e) => update({ name: e.target.value })} />
@@ -200,7 +208,7 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
                   </Field>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field>
                     <FieldLabel>Specifications</FieldLabel>
                     <Input value={form.specifications} onChange={(e) => update({ specifications: e.target.value })} />
@@ -211,16 +219,21 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
                   </Field>
                 </div>
 
-                <RadioGroup value={form.tracking_type} onValueChange={(v) => update({ tracking_type: v })}>
-                  <Field orientation="horizontal">
+                <RadioGroup value={form.tracking_type} onValueChange={(v) => update({ tracking_type: v })} className="flex flex-row gap-6 pt-2">
+                  <Field orientation="horizontal" className="space-x-2">
                     <RadioGroupItem value="asset" id="tt-asset" />
-                    <FieldLabel htmlFor="tt-asset" className="font-normal">Asset</FieldLabel>
+                    <FieldLabel htmlFor="tt-asset" className="font-normal cursor-pointer">Asset</FieldLabel>
                   </Field>
-                  <Field orientation="horizontal">
+                  <Field orientation="horizontal" className="space-x-2">
                     <RadioGroupItem value="consumable" id="tt-consumable" />
-                    <FieldLabel htmlFor="tt-consumable" className="font-normal">Consumable</FieldLabel>
+                    <FieldLabel htmlFor="tt-consumable" className="font-normal cursor-pointer">Consumable</FieldLabel>
                   </Field>
                 </RadioGroup>
+
+                {/* ADDED: Image Capture & Upload Field */}
+                <ImageCaptureInput
+                  onImageSelected={(file) => update({ image: file })}
+                />
 
                 {form.tracking_type === 'consumable' && (
                   <Field>
@@ -240,9 +253,9 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
           </FieldSet>
 
           <FieldSet>
-            <FieldLegend>Receiving Details</FieldLegend>
-            <FieldGroup>
-              <div className="grid grid-cols-3 gap-4">
+            <FieldLegend className="text-base font-semibold mb-3">Receiving Details</FieldLegend>
+            <FieldGroup className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Field>
                   <FieldLabel>Unit Cost (₱) *</FieldLabel>
                   <Input type="number" step="0.01" min="0" required value={form.unit_cost} onChange={(e) => update({ unit_cost: e.target.value })} />
@@ -259,21 +272,21 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
 
               {isAsset && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">Asset Details</CardTitle></CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center space-x-6">
-                      <Field orientation="horizontal">
+                  <CardHeader className="px-4 sm:px-6"><CardTitle className="text-base">Asset Details</CardTitle></CardHeader>
+                  <CardContent className="space-y-4 px-4 sm:px-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+                      <Field orientation="horizontal" className="space-x-3">
                         <Switch checked={form.has_property_number} onCheckedChange={(c) => update({ has_property_number: c })} />
-                        <FieldLabel>Assign Property Number</FieldLabel>
+                        <FieldLabel className="cursor-pointer">Assign Property Number</FieldLabel>
                       </Field>
 
-                      <Field orientation="horizontal">
+                      <Field orientation="horizontal" className="space-x-3">
                         <Switch checked={form.has_serial_number} onCheckedChange={(c) => update({ has_serial_number: c })} />
-                        <FieldLabel>Track Serial Numbers</FieldLabel>
+                        <FieldLabel className="cursor-pointer">Track Serial Numbers</FieldLabel>
                       </Field>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <Field><FieldLabel>Model</FieldLabel><Input value={form.model} onChange={(e) => update({ model: e.target.value })} /></Field>
                       <Field><FieldLabel>Manufacturer</FieldLabel><Input value={form.manufacturer_name} onChange={(e) => update({ manufacturer_name: e.target.value })} /></Field>
                       <Field><FieldLabel>Country of Origin</FieldLabel><Input value={form.country_of_origin} onChange={(e) => update({ country_of_origin: e.target.value })} /></Field>
@@ -293,6 +306,7 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
 
           <Button 
             type="submit" 
+            className="w-full sm:w-auto min-w-[200px]"
             disabled={submitting || (isAsset && form.has_serial_number && serials.length !== quantity)}
           >
             {submitting ? 'Processing...' : 'Save Item & Receive Stock'}

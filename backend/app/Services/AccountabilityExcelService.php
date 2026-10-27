@@ -76,7 +76,7 @@ class AccountabilityExcelService
 
     protected function calculatePageBudget(array $columnWidths): float
     {
-        $contentWidthPt = array_sum(array_map(fn ($w) => (7 * $w + 5) * 0.75, $columnWidths));
+        $contentWidthPt = array_sum(array_map(fn($w) => (7 * $w + 5) * 0.75, $columnWidths));
         $printableWidthPt = (self::PAPER_WIDTH_IN - self::MARGIN_LEFT_IN - self::MARGIN_RIGHT_IN) * 72;
         $scale = min(1.0, $printableWidthPt / $contentWidthPt);
 
@@ -117,7 +117,7 @@ class AccountabilityExcelService
         $lastKey = array_key_last($pages);
         $lastPage = $pages[$lastKey];
         $lastCapacity = ($lastKey === 0) ? $budget - $firstPageOverhead : $budget - $otherPageOverhead;
-        $lastUsed = array_sum(array_map(fn ($i) => $rowHeights[$i], $lastPage));
+        $lastUsed = array_sum(array_map(fn($i) => $rowHeights[$i], $lastPage));
 
         if ($lastUsed + $tailHeight > $lastCapacity && count($lastPage) > 1) {
             $moved = array_pop($lastPage);
@@ -189,7 +189,7 @@ class AccountabilityExcelService
         }
 
         if (!empty($asset->attached_to)) {
-            $lines[] = "Bundled with property no.: {$asset->attached_to}";
+            $lines[] = "Bundled with Property No.: {$asset->attached_to}";
         }
 
         return implode("\n", $lines);
@@ -233,7 +233,7 @@ class AccountabilityExcelService
         }
 
         if (!empty($asset->attached_to)) {
-            $lines[] = "Bundled with property no.: {$asset->attached_to}";
+            $lines[] = "Bundled with Property No.: {$asset->attached_to}";
         }
 
         return implode("\n", $lines);

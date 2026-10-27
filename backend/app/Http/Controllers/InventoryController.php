@@ -308,7 +308,7 @@ class InventoryController extends Controller
             $perPage = (int) $request->input('per_page', 20);
 
             // --- Consumables (stock batches) ---
-            $batchesQuery = StockBatch::with('item:id,name,item_code,unit_of_measure');
+            $batchesQuery = StockBatch::with('item:id,name,item_code,unit_of_measure,image_path');
 
             if ($itemId) {
                 $batchesQuery->where('item_id', $itemId);
@@ -328,6 +328,7 @@ class InventoryController extends Controller
                         'item_id' => $b->item_id,
                         'item_name' => $b->item->name ?? 'N/A',
                         'item_code' => $b->item->item_code ?? 'N/A',
+                        'item_image_url' => $b->item?->image_url,
                         'unit_of_measure' => $b->item->unit_of_measure ?? null,
                         'reference_no' => $b->iar_number,
                         'quantity' => $b->quantity_on_hand,
@@ -339,7 +340,7 @@ class InventoryController extends Controller
                 : collect();
 
             // --- Serialized Assets ---
-            $assetsQuery = SerializedAsset::with('item:id,name,item_code,unit_of_measure,estimated_useful_life');
+            $assetsQuery = SerializedAsset::with('item:id,name,item_code,unit_of_measure,estimated_useful_life,image_path');
             if ($itemId) {
                 $assetsQuery->where('item_id', $itemId);
             }
@@ -358,6 +359,7 @@ class InventoryController extends Controller
                         'item_id' => $a->item_id,
                         'item_name' => $a->item->name ?? 'N/A',
                         'item_code' => $a->item->item_code ?? 'N/A',
+                        'item_image_url' => $a->item?->image_url,
                         'unit_of_measure' => $a->item->unit_of_measure ?? null,
                         'reference_no' => $a->property_number,
                         'attached_to' => $a->attached_to,

@@ -310,9 +310,6 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                         <span className="font-semibold text-sm sm:text-base truncate">
                           {bundle.user?.name || 'Unassigned Primary Receiver'}
                         </span>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal shrink-0">
-                          Primary MR
-                        </Badge>
                         <span className="text-xs text-muted-foreground font-normal shrink-0">
                           ({bundle.date_issued})
                         </span>
@@ -472,7 +469,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                                   className="h-6 text-[10px] px-2"
                                                   onClick={() => handleDownloadTagPdf(child.serialized_asset.id)}
                                                 >
-                                                  Tag PDF
+                                                  Print Sticker
                                                 </Button>
                                               )}
                                             </td>
@@ -512,7 +509,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                         className="h-6 text-[10px] px-2 shrink-0"
                                         onClick={() => handleDownloadTagPdf(primary.serialized_asset.id)}
                                       >
-                                        Tag PDF
+                                        Print Sticker
                                       </Button>
                                     )}
                                   </div>

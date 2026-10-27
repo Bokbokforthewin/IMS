@@ -135,35 +135,32 @@ class AccountabilityController extends Controller
                         }
                     }
 
-                    // Pass 3: Derive unit acronym and shared sequence before processing buckets
+                    // Pass 3: Preserve full unit name cleanly without single-letter reduction
                     $recipientUserId = $validated['user_id'] ?? $validated['received_mr_by_id'];
                     $recipient = User::find($recipientUserId);
                     $rawUnitName = trim($recipient?->unit ?? 'OFFICE');
 
-                    if (preg_match('/^[A-Za-z0-9]{2,6}$/', $rawUnitName)) {
-                        $unitName = strtoupper($rawUnitName);
-                    } else {
-                        $acronym = '';
-                        foreach (explode(' ', $rawUnitName) as $word) {
-                            $cleanWord = preg_replace('/[^A-Za-z0-9]/', '', $word);
-                            if (!empty($cleanWord)) {
-                                $acronym .= strtoupper($cleanWord[0]);
-                            }
-                        }
-                        $unitName = !empty($acronym) ? $acronym : 'OFFICE';
+                    // Sanitize unit name to keep alphanumeric characters and dashes/underscores, uppercase it
+                    $unitName = strtoupper(preg_replace('/[^A-Za-z0-9-_]/', '', $rawUnitName));
+                    if (empty($unitName)) {
+                        $unitName = 'OFFICE';
                     }
 
-                    // One shared counter for this unit + year across BOTH receipt types
-                    $lastReceipt = AccountabilityReceipt::where('document_number', 'like', "{$unitName}-{$year}-%")
-                        ->orderBy('id', 'desc')
+                    // Robust sequence detection: safely fetch existing document numbers using get() + pluck()
+                    $existingReceipts = AccountabilityReceipt::where('document_number', 'like', "{$unitName}-{$year}-%")
                         ->lockForUpdate()
-                        ->first();
+                        ->get()
+                        ->pluck('document_number');
 
-                    $nextSeq = 1;
-                    if ($lastReceipt && $lastReceipt->document_number) {
-                        $parts = explode('-', $lastReceipt->document_number);
-                        $nextSeq = intval(end($parts)) + 1;
+                    $maxSeq = 0;
+                    foreach ($existingReceipts as $docNum) {
+                        $parts = explode('-', $docNum);
+                        $seq = intval(end($parts));
+                        if ($seq > $maxSeq) {
+                            $maxSeq = $seq;
+                        }
                     }
+                    $nextSeq = $maxSeq + 1;
 
                     $createdReceipts = [];
                     $buckets = [
@@ -175,8 +172,17 @@ class AccountabilityController extends Controller
                         if (empty($bucket['lines'])) continue;
 
                         $receiptType = $bucket['type'];
-                        $documentNumber = sprintf("%s-%s-%04d", $rawUnitName, $year, $nextSeq);
-                        $nextSeq++; // Increment locally so PAR + ICS pair in same issuance get sequential numbers
+
+                        // Ensure uniqueness: keep unit name fixed, increment only the %04d sequence
+                        do {
+                            $documentNumber = sprintf("%s-%s-%04d", $unitName, $year, $nextSeq);
+                            $exists = AccountabilityReceipt::where('document_number', $documentNumber)->exists();
+                            if ($exists) {
+                                $nextSeq++;
+                            }
+                        } while ($exists);
+
+                        $nextSeq++; // Prepare increment for next receipt
 
                         $receipt = AccountabilityReceipt::create([
                             'receipt_type' => $receiptType,
@@ -358,7 +364,7 @@ class AccountabilityController extends Controller
      */
     public function availableForCart(): JsonResponse
     {
-        $available = SerializedAsset::with('item')
+        $available = SerializedAsset::with(['item.category', 'currentHolder'])
             ->whereHas('item', fn($q) => $q->where('tracking_type', 'asset'))
             ->where('status', 'Available')
             ->whereNull('current_holder_id')

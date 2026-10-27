@@ -3,7 +3,6 @@ import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardContent,
   CardFooter,
 } from '@/components/ui/card';
@@ -44,7 +43,15 @@ function isAssetMatch(asset, query) {
   const cost = Number(asset.unit_cost || 0);
   const badgeType = cost >= 50000 ? 'par' : 'ics';
 
+  const categoryName = 
+    asset.category_name ||
+    asset.category?.name ||
+    asset.item?.category_name ||
+    asset.item?.category?.name ||
+    '';
+
   const fields = [
+    categoryName,
     asset.property_number,
     asset.reference_no,
     asset.serial_number,
@@ -92,7 +99,6 @@ function groupAssets(assets) {
   const childrenByParentKey = {};
 
   assets.forEach((asset) => {
-    // Check multiple possible key names from backend API payloads
     const rawAttachedTo =
       asset.attached_to ?? asset.attached_to_id ?? asset.parent_id ?? asset.attachedTo;
 
@@ -145,14 +151,12 @@ export default function AssetCatalogBrowse({
   const [detailsGroup, setDetailsGroup] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-  // Safely ensure rawAssets resolves to an array regardless of API payload structure
   const rawAssets =
     catalog?.serialized || catalog?.assets || (Array.isArray(catalog) ? catalog : []);
   const assets = Array.isArray(rawAssets) ? rawAssets : [];
 
   const groupedAssets = useMemo(() => groupAssets(assets), [assets]);
 
-  // Filters primary assets AND attached peripherals against the search query
   const filteredGroupedAssets = useMemo(() => {
     if (!searchQuery.trim()) return groupedAssets;
     const query = searchQuery.trim();
@@ -184,7 +188,7 @@ export default function AssetCatalogBrowse({
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search property no, serial, model..."
+              placeholder="Search category, property no, serial..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 pr-8"
@@ -243,7 +247,7 @@ export default function AssetCatalogBrowse({
         </div>
       ) : (
         /* Asset Grid */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {filteredGroupedAssets.map(({ primary, children }) => {
             const cartKey = `a-${primary.id}`;
             const inCart = cart.some((c) => c.key === cartKey);
@@ -252,80 +256,113 @@ export default function AssetCatalogBrowse({
             const itemName = primary.item?.name || primary.item_name || 'Asset Item';
             const itemCode = primary.item?.item_code || primary.item_code || 'N/A';
             const brandName = primary.item?.brand ? `${primary.item.brand} ` : '';
+            
+            // Resolve image URL
+            const imageUrl = primary.item?.image_url || primary.image_url || primary.item_image_url;
+
+            const categoryName =
+              primary.category_name ||
+              primary.category?.name ||
+              primary.item?.category_name ||
+              primary.item?.category?.name ||
+              null;
 
             return (
-              <Card key={primary.id} className="flex flex-col justify-between">
-                <div>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-1 mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant="default">Asset</Badge>
-                        {isBundled && (
-                          <Badge
-                            variant="secondary"
-                            className="bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 gap-1"
-                          >
-                            <Package className="h-3 w-3" />
-                            Bundled ({children.length})
-                          </Badge>
-                        )}
-                      </div>
-                      <Badge variant="outline">
-                        {cost >= 50000 ? 'PAR' : 'ICS'}
-                      </Badge>
+              <Card 
+                key={primary.id} 
+                className="group flex flex-col justify-between overflow-hidden rounded-2xl border shadow-sm transition-all hover:shadow-md"
+              >
+                {/* Large Hero Card Image Header */}
+                <div className="relative aspect-4/3 w-full bg-muted/40 overflow-hidden border-b flex items-center justify-center">
+                  {imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt={itemName}
+                      className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 text-muted-foreground/50">
+                      <Package className="size-10 stroke-[1.5]" />
+                      <span className="text-[11px] font-medium uppercase tracking-wider">No Image</span>
                     </div>
+                  )}
 
-                    <CardTitle className="text-base line-clamp-1">
-                      {brandName}{itemName}
-                    </CardTitle>
-                    <CardDescription className="text-xs font-mono text-muted-foreground truncate">
-                      {primary.property_number || primary.reference_no || itemCode}
-                    </CardDescription>
-                  </CardHeader>
-
-                  <CardContent className="pt-0 pb-3 text-sm">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-muted-foreground">Unit Cost</span>
-                      <span className="font-semibold text-foreground">{money(cost)}</span>
-                    </div>
-
-                    {/* Bundled peripherals summary preview */}
+                  {/* Overlaid Badges */}
+                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                    <Badge variant="default" className="shadow-xs text-[10px]">
+                      Asset
+                    </Badge>
                     {isBundled && (
-                      <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">Includes: </span>
-                        {children
-                          .map((c) => c.item?.name || c.item_name || 'Peripheral')
-                          .join(', ')}
-                      </div>
+                      <Badge variant="outline" className="bg-background/90 backdrop-blur-xs shadow-xs text-[10px]">
+                        Bundled ({children.length})
+                      </Badge>
                     )}
-                  </CardContent>
+                  </div>
+
+                  <div className="absolute top-2.5 right-2.5">
+                    <Badge variant="secondary" className="bg-background/90 backdrop-blur-xs shadow-xs text-[10px] font-bold">
+                      {cost >= 50000 ? 'PAR' : 'ICS'}
+                    </Badge>
+                  </div>
                 </div>
 
-                <CardFooter className="flex gap-2 pt-2 border-t">
+                <CardHeader className="p-4 pb-2">
+                  <CardTitle className="text-base font-bold line-clamp-1">
+                    {brandName}{itemName}
+                  </CardTitle>
+                  <p className="text-xs font-mono text-muted-foreground truncate">
+                    {categoryName || primary.property_number || primary.reference_no || itemCode}
+                  </p>
+                </CardHeader>
+
+                <CardContent className="px-4 py-2 flex-1">
+                  <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                    <dt className="text-muted-foreground">Property No.</dt>
+                    <dd className="text-right font-mono text-[11px] font-medium truncate">
+                      {primary.property_number || 'N/A'}
+                    </dd>
+
+                    <dt className="text-muted-foreground font-medium pt-1">Unit Cost</dt>
+                    <dd className="text-right font-bold text-sm text-foreground pt-1">
+                      {money(cost)}
+                    </dd>
+                  </dl>
+
+                  {isBundled && (
+                    <p className="text-[11px] text-muted-foreground mt-2 truncate border-t pt-1.5">
+                      <span className="font-semibold text-foreground">Includes:</span>{' '}
+                      {children
+                        .map((c) => c.item?.name || c.item_name || 'Peripheral')
+                        .join(', ')}
+                    </p>
+                  )}
+                </CardContent>
+
+                <CardFooter className="p-4 pt-2 flex gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1"
+                    className="flex-1 text-xs gap-1"
                     onClick={() => openDetails({ primary, children })}
                   >
-                    <Eye className="mr-1 h-3.5 w-3.5" />
+                    <Eye className="size-3.5" />
                     Details
                   </Button>
 
                   <Button
                     size="sm"
-                    className="flex-1"
+                    className="flex-1 text-xs gap-1"
                     disabled={inCart}
                     onClick={() => addAssetToCart(primary, children)}
                   >
                     {inCart ? (
                       <>
-                        <Check className="mr-1 h-3.5 w-3.5" />
+                        <Check className="size-3.5" />
                         Added
                       </>
                     ) : (
                       <>
-                        <Plus className="mr-1 h-3.5 w-3.5" />
+                        <Plus className="size-3.5" />
                         Add Asset
                       </>
                     )}
@@ -361,6 +398,14 @@ export default function AssetCatalogBrowse({
               const rowName = row.item?.name || row.item_name || 'Asset Item';
               const rowCode = row.item?.item_code || row.item_code || 'N/A';
               const isMain = idx === 0;
+              const rowImageUrl = row.item?.image_url || row.image_url || row.item_image_url;
+
+              const rowCategory =
+                row.category_name ||
+                row.category?.name ||
+                row.item?.category_name ||
+                row.item?.category?.name ||
+                'N/A';
 
               return (
                 <div
@@ -369,14 +414,34 @@ export default function AssetCatalogBrowse({
                     isMain ? 'bg-muted/30 border-muted-foreground/20' : ''
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium text-sm">{rowName}</div>
-                    <Badge variant={isMain ? 'default' : 'secondary'}>
-                      {isMain ? 'Main Asset' : 'Peripheral / Bundled Item'}
-                    </Badge>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="size-16 rounded-lg border bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                      {rowImageUrl ? (
+                        <img
+                          src={rowImageUrl}
+                          alt={rowName}
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        <Package className="size-8 text-muted-foreground/60" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium text-sm truncate">{rowName}</div>
+                        <Badge variant={isMain ? 'default' : 'secondary'}>
+                          {isMain ? 'Main Asset' : 'Peripheral / Bundled Item'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono">{rowCode}</p>
+                    </div>
                   </div>
 
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm border-t pt-2">
+                    <dt className="text-muted-foreground">Category</dt>
+                    <dd className="text-right font-medium text-xs">{rowCategory}</dd>
+
                     <dt className="text-muted-foreground">Item Code</dt>
                     <dd className="text-right font-mono text-xs">{rowCode}</dd>
 

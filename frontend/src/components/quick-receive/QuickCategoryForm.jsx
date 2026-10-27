@@ -351,7 +351,7 @@ function CategoryRow({ cat, handleSaveCategory, handleDeleteCategory }) {
           {/* DELETE ALERT DIALOG */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm">
+              <Button size="sm">
                 Delete
               </Button>
             </AlertDialogTrigger>

@@ -7,6 +7,7 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class ItemController extends Controller
 {
@@ -23,6 +24,10 @@ class ItemController extends Controller
 
     public function store(Request $request)
     {
+        // Log incoming payload details
+        Log::info('Store Request Inputs:', $request->all());
+        Log::info('Has image file?', ['hasFile' => $request->hasFile('image')]);
+
         $validatedData = $request->validate([
             'category_id' => 'required|exists:categories,id',
             'name' => 'required|string|max:255',
@@ -33,10 +38,11 @@ class ItemController extends Controller
             'reorder_level' => 'required|integer|min:0',
             'tracking_type' => 'required|in:asset,consumable',
             'estimated_useful_life' => 'nullable|string|max:255',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
         try {
-            return DB::transaction(function () use ($validatedData) {
+            return DB::transaction(function () use ($request, $validatedData) {
                 $category = Category::findOrFail($validatedData['category_id']);
                 $year = date('Y');
                 $month = date('m');
@@ -48,7 +54,6 @@ class ItemController extends Controller
                     $catPrefix = str_pad($catPrefix, 3, 'X', STR_PAD_RIGHT);
                 }
 
-                // Format: DOH NIR-DES-2026-10-06-
                 $prefixPattern = sprintf("DOH NIR-%s-%s-%s-%s-", $catPrefix, $year, $month, $day);
 
                 $lastItem = Item::where('item_code', 'LIKE', $prefixPattern . '%')
@@ -62,8 +67,13 @@ class ItemController extends Controller
                     $nextSeq = intval(end($parts)) + 1;
                 }
 
-                // Combines prefixPattern and sequence: DOH NIR-DES-2026-10-06-001
                 $itemCode = sprintf('%s%03d', $prefixPattern, $nextSeq);
+
+                // Store image file
+                $imagePath = null;
+                if ($request->hasFile('image')) {
+                    $imagePath = $request->file('image')->store('items', 'public');
+                }
 
                 $item = Item::create([
                     'category_id' => $validatedData['category_id'],
@@ -76,11 +86,12 @@ class ItemController extends Controller
                     'reorder_level' => $validatedData['reorder_level'],
                     'tracking_type' => $validatedData['tracking_type'],
                     'estimated_useful_life' => $validatedData['estimated_useful_life'] ?? null,
+                    'image_path' => $imagePath,
                 ]);
 
                 return response()->json([
                     'message' => 'Catalog item successfully created',
-                    'item' => $item
+                    'item' => $item->load('category')
                 ], 201);
             });
         } catch (\Exception $e) {
@@ -103,9 +114,19 @@ class ItemController extends Controller
             'reorder_level' => 'required|integer|min:0',
             'tracking_type' => 'required|in:asset,consumable',
             'estimated_useful_life' => 'nullable|string|max:255',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
         try {
+            if ($request->hasFile('image')) {
+                // Delete existing photo if present
+                if ($item->image_path && Storage::disk('public')->exists($item->image_path)) {
+                    Storage::disk('public')->delete($item->image_path);
+                }
+
+                $validatedData['image_path'] = $request->file('image')->store('items', 'public');
+            }
+
             $item->update($validatedData);
 
             return response()->json([
@@ -123,6 +144,10 @@ class ItemController extends Controller
     public function destroy(Item $item)
     {
         try {
+            if ($item->image_path && Storage::disk('public')->exists($item->image_path)) {
+                Storage::disk('public')->delete($item->image_path);
+            }
+
             $item->delete();
             return response()->json(['message' => 'Catalog item successfully deleted!'], 200);
         } catch (\Exception $e) {
