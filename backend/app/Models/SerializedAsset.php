@@ -57,4 +57,34 @@ class SerializedAsset extends Model
     {
         return $this->belongsTo(SerializedAsset::class, 'attached_to', 'property_number');
     }
+
+    public function scopeApplyDataScope($query, User $user)
+{
+    // 1. Super Admin & Supply Officer see everything
+    if ($user->hasRole(['super_admin', 'supply_officer']) || $user->email === 'ldbernardinonirchd@gmail.com') {
+        return $query;
+    }
+
+    $unit = trim($user->unit ?? '');
+    $division = trim($user->division ?? '');
+
+    // 2. Division Chief / Head
+    if ($user->hasRole('division_chief') || ($user->is_head && !empty($division) && (empty($unit) || $unit === ''))) {
+        return $query->where(function ($q) use ($division) {
+            $q->whereHas('currentHolder', fn($sub) => $sub->whereRaw('LOWER(TRIM(division)) = ?', [strtolower($division)]))
+              ->orWhere('status', 'Available');
+        });
+    }
+
+    // 3. Unit Head / Property Custodian
+    if ($user->hasRole(['property_custodian', 'unit_head', 'end_user']) || ($user->is_head && !empty($unit))) {
+        return $query->where(function ($q) use ($unit) {
+            $q->whereHas('currentHolder', fn($sub) => $sub->whereRaw('LOWER(TRIM(unit)) = ?', [strtolower($unit)]))
+              ->orWhere('status', 'Available');
+        });
+    }
+
+    // 4. Regular End-User
+    return $query->where('current_holder_id', $user->id);
+}
 }

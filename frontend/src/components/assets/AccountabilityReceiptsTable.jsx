@@ -73,13 +73,20 @@ function groupReceiptsIntoBundles(receipts) {
   const bundleMap = new Map();
 
   receipts.forEach((receipt) => {
-    const primaryUser = receipt.receivedMrBy || receipt.user;
-    const key = `${primaryUser?.id || receipt.user_id}_${receipt.issued_by_id}_${receipt.date_issued}_${receipt.remarks || ''}`;
+    // 🔍 Safely check camelCase, snake_case, and nested object or fallback name
+    const mrUser = 
+      receipt.receivedMrBy || 
+      receipt.received_mr_by || 
+      (receipt.received_mr_by_id ? { id: receipt.received_mr_by_id, name: `MR ID #${receipt.received_mr_by_id}` } : null) || 
+      receipt.user;
+
+    const primaryUserId = mrUser?.id || receipt.received_mr_by_id || receipt.user_id;
+    const key = `mr_${primaryUserId}_issued_${receipt.issued_by_id}_date_${receipt.date_issued}_${receipt.remarks || ''}`;
 
     if (!bundleMap.has(key)) {
       bundleMap.set(key, {
         key,
-        user: primaryUser,
+        user: mrUser, // ✅ Correctly displays the MR at the header
         issuedBy: receipt.issuedBy,
         date_issued: receipt.date_issued,
         remarks: receipt.remarks,

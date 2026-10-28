@@ -10,14 +10,17 @@ use Illuminate\Support\Facades\Log;
 
 class AssetTransferController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         try {
+            $user = $request->user();
+
             $transfers = AssetTransfer::with([
                 'serializedAsset.item.category',
                 'transferredFrom',
                 'transferredTo',
             ])
+            ->applyDataScope($user) // 🔒 Enforces Division/Unit scoping on transfer logs
             ->orderBy('created_at', 'desc')
             ->get();
 

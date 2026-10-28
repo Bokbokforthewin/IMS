@@ -39,7 +39,7 @@ class ConsumablesController extends Controller
                         'item_brand' => $item->brand,
                         'item_specifications' => $item->specifications,
                         'item_type' => $item->type,
-                        'image_url' => $item->image_url, // Added item image accessor
+                        'image_url' => $item->image_url,
                         'cost' => $nextBatch ? (float) $nextBatch->unit_cost : 0,
                         'total_stock' => $totalStock,
                         'reorder_level' => $reorderLevel,
@@ -54,10 +54,6 @@ class ConsumablesController extends Controller
         }
     }
 
-    /**
-     * Issue consumables using true FIFO, ordered by actual arrival date.
-     * Records every batch drawn from via stock_issuance_batches.
-     */
     public function issueConsumables(Request $request)
     {
         $validatedData = $request->validate([
@@ -105,7 +101,6 @@ class ConsumablesController extends Controller
                         if ($qtyToDeduct <= 0) break;
 
                         $take = min($batch->quantity_on_hand, $qtyToDeduct);
-                        // Fixed calculation syntax error
                         $batch->update(['quantity_on_hand' => $batch->quantity_on_hand - $take]);
 
                         $allocations[] = [
@@ -179,10 +174,13 @@ class ConsumablesController extends Controller
         return response()->json(['error' => 'Failed to generate a unique document number after several attempts.'], 500);
     }
 
-    public function indexIssuances()
+    public function indexIssuances(Request $request)
     {
         try {
+            $user = $request->user();
+
             $issuances = StockIssuance::with(['lines.item', 'lines.issuedTo', 'lines.batchAllocations.stockBatch'])
+                ->applyDataScope($user) // 🔒 Enforces Division/Unit scoping on consumable issuance logs
                 ->orderBy('created_at', 'desc')
                 ->get();
 

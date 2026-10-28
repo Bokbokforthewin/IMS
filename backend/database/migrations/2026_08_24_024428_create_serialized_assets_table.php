@@ -23,7 +23,7 @@ return new class extends Migration
             $table->decimal('unit_cost', 12, 2);
             $table->integer('quantity_on_hand')->default(0);
             $table->string('attached_to')->nullable();
-            $table->enum('status', ['Available', 'Assigned', 'Under Repair', 'Condemned'])->default('Available');
+            $table->enum('status', ['Available', 'Assigned', 'Distributed', 'Under Repair', 'Condemned'])->default('Available');
             $table->string('pre_repair_status')->nullable();
             $table->text('condition_remarks')->nullable();
             $table->timestamps();

@@ -16,12 +16,15 @@ use App\Services\BulkPropertyTagPdfService;
 class AccountabilityController extends Controller
 {
     /**
-     * Display a listing of all serialized assets.
+     * Display a listing of all serialized assets (scoped by user division/unit).
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
+            $user = $request->user();
+
             $assets = SerializedAsset::with(['item', 'currentHolder'])
+                ->applyDataScope($user)
                 ->orderBy('created_at', 'desc')
                 ->get();
 
@@ -33,11 +36,13 @@ class AccountabilityController extends Controller
     }
 
     /**
-     * Retrieve all issued accountability receipts along with primary/secondary holder details.
+     * Retrieve all issued accountability receipts along with primary/secondary holder details (scoped by user division/unit).
      */
-    public function getReceipts(): JsonResponse
+    public function getReceipts(Request $request): JsonResponse
     {
         try {
+            $user = $request->user();
+
             $receipts = AccountabilityReceipt::with([
                 'lines.serializedAsset.item',
                 'lines.serializedAsset.currentHolder',
@@ -45,6 +50,7 @@ class AccountabilityController extends Controller
                 'issuedBy',
                 'receivedMrBy'
             ])
+            ->applyDataScope($user)
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -318,17 +324,21 @@ class AccountabilityController extends Controller
     }
 
     /**
-     * Download receipt as an Excel workbook.
+     * Download receipt as an Excel workbook (secured by data scoping).
      */
-    public function downloadExcel(int $id, AccountabilityExcelService $excelService)
+    public function downloadExcel(int $id, Request $request, AccountabilityExcelService $excelService)
     {
+        $user = $request->user();
+
         $receipt = AccountabilityReceipt::with([
             'user',
             'issuedBy',
             'receivedMrBy',
             'lines.serializedAsset.item',
             'lines.serializedAsset.currentHolder',
-        ])->findOrFail($id);
+        ])
+        ->applyDataScope($user)
+        ->findOrFail($id);
 
         return $excelService->generate($receipt);
     }
@@ -360,11 +370,14 @@ class AccountabilityController extends Controller
     }
 
     /**
-     * Get available assets eligible for selection in the issuance cart.
+     * Get available assets eligible for selection in the issuance cart (scoped by unit/division).
      */
-    public function availableForCart(): JsonResponse
+    public function availableForCart(Request $request): JsonResponse
     {
+        $user = $request->user();
+
         $available = SerializedAsset::with(['item.category', 'currentHolder'])
+            ->applyDataScope($user)
             ->whereHas('item', fn($q) => $q->where('tracking_type', 'asset'))
             ->where('status', 'Available')
             ->whereNull('current_holder_id')

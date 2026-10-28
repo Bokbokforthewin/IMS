@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('unit');
-            $table->string('division');
+            $table->string('unit')->index(); // Added index for fast unit scoping
+            $table->string('division')->index(); // Added index for fast division scoping
             $table->string('designation');
             $table->boolean('is_head')->nullable();
             $table->string('email')->unique();
