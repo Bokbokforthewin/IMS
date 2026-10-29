@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useDistribution, AssetStatusCell, ReceiptDistributeButtons, DistributionDialogs } from './DistributionControls';
 
 function money(n) {
   return `₱${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
@@ -127,6 +128,9 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
   useEffect(() => {
     fetchReceipts();
   }, [fetchReceipts, refreshKey]);
+
+  // Fetch distribution status for each receipt
+  const dist = useDistribution(fetchReceipts);
 
   // Reset to page 1 when search query changes
   useEffect(() => {
@@ -369,6 +373,8 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                               </span>
                             </div>
 
+                         <div className="flex flex-wrap items-center gap-2">
+                            <ReceiptDistributeButtons rcpt={rcpt} dist={dist} />
                             {/* Excel Download Button */}
                             <Button
                               size="sm"
@@ -380,6 +386,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                               <Download className="w-3.5 h-3.5" />
                               <span>Download Sheet</span>
                             </Button>
+                            </div>
                           </div>
 
                           {/* Desktop Layout: Table View (hidden on small screens) */}
@@ -391,6 +398,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                   <th className="py-2 px-3 font-medium">Property No. / SN</th>
                                   <th className="py-2 px-3 font-medium">End User</th>
                                   <th className="py-2 px-3 font-medium text-right">Unit Cost</th>
+                                  <th className="py-2 px-3 font-medium">Status</th>
                                   <th className="py-2 px-3 font-medium text-center w-[70px]">Tag</th>
                                 </tr>
                               </thead>
@@ -424,6 +432,8 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                         <td className="py-2 px-3 text-right font-mono">
                                           {money(primary.serialized_asset?.unit_cost)}
                                         </td>
+                                           <td className="py-2 px-3"><AssetStatusCell line={primary} rcpt={rcpt} dist={dist} />
+                                           </td>
                                         <td className="py-2 px-3 text-center">
                                           {primary.serialized_asset?.id && (
                                             <Button
@@ -468,6 +478,8 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                             <td className="py-1.5 px-3 text-right font-mono text-[11px]">
                                               {money(child.serialized_asset?.unit_cost)}
                                             </td>
+                                               <td className="py-1.5 px-3"><AssetStatusCell line={child} rcpt={rcpt} dist={dist} />
+                                               </td>
                                             <td className="py-1.5 px-3 text-center">
                                               {child.serialized_asset?.id && (
                                                 <Button
@@ -531,6 +543,8 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                     </span>
                                   </div>
 
+                                  <AssetStatusCell line={primary} rcpt={rcpt} dist={dist} />
+
                                   {/* Mobile Attached Peripherals */}
                                   {children.map((child) => {
                                     const childSecondaryHolder = getSecondaryReceiver(
@@ -552,6 +566,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                         <p className="text-[10px] text-muted-foreground">
                                           User: {childSecondaryHolder}
                                         </p>
+                                        <AssetStatusCell line={child} rcpt={rcpt} dist={dist} />
                                       </div>
                                     );
                                   })}
@@ -644,6 +659,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
           </div>
         )}
       </CardContent>
+      <DistributionDialogs dist={dist} />
     </Card>
   );
 }

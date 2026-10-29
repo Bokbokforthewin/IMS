@@ -25,6 +25,7 @@ return new class extends Migration
             $table->string('attached_to')->nullable();
             $table->enum('status', ['Available', 'Assigned', 'Distributed', 'Under Repair', 'Condemned'])->default('Available');
             $table->string('pre_repair_status')->nullable();
+            $table->string('revert_reason')->nullable();
             $table->text('condition_remarks')->nullable();
             $table->timestamps();
         });

@@ -18,6 +18,7 @@ use App\Http\Controllers\QuickReceiveController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\AssetDistributionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -209,10 +210,18 @@ Route::prefix('v1')
             Route::get('/accountability/receipts/{receipt}/download-excel', [AccountabilityController::class, 'downloadExcel']);
             Route::get('/accountability/serialized-assets/{serializedAsset}/download-tag-pdf', [AccountabilityController::class, 'downloadPropertyTagPdf']);
             Route::post('/accountability/bulk-tags-pdf', [AccountabilityController::class, 'bulkDownloadTags']);
-            Route::put('/inventory/serialized-assets/{serializedAsset}/status', [InventoryController::class, 'updateAssetStatus']);
+
+            Route::post('/accountability/receipts/{receipt}/distribute', [AssetDistributionController::class, 'distribute']);
+            Route::post('/accountability/serialized-assets/{serializedAsset}/request-revert', [AssetDistributionController::class, 'requestRevert']);
 
             Route::get('/asset-transfers', [AssetTransferController::class, 'index']);
             Route::post('/asset-transfers', [AssetTransferController::class, 'store']);
+        });
+
+        Route::middleware('permission:action:manage asset status')->group(function () {
+            Route::post('/accountability/serialized-assets/{serializedAsset}/revert-distribution', [AssetDistributionController::class, 'revert']);
+            Route::post('/accountability/serialized-assets/{serializedAsset}/decline-revert', [AssetDistributionController::class, 'declineRevert']);
+            Route::put('inventory/serialized-assets/{serializedAsset}/status', [AccountabilityController::class, 'updateAssetStatus']);
         });
 
         /*

@@ -59,6 +59,7 @@ const PERMISSION_LABEL_MAP = {
   // Actions & Admin
   "action:manage users": { title: "Manage Users", desc: "Create, edit, or deactivate user accounts" },
   "action:manage roles": { title: "Manage Roles & Matrix", desc: "Configure role permissions and settings" },
+  "action:manage_asset_status": { title: "Manage PAR/ICS Status", desc: "This action is only available to ICTU users." },
   "action:create_custom_permission": { title: "Create Permissions", desc: "Add custom permissions to system" },
   "action:create_custom_role": { title: "Create Roles", desc: "Create new user roles" },
 };

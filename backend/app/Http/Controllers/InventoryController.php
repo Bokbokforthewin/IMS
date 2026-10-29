@@ -8,6 +8,7 @@ use App\Models\SerializedAsset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\JsonResponse;
 
 class InventoryController extends Controller
 {
@@ -491,35 +492,87 @@ class InventoryController extends Controller
         }
     }
 
-    public function updateAssetStatus(Request $request, SerializedAsset $serializedAsset)
+     public function updateAssetStatus(Request $request, SerializedAsset $serializedAsset): JsonResponse
     {
         $validated = $request->validate([
-            'status' => 'required|in:Available,Under Repair,Condemned',
+            'status' => 'required|in:Available,Assigned,Distributed,Under Repair,Condemned',
             'condition_remarks' => 'required_if:status,Under Repair,Condemned|nullable|string|max:1000',
         ]);
-
-        $currentStatus = $serializedAsset->status;
-        $newStatus = $validated['status'];
-
-        if ($currentStatus === 'Assigned' && $newStatus === 'Available') {
-            return response()->json([
-                'error' => 'This asset is currently assigned to someone. Use the Return/Transfer page to properly return it — that keeps the audit trail correct.'
-            ], 422);
-        }
-
-        try {
-            $serializedAsset->update([
-                'status' => $newStatus,
-                'condition_remarks' => $validated['condition_remarks'] ?? null,
+ 
+        return DB::transaction(function () use ($request, $serializedAsset, $validated) {
+            $asset = SerializedAsset::whereKey($serializedAsset->id)->lockForUpdate()->first();
+ 
+            $currentStatus = $asset->status;
+            $newStatus = $validated['status'];
+            $remarks = $validated['condition_remarks'] ?? null;
+ 
+            if ($currentStatus === 'Condemned') {
+                return response()->json([
+                    'error' => 'This asset is condemned and its status cannot be modified.',
+                ], 422);
+            }
+ 
+            if ($newStatus === $currentStatus) {
+                return response()->json([
+                    'error' => "Asset is already '{$currentStatus}'.",
+                ], 422);
+            }
+ 
+            if ($newStatus === 'Under Repair') {
+                // Remember where it came from so it can return to the same status
+                $changes = [
+                    'status' => 'Under Repair',
+                    'pre_repair_status' => $currentStatus,
+                    'condition_remarks' => $remarks,
+                ];
+                $message = 'Asset marked Under Repair.';
+            } elseif ($currentStatus === 'Under Repair') {
+                $allowedReturn = $asset->pre_repair_status ?? 'Available';
+ 
+                if ($newStatus !== $allowedReturn && $newStatus !== 'Condemned') {
+                    return response()->json([
+                        'error' => "This asset was under repair from '{$allowedReturn}' and can only return to '{$allowedReturn}', or be marked Condemned.",
+                    ], 422);
+                }
+ 
+                $changes = [
+                    'status' => $newStatus,
+                    'pre_repair_status' => null,
+                    'condition_remarks' => $newStatus === 'Condemned' ? $remarks : null,
+                ];
+                $message = $newStatus === 'Condemned'
+                    ? 'Asset marked Condemned.'
+                    : "Asset status updated to '{$newStatus}'.";
+            } elseif ($newStatus === 'Condemned') {
+                $changes = [
+                    'status' => 'Condemned',
+                    'pre_repair_status' => null,
+                    'condition_remarks' => $remarks,
+                ];
+                $message = 'Asset marked Condemned.';
+            } else {
+                return response()->json([
+                    'error' => "Cannot change status from '{$currentStatus}' to '{$newStatus}' directly. Use Return/Transfer for assigned or distributed items.",
+                ], 422);
+            }
+ 
+            $asset->update($changes);
+ 
+            DB::table('asset_status_histories')->insert([
+                'serialized_asset_id'       => $asset->id,
+                'accountability_receipt_id' => null,
+                'from_status'               => $currentStatus,
+                'to_status'                 => $newStatus,
+                'changed_by_id'             => $request->user()->id,
+                'reason'                    => $remarks,
+                'created_at'                => now(),
+                'updated_at'                => now(),
             ]);
-
+ 
             return response()->json([
-                'message' => "Asset status updated to '{$newStatus}'.",
-                'asset' => $serializedAsset->fresh(['item', 'currentHolder']),
+                'message' => $message,
+                'asset'   => $asset->fresh(['item', 'currentHolder']),
             ], 200);
-        } catch (\Exception $e) {
-            Log::error('Failed to update asset status: ' . $e->getMessage());
-            return response()->json(['error' => 'Failed to update asset status.'], 500);
-        }
+        });
     }
 }

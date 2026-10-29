@@ -25,6 +25,7 @@ class SerializedAsset extends Model
         'current_holder_id',
         'condition_remarks',
         'pre_repair_status',
+        'revert_reason',
     ];
 
     public function item(): BelongsTo

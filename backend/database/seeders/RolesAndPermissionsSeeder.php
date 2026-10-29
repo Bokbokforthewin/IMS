@@ -49,6 +49,7 @@ class RolesAndPermissionsSeeder extends Seeder
             // Admin actions
             'action:manage users',
             'action:manage roles',
+            'action:manage asset status',
             'action:create_custom_permission',
             'action:create_custom_role',
         ];

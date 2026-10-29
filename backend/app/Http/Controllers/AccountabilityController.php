@@ -251,78 +251,80 @@ class AccountabilityController extends Controller
     /**
      * Update asset lifecycle status (Available, Assigned, Under Repair, Condemned).
      */
-    public function updateAssetStatus(Request $request, SerializedAsset $serializedAsset): JsonResponse
+     public function updateAssetStatus(Request $request, SerializedAsset $serializedAsset): JsonResponse
     {
         $validated = $request->validate([
-            'status' => 'required|in:Available,Assigned,Under Repair,Condemned',
+            'status' => 'required|in:Available,Assigned,Distributed,Under Repair,Condemned',
             'condition_remarks' => 'required_if:status,Under Repair,Condemned|nullable|string|max:1000',
         ]);
-
-        $currentStatus = $serializedAsset->status;
-        $newStatus = $validated['status'];
-
-        if ($currentStatus === 'Condemned') {
-            return response()->json([
-                'error' => 'This asset is condemned and its status cannot be modified.'
-            ], 422);
-        }
-
-        if ($newStatus === 'Under Repair') {
-            if ($currentStatus === 'Under Repair') {
-                return response()->json(['error' => 'Asset is already Under Repair.'], 422);
-            }
-
-            $serializedAsset->update([
-                'status' => 'Under Repair',
-                'pre_repair_status' => $currentStatus,
-                'condition_remarks' => $validated['condition_remarks'] ?? null,
-            ]);
-
-            return response()->json([
-                'message' => 'Asset marked Under Repair.',
-                'asset' => $serializedAsset->fresh(['item', 'currentHolder']),
-            ], 200);
-        }
-
-        if ($currentStatus === 'Under Repair') {
-            $allowedReturn = $serializedAsset->pre_repair_status ?? 'Available';
-
-            if ($newStatus !== $allowedReturn && $newStatus !== 'Condemned') {
+ 
+        return DB::transaction(function () use ($request, $serializedAsset, $validated) {
+            $asset = SerializedAsset::whereKey($serializedAsset->id)->lockForUpdate()->first();
+ 
+            $currentStatus = $asset->status;
+            $newStatus = $validated['status'];
+            $remarks = $validated['condition_remarks'] ?? null;
+ 
+            if ($currentStatus === 'Condemned') {
                 return response()->json([
-                    'error' => "This asset was under repair from '{$allowedReturn}' and can only return to '{$allowedReturn}', or be marked Condemned."
+                    'error' => 'This asset is condemned and its status cannot be modified.',
                 ], 422);
             }
-
-            $serializedAsset->update([
-                'status' => $newStatus,
-                'pre_repair_status' => null,
-                'condition_remarks' => $newStatus === 'Condemned' ? ($validated['condition_remarks'] ?? null) : null,
-            ]);
-
+ 
+            if ($newStatus === $currentStatus) {
+                return response()->json([
+                    'error' => "Asset is already '{$currentStatus}'.",
+                ], 422);
+            }
+ 
+            if ($newStatus === 'Under Repair') {
+                // Remember where it came from so it can return to the same status
+                $changes = [
+                    'status' => 'Under Repair',
+                    'pre_repair_status' => $currentStatus,
+                    'condition_remarks' => $remarks,
+                    'revert_reason' => null,
+                ];
+                $message = 'Asset marked Under Repair.';
+            } elseif ($currentStatus === 'Under Repair') {
+                $allowedReturn = $asset->pre_repair_status ?? 'Available';
+ 
+                if ($newStatus !== $allowedReturn && $newStatus !== 'Condemned') {
+                    return response()->json([
+                        'error' => "This asset was under repair from '{$allowedReturn}' and can only return to '{$allowedReturn}', or be marked Condemned.",
+                    ], 422);
+                }
+ 
+                $changes = [
+                    'status' => $newStatus,
+                    'pre_repair_status' => null,
+                    'condition_remarks' => $newStatus === 'Condemned' ? $remarks : null,
+                ];
+                $message = $newStatus === 'Condemned'
+                    ? 'Asset marked Condemned.'
+                    : "Asset status updated to '{$newStatus}'.";
+            } elseif ($newStatus === 'Condemned') {
+                $changes = [
+                    'status' => 'Condemned',
+                    'pre_repair_status' => null,
+                    'condition_remarks' => $remarks,
+                    'revert_reason' => null,
+                ];
+                $message = 'Asset marked Condemned.';
+            } else {
+                return response()->json([
+                    'error' => "Cannot change status from '{$currentStatus}' to '{$newStatus}' directly. Use Return/Transfer for assigned or distributed items.",
+                ], 422);
+            }
+ 
+            $asset->update($changes);
+ 
             return response()->json([
-                'message' => "Asset status updated to '{$newStatus}'.",
-                'asset' => $serializedAsset->fresh(['item', 'currentHolder']),
+                'message' => $message,
+                'asset'   => $asset->fresh(['item', 'currentHolder']),
             ], 200);
-        }
-
-        if ($newStatus === 'Condemned') {
-            $serializedAsset->update([
-                'status' => 'Condemned',
-                'pre_repair_status' => null,
-                'condition_remarks' => $validated['condition_remarks'] ?? null,
-            ]);
-
-            return response()->json([
-                'message' => 'Asset marked Condemned.',
-                'asset' => $serializedAsset->fresh(['item', 'currentHolder']),
-            ], 200);
-        }
-
-        return response()->json([
-            'error' => "Cannot change status from '{$currentStatus}' to '{$newStatus}' directly. Use Return/Transfer for assigned assets."
-        ], 422);
+        });
     }
-
     /**
      * Download receipt as an Excel workbook (secured by data scoping).
      */

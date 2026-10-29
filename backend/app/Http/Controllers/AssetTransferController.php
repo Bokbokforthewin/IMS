@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Log;
 
 class AssetTransferController extends Controller
 {
+    // Must match the permission name in the seeder exactly.
+    private const ICTU_PERMISSION = 'action:manage asset status';
+
     public function index(Request $request)
     {
         try {
@@ -33,6 +36,12 @@ class AssetTransferController extends Controller
 
     public function store(Request $request)
     {
+        // Returns and transfers change who is accountable for an item, so ICTU records them
+        // (the MR requests, ICTU processes). Remove this block if MRs should file them directly.
+        if (!$request->user()->can(self::ICTU_PERMISSION)) {
+            return response()->json(['error' => 'Only ICTU can process transfers and returns.'], 403);
+        }
+
         $validatedData = $request->validate([
             'serialized_asset_id' => 'required|exists:serialized_assets,id',
             'transfer_type'       => 'required|in:RETURN,TRANSFER',
@@ -54,6 +63,14 @@ class AssetTransferController extends Controller
                 $asset = SerializedAsset::where('id', $validatedData['serialized_asset_id'])
                     ->lockForUpdate()
                     ->firstOrFail();
+
+                // Only items that are out with someone can be transferred or returned.
+                // (Without this, a Condemned item could be "transferred" back to Assigned.)
+                if (!in_array($asset->status, ['Assigned', 'Distributed'], true)) {
+                    return response()->json([
+                        'error' => "Only Assigned or Distributed items can be transferred or returned (this item is {$asset->status}).",
+                    ], 422);
+                }
 
                 $lastRecord = AssetTransfer::where('transfer_type', $validatedData['transfer_type'])
                     ->whereYear('transfer_date', $year)
@@ -82,16 +99,19 @@ class AssetTransferController extends Controller
                     'remarks'             => $validatedData['remarks'] ?? null,
                 ]);
 
-                // Update asset status AND assign the new holder ID
                 if ($validatedData['transfer_type'] === 'RETURN') {
+                    // Back in the ICTU office: no holder. ICTU can then mark it
+                    // Under Repair or Condemned from the status action.
                     $asset->update([
                         'status'            => 'Available',
-                        'current_holder_id' => null, // Returned back to inventory
+                        'current_holder_id' => null,
+                        'revert_reason'     => null, // clear any pending revert request
                     ]);
                 } else {
+                    // A transfer only changes the holder. Assigned stays Assigned and
+                    // Distributed stays Distributed, so it can never undo a distribution.
                     $asset->update([
-                        'status'            => 'Assigned',
-                        'current_holder_id' => $validatedData['transfered_to'], // Reassigned
+                        'current_holder_id' => $validatedData['transfered_to'],
                     ]);
                 }
 
