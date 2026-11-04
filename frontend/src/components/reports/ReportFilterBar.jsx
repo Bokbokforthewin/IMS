@@ -28,12 +28,12 @@ export default function ReportFilterBar({ filters, setFilters, onApply, loading 
       </div>
 
       <div className="flex flex-wrap items-end gap-3.5">
-        {/* Scope Selector */}
+        {/* Scope Selector: Defaults to "both" (All Records) */}
         <div className="space-y-1.5 flex-1 min-w-[160px] sm:min-w-[180px] lg:min-w-[200px] xl:min-w-[220px]">
           <label className="text-xs font-medium text-muted-foreground">Report Scope</label>
           <Select
-            value={filters.report_type}
-            onValueChange={(val) => setFilters((f) => ({ ...f, report_type: val }))} className="w-full"
+            value={filters.report_type || "both"}
+            onValueChange={(val) => setFilters((f) => ({ ...f, report_type: val }))}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select Scope" />
@@ -46,12 +46,12 @@ export default function ReportFilterBar({ filters, setFilters, onApply, loading 
           </Select>
         </div>
 
-        {/* Filter Mode */}
+        {/* Filter Mode: Defaults to "year" (By Year) */}
         <div className="space-y-1.5 flex-1 min-w-[160px] sm:min-w-[180px] lg:min-w-[200px] xl:min-w-[220px]">
           <label className="text-xs font-medium text-muted-foreground">Time Horizon</label>
           <Select
-            value={filters.filter_mode}
-            onValueChange={(val) => setFilters((f) => ({ ...f, filter_mode: val }))} className="w-full"
+            value={filters.filter_mode || "year"}
+            onValueChange={(val) => setFilters((f) => ({ ...f, filter_mode: val }))}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select Mode" />
@@ -66,12 +66,12 @@ export default function ReportFilterBar({ filters, setFilters, onApply, loading 
         </div>
 
         {/* Single Year Dropdown */}
-        {filters.filter_mode === "year" && (
+        {(filters.filter_mode || "year") === "year" && (
           <div className="space-y-1.5 w-full sm:w-[130px] lg:w-[140px] xl:w-[150px]">
             <label className="text-xs font-medium text-muted-foreground">Year</label>
             <Select
-              value={String(filters.year)}
-              onValueChange={(val) => setFilters((f) => ({ ...f, year: Number(val) }))} className="w-full"
+              value={String(filters.year || currentYear)}
+              onValueChange={(val) => setFilters((f) => ({ ...f, year: Number(val) }))}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Year" />
@@ -91,8 +91,8 @@ export default function ReportFilterBar({ filters, setFilters, onApply, loading 
             <div className="space-y-1.5 w-full sm:w-[120px] lg:w-[130px] xl:w-[140px]">
               <label className="text-xs font-medium text-muted-foreground">Year</label>
               <Select
-                value={String(filters.year)}
-                onValueChange={(val) => setFilters((f) => ({ ...f, year: Number(val) }))} className="w-full"
+                value={String(filters.year || currentYear)}
+                onValueChange={(val) => setFilters((f) => ({ ...f, year: Number(val) }))}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Year" />
@@ -105,8 +105,8 @@ export default function ReportFilterBar({ filters, setFilters, onApply, loading 
             <div className="space-y-1.5 w-full sm:w-[150px] lg:w-[160px] xl:w-[170px]">
               <label className="text-xs font-medium text-muted-foreground">Month</label>
               <Select
-                value={String(filters.month)}
-                onValueChange={(val) => setFilters((f) => ({ ...f, month: Number(val) }))} className="w-full"
+                value={String(filters.month || 1)}
+                onValueChange={(val) => setFilters((f) => ({ ...f, month: Number(val) }))}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Month" />
@@ -149,7 +149,8 @@ export default function ReportFilterBar({ filters, setFilters, onApply, loading 
               <Input
                 type="date"
                 value={filters.start_date || ""}
-                onChange={(e) => setFilters((f) => ({ ...f, start_date: e.target.value }))} className="w-full"
+                onChange={(e) => setFilters((f) => ({ ...f, start_date: e.target.value }))}
+                className="w-full"
               />
             </div>
             <div className="space-y-1.5 flex-1 min-w-[150px] sm:min-w-[180px] lg:min-w-[210px] xl:min-w-[240px]">
@@ -157,7 +158,8 @@ export default function ReportFilterBar({ filters, setFilters, onApply, loading 
               <Input
                 type="date"
                 value={filters.end_date || ""}
-                onChange={(e) => setFilters((f) => ({ ...f, end_date: e.target.value }))} className="w-full"
+                onChange={(e) => setFilters((f) => ({ ...f, end_date: e.target.value }))}
+                className="w-full"
               />
             </div>
           </>

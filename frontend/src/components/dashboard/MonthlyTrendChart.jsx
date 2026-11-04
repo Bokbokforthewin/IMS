@@ -19,6 +19,16 @@ function formatCurrency(v) {
 }
 
 export default function MonthlyTrendChart({ data }) {
+  const summary = data.reduce(
+    (totals, month) => ({
+      assetValue: totals.assetValue + Number(month.asset_value || 0),
+      consumableValue: totals.consumableValue + Number(month.consumable_value || 0),
+      issuances: totals.issuances + Number(month.issuances || 0),
+      receipts: totals.receipts + Number(month.receipts || 0),
+    }),
+    { assetValue: 0, consumableValue: 0, issuances: 0, receipts: 0 }
+  );
+
   return (
     <Card className="border-border/60 shadow-none hover:border-border transition-colors">
       <CardHeader className="p-3.5 pb-2 flex flex-row items-center justify-between space-y-0">
@@ -85,6 +95,21 @@ export default function MonthlyTrendChart({ data }) {
             />
           </AreaChart>
         </ChartContainer>
+
+        <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-border/40 pt-5 text-[11px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-muted-foreground">Assets received</span>
+            <span className="shrink-0 font-medium tabular-nums text-foreground">
+              {formatCurrency(summary.assetValue)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-muted-foreground">Consumables received</span>
+            <span className="shrink-0 font-medium tabular-nums text-foreground">
+              {formatCurrency(summary.consumableValue)}
+            </span>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

@@ -6,6 +6,12 @@ const api = axios.create({ baseURL: '/api' });
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  // If the payload is FormData, let Axios/Browser handle the Content-Type boundary automatically
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+
   return config;
 });
 

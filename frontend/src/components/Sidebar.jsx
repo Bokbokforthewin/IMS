@@ -14,6 +14,8 @@ import {
   Baby,
   ReceiptText,
   ShieldCogCorner,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 import {
@@ -39,6 +41,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+
+import { Switch } from "@/components/ui/switch";
 
 const rawMenuItems = [
   {
@@ -154,7 +158,7 @@ function SidebarCollapseButton() {
         toggleSidebar();
       }}
       aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-      className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+      className="flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
     >
       {isCollapsed ? (
         <PanelLeftOpen className="size-4" />
@@ -175,12 +179,26 @@ export default function Sidebar({
   const [openMenus, setOpenMenus] = useState({});
   const [appConfig, setAppConfig] = useState(propConfig || null);
 
+  // Night Mode State synced with document class and localStorage
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return document.documentElement.classList.contains("dark") ||
+      localStorage.getItem("theme") === "dark";
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+  }, [isDarkMode]);
+
   const simplified = settings?.simplified_encoding_workflow;
 
-  // Filter menu hierarchy dynamically
   const filteredMenuItems = rawMenuItems
     .filter((item) => {
-      // System setting check for simplified workflow
       if (simplified && (item.id === "catalog" || item.id === "receive")) return false;
       if (!simplified && item.id === "quick-receive") return false;
       return true;
@@ -191,7 +209,6 @@ export default function Sidebar({
         (subItem) => !subItem.permission || hasPermission(subItem.permission)
       );
 
-      // Parent is allowed if page permission is granted OR at least one component widget is accessible
       if (hasParentPerm || allowedSubItems.length > 0) {
         return {
           ...item,
@@ -232,8 +249,9 @@ export default function Sidebar({
   };
 
   return (
-    <ShadcnSidebar collapsible="icon" variant="sidebar" className="border-r text-left">
-      <SidebarHeader className="flex h-14 items-center justify-between border-b px-3 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+    <ShadcnSidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground text-left">
+      {/* Header */}
+      <SidebarHeader className="flex h-14 items-center justify-between border-b border-sidebar-border px-3 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
         <div className="flex w-full items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
           <div className="flex items-center gap-2.5 overflow-hidden text-left group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0">
             <button
@@ -249,7 +267,7 @@ export default function Sidebar({
               <span className="truncate font-semibold text-sidebar-foreground">
                 {appConfig?.name || "Inventory System"}
               </span>
-              <span className="truncate text-xs text-muted-foreground">
+              <span className="truncate text-xs text-sidebar-muted-foreground">
                 {appConfig?.organization || "DOH NIR CHD"}
               </span>
             </div>
@@ -261,9 +279,10 @@ export default function Sidebar({
         </div>
       </SidebarHeader>
 
+      {/* Content */}
       <SidebarContent className="text-left">
         <SidebarGroup className="text-left">
-          <SidebarGroupLabel className="text-left text-xs font-medium text-muted-foreground">
+          <SidebarGroupLabel className="text-left text-xs font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
             Inventory Management
           </SidebarGroupLabel>
 
@@ -286,7 +305,7 @@ export default function Sidebar({
                         <SidebarMenuButton
                           tooltip={item.label}
                           isActive={isParentActive}
-                          className="h-9 w-full justify-start text-left"
+                          className="h-9 w-full justify-start text-left text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                           onClick={() => {
                             if (item.subItems?.length) {
                               setActiveTab(item.subItems[0].id);
@@ -295,20 +314,20 @@ export default function Sidebar({
                             }
                           }}
                         >
-                          <Icon className="size-4 shrink-0" />
+                          <Icon className="size-4 shrink-0 text-sidebar-foreground" />
                           <span className="flex-1 truncate text-left">
                             {item.label}
                           </span>
 
                           {item.subItems?.length > 0 && (
-                            <ChevronRight className="ml-auto size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                            <ChevronRight className="ml-auto size-4 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 text-sidebar-muted-foreground" />
                           )}
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
 
                       {item.subItems?.length > 0 && (
                         <CollapsibleContent>
-                          <SidebarMenuSub className="my-1 ml-3.5 border-l pl-2.5 text-left">
+                          <SidebarMenuSub className="my-1 ml-3.5 border-l border-sidebar-border pl-2.5 text-left">
                             {item.subItems.map((subItem) => {
                               const isActive = activeTab === subItem.id;
 
@@ -316,7 +335,7 @@ export default function Sidebar({
                                 <SidebarMenuSubItem key={subItem.id} className="text-left">
                                   <SidebarMenuSubButton
                                     isActive={isActive}
-                                    className="h-8 w-full justify-start text-left"
+                                    className="h-8 w-full justify-start text-left text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground"
                                     onClick={() => setActiveTab(subItem.id)}
                                   >
                                     <span className="truncate text-left">
@@ -338,15 +357,33 @@ export default function Sidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t p-2 text-left">
+      {/* Footer */}
+      <SidebarFooter className="border-t border-sidebar-border p-2 space-y-2 text-left">
+        {/* Night Mode Switch Toggle */}
+        <div className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-sidebar-accent/50 transition-colors group-data-[collapsible=icon]:justify-center">
+          <div className="flex items-center gap-2.5 group-data-[collapsible=icon]:hidden">
+            {isDarkMode ? (
+              <Moon className="size-4 shrink-0 text-sidebar-muted-foreground" />
+            ) : (
+              <Sun className="size-4 shrink-0 text-sidebar-muted-foreground" />
+            )}
+            <span className="text-xs font-medium text-sidebar-foreground">Night Mode</span>
+          </div>
+          <Switch
+            checked={isDarkMode}
+            onCheckedChange={setIsDarkMode}
+            aria-label="Toggle night mode"
+          />
+        </div>
+
         <SidebarMenu className="text-left">
           <SidebarMenuItem className="text-left">
             <SidebarMenuButton
               size="lg"
               tooltip={appConfig?.organization || "Organization"}
-              className="w-full justify-start text-left"
+              className="w-full justify-start text-left hover:bg-sidebar-accent"
             >
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sidebar-foreground">
                 <Boxes className="size-4" />
               </div>
 
@@ -354,7 +391,7 @@ export default function Sidebar({
                 <span className="truncate font-semibold text-sidebar-foreground">
                   {appConfig?.region || "DOH NIR CHD"}
                 </span>
-                <span className="truncate text-[11px] text-muted-foreground">
+                <span className="truncate text-[11px] text-sidebar-muted-foreground">
                   ICT Unit Systems
                 </span>
               </div>

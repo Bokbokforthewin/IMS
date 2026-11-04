@@ -20,7 +20,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardFooter,
 } from '@/components/ui/card';
 
@@ -101,12 +100,20 @@ export default function CartReview({
     }).finally(() => setSubmitting(false));
   };
 
-  const renderGroup = (items, label, badgeVariant) => {
+  const renderGroup = (items, label, isPar) => {
     if (items.length === 0) return null;
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <Badge variant={badgeVariant}>{label}</Badge>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider border ${
+              isPar
+                ? 'bg-info-soft text-info-text border-info-border'
+                : 'bg-secondary text-secondary-foreground border-border'
+            }`}
+          >
+            {label}
+          </span>
           <span className="text-xs text-muted-foreground">
             {items.length} item(s) — printed on receipt
           </span>
@@ -124,11 +131,13 @@ export default function CartReview({
           return (
             <div
               key={itemKey}
-              className="flex flex-col sm:flex-row sm:items-center justify-between rounded-md border p-3 text-sm gap-3 bg-card"
+              className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border border-border p-3 text-xs gap-3 bg-card"
             >
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{item.name || item.item?.name || 'Serialized Asset'}</span>
+                  <span className="font-semibold text-foreground text-sm">
+                    {item.name || item.item?.name || 'Serialized Asset'}
+                  </span>
                   {item.property_number && (
                     <span className="text-xs text-muted-foreground font-mono">
                       ({item.property_number})
@@ -137,7 +146,7 @@ export default function CartReview({
                 </div>
 
                 {/* Secondary Receiver Assignment */}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs pt-0.5">
                   <span className="text-muted-foreground flex items-center gap-1 font-medium">
                     <UserCheck className="h-3.5 w-3.5 text-primary shrink-0" />
                     End User:
@@ -156,7 +165,7 @@ export default function CartReview({
               </div>
 
               <div className="self-end sm:self-center text-right shrink-0">
-                <span className="font-mono font-semibold text-foreground">
+                <span className="font-mono font-semibold text-foreground text-sm">
                   ₱{getCost(item).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>
               </div>
@@ -168,54 +177,52 @@ export default function CartReview({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6">
-      {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5 text-primary" />
-            Confirm Receiver Assignments
-          </h2>
-        </div>
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
+      {/* Task Header Bar */}
+      <div className="flex items-center gap-2 border-b border-border pb-3">
+        <ShoppingCart className="h-4 w-4 text-primary" />
+        <h3 className="text-xs font-semibold tracking-wider uppercase text-muted-foreground">
+          Confirm Receiver Assignments & Review Issuance
+        </h3>
       </div>
 
       {/* Primary Signatories & Issuance Summary */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">
+      <Card className="rounded-lg border border-border bg-card shadow-2xs">
+        <CardHeader className="border-b border-border py-3 px-4 sm:px-6">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
             Signatories & Overview
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm pt-2 border-t">
+        <CardContent className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
           {/* Primary Receiver */}
-          <div className="flex items-start gap-2.5 p-2 rounded-md bg-muted/20 border border-muted">
+          <div className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/30 border border-border">
             <User className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <div>
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Issued To
               </p>
-              <p className="font-semibold text-foreground">
+              <p className="font-semibold text-foreground text-sm">
                 {deliveryDetails?.primaryReceiverUser?.name ||
                   deliveryDetails?.recipientUser?.name ||
                   'N/A'}
               </p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground mt-0.5">
                 Accountable official signing the PAR/ICS receipt.
               </p>
             </div>
           </div>
 
           {/* Issued By / Sender */}
-          <div className="flex items-start gap-2.5 p-2 rounded-md bg-muted/20 border border-muted">
+          <div className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/30 border border-border">
             <ShieldCheck className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <div>
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Issued By
               </p>
-              <p className="font-semibold text-foreground">
+              <p className="font-semibold text-foreground text-sm">
                 {deliveryDetails?.issuerUser?.name || 'N/A'}
               </p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground mt-0.5">
                 Property Officer issuing the items.
               </p>
             </div>
@@ -225,7 +232,7 @@ export default function CartReview({
           <div className="flex items-start gap-2.5">
             <CalendarIcon className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs text-muted-foreground">Date Issued</p>
+              <p className="text-[11px] text-muted-foreground">Date Issued</p>
               <p className="font-medium text-foreground">{deliveryDetails?.dateIssued || 'N/A'}</p>
             </div>
           </div>
@@ -235,7 +242,7 @@ export default function CartReview({
             <div className="flex items-start gap-2.5">
               <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
               <div>
-                <p className="text-xs text-muted-foreground">Remarks / Purpose</p>
+                <p className="text-[11px] text-muted-foreground">Remarks / Purpose</p>
                 <p className="font-medium text-foreground">{deliveryDetails.remarks}</p>
               </div>
             </div>
@@ -244,33 +251,33 @@ export default function CartReview({
       </Card>
 
       {/* Items & Document Categorization */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">
+      <Card className="rounded-lg border border-border bg-card shadow-2xs">
+        <CardHeader className="border-b border-border py-3 px-4 sm:px-6">
+          <CardTitle className="text-sm font-semibold text-foreground">
             Items & End User Allocation
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-5">
-          {renderGroup(parItems, 'PAR (≥ ₱50,000)', 'default')}
-          {renderGroup(icsItems, 'ICS (< ₱50,000)', 'secondary')}
+        <CardContent className="p-4 sm:p-5 space-y-5">
+          {renderGroup(parItems, 'PAR', true)}
+          {renderGroup(icsItems, 'ICS', false)}
         </CardContent>
       </Card>
 
       {/* Totals & Confirm Actions */}
-      <Card className="bg-muted/30 border-muted">
-        <CardContent className="p-4 sm:p-6 space-y-4">
-          <div className="flex items-center justify-between border-b pb-3">
-            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+      <Card className="rounded-lg border border-border bg-muted/30 shadow-2xs overflow-hidden">
+        <CardContent className="p-4 sm:p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Total Estimated Value
             </span>
-            <span className="text-2xl font-bold font-mono text-primary">
+            <span className="text-xl sm:text-2xl font-bold font-mono text-primary">
               ₱{total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
           </div>
 
           {parItems.length > 0 && icsItems.length > 0 && (
-            <div className="flex items-start gap-2.5 text-xs text-muted-foreground bg-background p-3 rounded-lg border">
-              <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2.5 text-xs text-muted-foreground bg-card p-3 rounded-lg border border-border">
+              <Info className="h-4 w-4 text-info shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-foreground mb-0.5">
                   Two separate receipts will be generated
@@ -282,27 +289,29 @@ export default function CartReview({
           )}
         </CardContent>
 
-        <CardFooter className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 bg-muted/50 px-6 py-4 border-t">
+        <CardFooter className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 bg-muted/40 px-4 sm:px-6 py-3 border-t border-border">
           <Button
             variant="outline"
+            size="sm"
             onClick={onBack}
             disabled={submitting}
-            className="w-full sm:w-auto gap-2"
+            className="w-full sm:w-auto gap-2 text-xs h-8"
           >
-            <ArrowLeft className="h-4 w-4" /> Back to Edit
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Edit
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={submitting}
-            className="w-full sm:w-auto gap-2 font-medium"
+            size="sm"
+            className="w-full sm:w-auto gap-2 text-xs h-8"
           >
             {submitting ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Processing Issuance...
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Processing Issuance...
               </>
             ) : (
               <>
-                <CheckCircle2 className="h-4 w-4" /> Confirm & Generate Receipt
+                <CheckCircle2 className="h-3.5 w-3.5" /> Confirm & Generate Receipt
                 {parItems.length > 0 && icsItems.length > 0 ? 's' : ''}
               </>
             )}

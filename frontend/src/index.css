@@ -1,270 +1,347 @@
-/* src/index.css */
+/* ==========================================================================
+   src/index.css  -  design tokens for the whole system
+
+   ONE place for color, type, radius and shadow. Change a value here and every
+   page follows. Components should use the Tailwind utilities that map to these
+   tokens (bg-primary, text-muted-foreground, bg-success-soft, rounded-lg, ...)
+   and never hard-code a hex or a Tailwind palette color (bg-blue-50, etc.).
+
+   Layers:
+     1. Palette      the few raw brand + status colors
+     2. Semantic     what each color MEANS (background, card, border, ...)
+     3. Derived      tints computed from the status colors
+     4. Dark theme   ready, but not switched on until the app adds a toggle
+     5. Tailwind     exposes the tokens as utilities (@theme inline)
+     6. Base         global element defaults
+   ========================================================================== */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+
+/* Barlow ships as static weights (no variable build), so import each weight used. */
+@import "@fontsource/barlow/400.css";
+@import "@fontsource/barlow/500.css";
+@import "@fontsource/barlow/600.css";
+@import "@fontsource/barlow/700.css";
 
 @custom-variant dark (&:is(.dark *));
 
+
+/* ==========================================================================
+   1 + 2.  PALETTE and SEMANTIC TOKENS  (light theme)
+   ========================================================================== */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #ffffff;
-  --border: oklch(0.922 0 0);
-  --code-bg: #f4f3ec;
-  --accent: oklch(0.97 0 0);
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-  --color-navy: #1f2a45;
+  color-scheme: light;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* ---- 1. Palette -------------------------------------------------------- */
+  --brand-primary: #1F2A45;   /* navy: sidebar, header, primary buttons        */
+  --brand-ink:     #333333;   /* text color                                    */
+  --brand-canvas:  #ffffff;   /* page background (cards stay white)            */
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --status-red:    #AD0F0A;   /* danger / errors / condemned                   */
+  --status-gold:   #FFD700;   /* warning / needs attention                     */
+  --status-blue:   #0B4BAA;   /* information / links / focus                   */
+  --status-green:  #16784B;   /* success (emerald, 5.5:1 with white text)      */
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  /* ---- 2. Semantic: surfaces and text ------------------------------------ */
+  --background: var(--brand-canvas);
+  --foreground: var(--brand-ink);
 
-  --background: oklch(1 0 0);
+  --card: #FFFFFF;
+  --card-foreground: var(--brand-ink);
+  --popover: #FFFFFF;
+  --popover-foreground: var(--brand-ink);
 
-  --foreground: oklch(0.145 0 0);
+  --primary: var(--brand-primary);
+  --primary-foreground: #FFFFFF;
 
-  --card: oklch(1 0 0);
+  --secondary: #E4F0EB;               /* quiet fill: secondary buttons, tags    */
+  --secondary-foreground: var(--brand-ink);
 
-  --card-foreground: oklch(0.145 0 0);
+  --muted: #F2F7F5;                   /* table headers, zebra rows, wells       */
+  --muted-foreground: #566560;        /* helper text, 5.7:1 on the page bg      */
 
-  --popover: oklch(1 0 0);
+  --accent: #E4F0EB;                  /* hover fill for menu items, ghost btns  */
+  --accent-foreground: var(--brand-ink);
 
-  --popover-foreground: oklch(0.145 0 0);
+  /* ---- 2. Semantic: lines and focus -------------------------------------- */
+  --border: #D4E3DD;                  /* card and divider lines (soft)          */
+  --input: #7F948B;                   /* form control outline, 3:1 on white     */
+  --ring: var(--status-blue);         /* keyboard focus                         */
 
-  --primary: oklch(0.205 0 0);
+  /* ---- 2. Semantic: status ----------------------------------------------- */
+  /* Each status has a solid color (+ text on it) and a readable text color.
+     The tinted "-soft" and "-border" versions come from section 3. */
+  --destructive: var(--status-red);
+  --destructive-foreground: #FFFFFF;
+  --destructive-text: var(--status-red);
 
-  --primary-foreground: oklch(0.985 0 0);
+  --warning: var(--status-gold);
+  --warning-foreground: var(--brand-primary);  /* navy on gold, 10:1            */
+  --warning-text: #735800;                     /* gold is too light for text    */
 
-  --secondary: oklch(0.97 0 0);
+  --success: var(--status-green);
+  --success-foreground: #FFFFFF;
+  --success-text: #0F6A42;
 
-  --secondary-foreground: oklch(0.205 0 0);
+  --info: var(--status-blue);
+  --info-foreground: #FFFFFF;
+  --info-text: var(--status-blue);
 
-  --muted: oklch(0.97 0 0);
+  /* ---- 2. Semantic: app chrome ------------------------------------------- */
+  --sidebar: var(--brand-primary);
+  --sidebar-foreground: #E6EAF2;
+  --sidebar-muted-foreground: #AEB9D0;         /* group labels, small captions  */
+  --sidebar-primary: #FFFFFF;
+  --sidebar-primary-foreground: var(--brand-primary);
+  --sidebar-accent: #2D3B5E;                   /* hover and active item         */
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #34425F;
+  --sidebar-ring: #8DB4F5;
 
-  --muted-foreground: oklch(0.556 0 0);
+  --header: var(--brand-primary);
+  --header-foreground: #FFFFFF;
+  --header-border: #34425F;
 
-  --accent-foreground: oklch(0.205 0 0);
+  /* ---- Charts (categorical; red is left out because it means "bad") ------ */
+  --chart-1: #0B4BAA;
+  --chart-2: #16784B;
+  --chart-3: #B37700;
+  --chart-4: #6D5BD0;
+  --chart-5: #5B6577;
 
-  --destructive: oklch(0.577 0.245 27.325);
+  /* ---- Radius: the base of the whole scale (see section 5) --------------- */
+  --radius: 0.5rem;
 
-  --input: oklch(0.922 0 0);
+  /* How strong the status tints are (section 3) */
+  --tint-soft: 12%;
+  --tint-border: 30%;
 
-  --ring: oklch(0.708 0 0);
-
-  --chart-1: oklch(0.87 0 0);
-
-  --chart-2: oklch(0.556 0 0);
-
-  --chart-3: oklch(0.439 0 0);
-
-  --chart-4: oklch(0.371 0 0);
-
-  --chart-5: oklch(0.269 0 0);
-
-  --radius: 0.625rem;
-
-  --sidebar: oklch(0.985 0 0);
-
-  --sidebar-foreground: oklch(0.145 0 0);
-
-  --sidebar-primary: oklch(0.205 0 0);
-
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-
-  --sidebar-accent: oklch(0.97 0 0);
-
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-
-  --sidebar-border: oklch(0.922 0 0);
-
-  --sidebar-ring: oklch(0.708 0 0)
+  /* ---- Legacy aliases: delete once nothing references them --------------- */
+  --color-navy: var(--brand-primary);
+  --sans: var(--font-sans);
+  --heading: var(--font-heading);
+  --mono: var(--font-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
+/* ==========================================================================
+   3.  DERIVED TOKENS
+   Computed from the status colors so a changed color updates its tints too.
+   Declared for :root AND .dark so they recompute under either theme.
+   ========================================================================== */
+:root,
+.dark {
+  --destructive-soft:   color-mix(in oklab, var(--destructive) var(--tint-soft), var(--card));
+  --destructive-border: color-mix(in oklab, var(--destructive) var(--tint-border), var(--card));
 
-body {
-  margin: 0;
-  background-color: #ffffff;
+  --warning-soft:       color-mix(in oklab, var(--warning) var(--tint-soft), var(--card));
+  --warning-border:     color-mix(in oklab, var(--warning) var(--tint-border), var(--card));
+
+  --success-soft:       color-mix(in oklab, var(--success) var(--tint-soft), var(--card));
+  --success-border:     color-mix(in oklab, var(--success) var(--tint-border), var(--card));
+
+  --info-soft:          color-mix(in oklab, var(--info) var(--tint-soft), var(--card));
+  --info-border:        color-mix(in oklab, var(--info) var(--tint-border), var(--card));
 }
 
-#root {
-  width: 100vw;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+
+/* ==========================================================================
+   4.  DARK THEME  (prepared; nothing switches it on yet)
+   Add the class "dark" to <html> from a toggle to enable it.
+   ========================================================================== */
+.dark {
+  color-scheme: dark;
+
+  --background: #0F1626;
+  --foreground: #E6EAF2;
+
+  --card: #172036;
+  --card-foreground: #E6EAF2;
+  --popover: #172036;
+  --popover-foreground: #E6EAF2;
+
+  --primary: #DCE4F5;
+  --primary-foreground: #1F2A45;
+
+  --secondary: #212B45;
+  --secondary-foreground: #E6EAF2;
+  --muted: #1B2540;
+  --muted-foreground: #A3AEC4;
+  --accent: #25304D;
+  --accent-foreground: #E6EAF2;
+
+  --border: #2A3553;
+  --input: #6B7A9B;
+  --ring: #7FA6E8;
+
+  --destructive: #FF8A83;
+  --destructive-foreground: #0F1626;
+  --destructive-text: #FF8A83;
+  --warning: #FFD700;
+  --warning-foreground: #0F1626;
+  --warning-text: #FFD700;
+  --success: #4CC995;
+  --success-foreground: #0F1626;
+  --success-text: #4CC995;
+  --info: #7DB0FF;
+  --info-foreground: #0F1626;
+  --info-text: #7DB0FF;
+
+  --tint-soft: 16%;
+
+  --sidebar: #0B1120;
+  --sidebar-foreground: #E6EAF2;
+  --sidebar-muted-foreground: #9AA7C2;
+  --sidebar-primary: #DCE4F5;
+  --sidebar-primary-foreground: #1F2A45;
+  --sidebar-accent: #1E2A47;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #232F4D;
+  --sidebar-ring: #7FA6E8;
+
+  --header: #0B1120;
+  --header-foreground: #FFFFFF;
+  --header-border: #232F4D;
+
+  --chart-1: #7DB0FF;
+  --chart-2: #4CC995;
+  --chart-3: #FFD700;
+  --chart-4: #A99BFF;
+  --chart-5: #9AA7C2;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
-
-/* Apply border-box to all elements to prevent padding layout breakages */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
+/* ==========================================================================
+   5.  TAILWIND THEME  -  turns the tokens above into utility classes
+       bg-success-soft  text-success-text  border-info-border  bg-header ...
+   ========================================================================== */
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
+  /* ---- Fonts -------------------------------------------------------------- */
+  --font-sans: 'Barlow', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-heading: var(--font-sans);          /* point at another family to split headings from body */
+  --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Consolas, 'Liberation Mono', monospace;
+
+  /* ---- Radius scale (derived from --radius; sizes shown at the 18px root) - */
+  --radius-sm:  calc(var(--radius) * 0.6);   /*  ~5px  checkboxes, small chips   */
+  --radius-md:  calc(var(--radius) * 0.8);   /*  ~7px  badges, small buttons     */
+  --radius-lg:  var(--radius);               /*  ~9px  buttons, inputs, selects  */
+  --radius-xl:  calc(var(--radius) * 1.4);   /* ~13px  cards, popovers, menus    */
+  --radius-2xl: calc(var(--radius) * 1.8);   /* ~16px  dialogs, large panels     */
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* ---- Shadows: navy-tinted so white cards lift off the mint background --- */
+  --shadow-2xs: 0 1px 1px 0 rgb(31 42 69 / 0.04);
+  --shadow-xs:  0 1px 2px 0 rgb(31 42 69 / 0.06);
+  --shadow-sm:  0 1px 3px 0 rgb(31 42 69 / 0.08), 0 1px 2px -1px rgb(31 42 69 / 0.06);
+  --shadow-md:  0 4px 8px -2px rgb(31 42 69 / 0.10), 0 2px 4px -2px rgb(31 42 69 / 0.06);
+  --shadow-lg:  0 12px 24px -6px rgb(31 42 69 / 0.14), 0 4px 8px -4px rgb(31 42 69 / 0.08);
+
+  /* ---- Colors: surfaces and text ----------------------------------------- */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  /* ---- Colors: lines and focus ------------------------------------------- */
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* ---- Colors: status ------------------------------------------------------ */
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-text: var(--destructive-text);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-border: var(--destructive-border);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-text: var(--warning-text);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-border: var(--warning-border);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-text: var(--success-text);
+  --color-success-soft: var(--success-soft);
+  --color-success-border: var(--success-border);
+
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-text: var(--info-text);
+  --color-info-soft: var(--info-soft);
+  --color-info-border: var(--info-border);
+
+  /* ---- Colors: app chrome -------------------------------------------------- */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-header: var(--header);
+  --color-header-foreground: var(--header-foreground);
+  --color-header-border: var(--header-border);
+
+  /* ---- Colors: charts ------------------------------------------------------ */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
 
+/* ==========================================================================
+   6.  BASE  -  global element defaults (kept in a layer so utilities win)
+   ========================================================================== */
 @layer base {
   * {
-    @apply border-border outline-ring/50;}
-  body {
-    @apply bg-background text-foreground;}
+    @apply border-border outline-ring/50;
+  }
+
   html {
-    @apply font-sans;}}
+    @apply font-sans;
+    font-size: 18px;                 /* rem base: every text-* and spacing-* scales from this */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  @media (max-width: 1024px) {
+    html {
+      font-size: 16px;
+    }
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    margin: 0;
+    line-height: 1.45;
+    letter-spacing: 0.01em;
+    text-rendering: optimizeLegibility;
+  }
+
+  #root {
+    min-height: 100svh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+}

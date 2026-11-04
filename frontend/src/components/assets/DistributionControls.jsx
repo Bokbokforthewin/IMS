@@ -19,11 +19,11 @@ import {
 } from '@/components/ui/dialog';
 
 const STATUS_STYLES = {
-  Available: 'border-slate-300 text-slate-600',
-  Assigned: 'border-blue-300 bg-blue-50 text-blue-700',
-  Distributed: 'border-emerald-300 bg-emerald-50 text-emerald-700',
-  'Under Repair': 'border-amber-300 bg-amber-50 text-amber-700',
-  Condemned: 'border-red-300 bg-red-50 text-red-700',
+  Available: 'border-border bg-muted/50 text-muted-foreground',
+  Assigned: 'border-info-border bg-info-soft text-info-text',
+  Distributed: 'border-success-border bg-success-soft text-success-text',
+  'Under Repair': 'border-warning-border bg-warning-soft text-warning-text',
+  Condemned: 'border-destructive-border bg-destructive-soft text-destructive-text',
 };
 
 function errorMessage(err, fallback) {
@@ -39,7 +39,7 @@ export function AssetStatusBadge({ status }) {
   return (
     <Badge
       variant="outline"
-      className={`px-1.5 py-0 text-[10px] font-medium ${STATUS_STYLES[status] || ''}`}
+      className={`px-1.5 py-0 text-[10px] font-medium shrink-0 whitespace-nowrap ${STATUS_STYLES[status] || 'border-border text-muted-foreground'}`}
     >
       {status || 'Unknown'}
     </Badge>
@@ -222,13 +222,11 @@ export function AssetStatusCell({ line, rcpt, dist }) {
   const selectable = dist.canDistribute(rcpt) && asset.status === 'Assigned';
   const key = `${rcpt.id}:${asset.id}`;
 
-  console.log({ status: asset.status, isIctu: dist.isIctu, canDistribute: dist.canDistribute(rcpt), mr: rcpt.received_mr_by_id });
-
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap min-w-max">
       {selectable && (
         <Checkbox
-          className="size-3.5"
+          className="size-3.5 shrink-0"
           checked={dist.selected.has(key)}
           onCheckedChange={() => dist.toggle(rcpt.id, asset.id)}
           aria-label={`Select ${asset.property_number || asset.id} for distribution`}
@@ -240,21 +238,21 @@ export function AssetStatusCell({ line, rcpt, dist }) {
       {pending && (
         <Badge
           variant="outline"
-          className="border-amber-300 bg-amber-50 px-1.5 py-0 text-[10px] font-medium text-amber-700"
+          className="border-warning-border bg-warning-soft px-1.5 py-0 text-[10px] font-medium text-warning-text shrink-0 whitespace-nowrap"
           title={`Reason: ${asset.revert_reason}`}
         >
           Revert requested
         </Badge>
       )}
 
-      {/* ICTU */}
+      {/* ICTU Actions */}
       {isDistributed && dist.isIctu && pending && (
-        <>
+        <div className="flex items-center gap-1 shrink-0">
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-5 gap-0.5 px-1 text-[10px]"
+            className="h-5 gap-0.5 px-1 text-[10px] h-6 text-foreground hover:bg-accent"
             onClick={() => dist.openReasonDialog('revert', asset)}
             title="Approve the revert to Assigned"
           >
@@ -265,13 +263,13 @@ export function AssetStatusCell({ line, rcpt, dist }) {
             type="button"
             variant="ghost"
             size="sm"
-            className="h-5 px-1 text-[10px]"
+            className="h-5 px-1 text-[10px] h-6 text-destructive hover:bg-destructive-soft"
             onClick={() => dist.openReasonDialog('decline', asset)}
             title="Decline the request"
           >
             Decline
           </Button>
-        </>
+        </div>
       )}
 
       {isDistributed && dist.isIctu && !pending && (
@@ -279,7 +277,7 @@ export function AssetStatusCell({ line, rcpt, dist }) {
           type="button"
           variant="ghost"
           size="sm"
-          className="h-5 gap-0.5 px-1 text-[10px]"
+          className="h-5 gap-0.5 px-1 text-[10px] h-6 text-muted-foreground hover:text-foreground shrink-0"
           onClick={() => dist.openReasonDialog('revert', asset)}
           title="Revert to Assigned (ICTU correction)"
         >
@@ -288,13 +286,13 @@ export function AssetStatusCell({ line, rcpt, dist }) {
         </Button>
       )}
 
-      {/* MR (not ICTU): can only ask */}
+      {/* MR (not ICTU): can only request */}
       {isDistributed && !dist.isIctu && dist.canDistribute(rcpt) && !pending && (
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          className="h-5 px-1 text-[10px]"
+          className="h-5 px-1 text-[10px] h-6 text-muted-foreground hover:text-foreground shrink-0"
           onClick={() => dist.openReasonDialog('request', asset)}
           title="Ask ICTU to revert this item to Assigned"
         >
@@ -315,11 +313,11 @@ export function ReceiptDistributeButtons({ rcpt, dist }) {
   const chosen = dist.selectedIds(rcpt);
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex items-center gap-1.5 flex-wrap">
       {chosen.length > 0 && (
         <Button
           size="sm"
-          className="h-7 gap-1.5 text-xs"
+          className="h-7 gap-1.5 text-xs shadow-2xs"
           onClick={() => dist.requestDistribute(rcpt, chosen)}
         >
           <PackageCheck className="h-3.5 w-3.5" />
@@ -330,7 +328,7 @@ export function ReceiptDistributeButtons({ rcpt, dist }) {
       <Button
         size="sm"
         variant="outline"
-        className="h-7 gap-1.5 text-xs"
+        className="h-7 gap-1.5 text-xs border-border shadow-2xs"
         onClick={() => dist.requestDistribute(rcpt, waiting)}
       >
         <PackageCheck className="h-3.5 w-3.5" />
@@ -354,17 +352,17 @@ export function DistributionDialogs({ dist }) {
           if (!open && !busy) dist.closeConfirm();
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md border-border bg-card">
           <DialogHeader>
-            <DialogTitle>Mark items as distributed?</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-foreground">Mark items as distributed?</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               {count} item{count === 1 ? '' : 's'} on {confirm?.rcpt?.document_number} will be
               recorded as handed over to the end users. Once confirmed, only ICTU can change it back.
             </DialogDescription>
           </DialogHeader>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={dist.closeConfirm} disabled={busy}>
+            <Button variant="outline" onClick={dist.closeConfirm} disabled={busy} className="border-border">
               Cancel
             </Button>
             <Button onClick={dist.submitDistribute} disabled={busy}>
@@ -381,10 +379,10 @@ export function DistributionDialogs({ dist }) {
           if (!open && !busy) dist.closeReasonDialog();
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md border-border bg-card">
           <DialogHeader>
-            <DialogTitle>{cfg?.title}</DialogTitle>
-            <DialogDescription>{cfg?.description}</DialogDescription>
+            <DialogTitle className="text-foreground">{cfg?.title}</DialogTitle>
+            <DialogDescription className="text-muted-foreground">{cfg?.description}</DialogDescription>
           </DialogHeader>
 
           {cfg?.needsReason && (
@@ -393,11 +391,12 @@ export function DistributionDialogs({ dist }) {
               value={reason}
               onChange={(e) => dist.setReason(e.target.value)}
               maxLength={1000}
+              className="text-xs bg-card border-border"
             />
           )}
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={dist.closeReasonDialog} disabled={busy}>
+            <Button variant="outline" onClick={dist.closeReasonDialog} disabled={busy} className="border-border">
               Cancel
             </Button>
             <Button

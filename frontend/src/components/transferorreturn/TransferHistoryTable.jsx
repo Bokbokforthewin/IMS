@@ -9,26 +9,31 @@ import {
   Loader2,
   Calendar,
   Filter,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
 } from 'lucide-react';
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
-} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Field, FieldLabel } from '@/components/ui/field';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -53,7 +58,7 @@ export default function TransferHistoryTable({ refreshKey }) {
 
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const fetchTransfers = useCallback(async () => {
     setIsLoading(true);
@@ -93,7 +98,7 @@ export default function TransferHistoryTable({ refreshKey }) {
   // Reset to first page when search terms or type filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, typeFilter, pageSize]);
+  }, [searchTerm, typeFilter, itemsPerPage]);
 
   // Cleaned and robust search filter
   const filteredTransfers = useMemo(() => {
@@ -126,7 +131,7 @@ export default function TransferHistoryTable({ refreshKey }) {
       const fromName = (fromUser?.name || '').toLowerCase();
       const toName = (toUser?.name || '').toLowerCase();
 
-      // User Unit, Designation, Division (Direct string columns on User model)
+      // User Unit, Designation, Division
       const fromUnit = (fromUser?.unit || '').toLowerCase();
       const toUnit = (toUser?.unit || '').toLowerCase();
 
@@ -167,26 +172,32 @@ export default function TransferHistoryTable({ refreshKey }) {
     });
   }, [transfers, searchTerm, typeFilter]);
 
-  // Calculate pagination bounds
-  const totalItems = filteredTransfers.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  // Dynamic Pagination Calculations
+  const safeTransfers = filteredTransfers || [];
+  const totalItems = safeTransfers.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
-  // Slice paginated data for display
-  const paginatedTransfers = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredTransfers.slice(startIndex, startIndex + pageSize);
-  }, [filteredTransfers, currentPage, pageSize]);
+  const validPage = Math.max(1, Math.min(currentPage, totalPages));
+  const startIndex = (validPage - 1) * itemsPerPage;
+  const paginatedTransfers = safeTransfers.slice(startIndex, startIndex + itemsPerPage);
+
+  const handleRowsPerPageChange = (value) => {
+    setItemsPerPage(Number(value));
+    setCurrentPage(1);
+  };
 
   return (
-    <Card className="shadow-sm border-primary/20 flex flex-col">
-      <CardHeader className="border-b bg-muted/20 pb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <History className="h-4 w-4 text-primary" />
+    <div className="min-w-0 w-full space-y-4">
+      <div className="min-w-0 w-full rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-4">
+        {/* Prominent Task Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+          <div className="flex items-center gap-2">
+            <History className="h-4 w-4 text-primary shrink-0" />
+            <h3 className="text-xs font-semibold tracking-wider uppercase text-muted-foreground">
               Return & Transfer History Logs
-            </CardTitle>
+            </h3>
           </div>
+
           <Button
             variant="outline"
             size="sm"
@@ -200,85 +211,153 @@ export default function TransferHistoryTable({ refreshKey }) {
         </div>
 
         {/* Filter & Search Bar */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 pt-3">
-          <div className="relative w-full sm:flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="relative w-full sm:flex-1 min-w-0">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
               type="text"
               placeholder="Search by doc no, asset, unit, division, designation, employee..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 h-8 text-xs"
+              className="pl-8 h-8 text-xs bg-card border-border w-full"
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
             <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0 hidden sm:block" />
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="h-8 text-xs w-full sm:w-[150px] bg-background">
+              <SelectTrigger className="h-8 text-xs w-full sm:w-[150px] bg-card border-border">
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
-              <SelectContent className="z-50 text-xs">
-                <SelectItem value="ALL">All Types</SelectItem>
-                <SelectItem value="RETURN">Return Only</SelectItem>
-                <SelectItem value="TRANSFER">Transfer Only</SelectItem>
+              <SelectContent className="z-50 text-xs border-border">
+                <SelectGroup>
+                  <SelectItem value="ALL">All Types</SelectItem>
+                  <SelectItem value="RETURN">Return Only</SelectItem>
+                  <SelectItem value="TRANSFER">Transfer Only</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
         </div>
-      </CardHeader>
 
-      <CardContent className="p-0 flex-1">
+        {/* Error State Banner */}
         {errorMessage && (
-          <div className="p-4 m-4 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md flex items-center gap-2">
+          <div className="p-3 text-xs text-destructive-text bg-destructive-soft border border-destructive-border rounded-lg flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b bg-muted/40 text-muted-foreground font-semibold">
-                <th className="p-3">Doc Number</th>
-                <th className="p-3">Type</th>
-                <th className="p-3">Item & Serial No.</th>
-                <th className="p-3">Route (From ➔ To)</th>
-                <th className="p-3">Description</th>
-                <th className="p-3">Reason</th>
-                <th className="p-3">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                    <div className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      <span>Loading transfer records...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : paginatedTransfers.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                    <div className="flex flex-col items-center justify-center gap-1.5">
-                      <FileText className="h-8 w-8 text-muted-foreground/40" />
-                      <span className="font-medium text-foreground">
-                        {searchTerm || typeFilter !== 'ALL'
-                          ? 'No matching records found'
-                          : 'No return or transfer records found'}
-                      </span>
-                      <span className="text-[11px]">
-                        {searchTerm || typeFilter !== 'ALL'
-                          ? 'Try adjusting your search criteria or filters.'
-                          : 'Processed transfers and equipment returns will appear here.'}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                paginatedTransfers.map((t) => {
+        {/* Main Table / Mobile Card Container */}
+        <div className="w-full min-w-0 overflow-hidden rounded-lg border border-border bg-card">
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-center text-xs text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <span>Loading transfer records...</span>
+            </div>
+          ) : paginatedTransfers.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <div className="flex flex-col items-center justify-center gap-1.5 text-xs">
+                <FileText className="h-8 w-8 text-muted-foreground/40" />
+                <span className="font-semibold text-foreground">
+                  {searchTerm || typeFilter !== 'ALL'
+                    ? 'No matching records found'
+                    : 'No return or transfer records found'}
+                </span>
+                <span className="text-[11px]">
+                  {searchTerm || typeFilter !== 'ALL'
+                    ? 'Try adjusting your search criteria or filters.'
+                    : 'Processed transfers and equipment returns will appear here.'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* DESKTOP VIEW (Full Table for XL screens) */}
+              <div className="hidden xl:block overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="font-semibold text-foreground">Doc Number</TableHead>
+                      <TableHead className="font-semibold text-foreground">Type</TableHead>
+                      <TableHead className="font-semibold text-foreground">Item & Serial No.</TableHead>
+                      <TableHead className="font-semibold text-foreground">Route (From ➔ To)</TableHead>
+                      <TableHead className="font-semibold text-foreground">Description</TableHead>
+                      <TableHead className="font-semibold text-foreground">Reason</TableHead>
+                      <TableHead className="font-semibold text-foreground whitespace-nowrap">Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {paginatedTransfers.map((t) => {
+                      const isReturn = t.transfer_type === 'RETURN';
+                      const fromUser = t.transferred_from?.name || t.user?.name || 'N/A';
+                      const toUser = t.transferred_to?.name || t.recipient?.name || 'N/A';
+
+                      const itemName = t.serialized_asset?.item?.name || 'Unknown Item';
+                      const categoryName = t.serialized_asset?.item?.category?.name
+                        ? `[${t.serialized_asset.item.category.name}] `
+                        : '';
+                      const serialNo = t.serialized_asset?.serial_number || 'N/A';
+                      const propertyNo = t.serialized_asset?.property_number;
+
+                      return (
+                        <TableRow key={t.id} className="hover:bg-muted/30 transition-colors">
+                          <TableCell className="font-mono text-xs font-semibold text-foreground whitespace-nowrap">
+                            {t.document_number || `PTR-${t.id}`}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] px-2 py-0.5 font-semibold ${
+                                isReturn
+                                  ? 'border-warning-border bg-warning-soft text-warning-text'
+                                  : 'border-info-border bg-info-soft text-info-text'
+                              }`}
+                            >
+                              {t.transfer_type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-semibold text-foreground">
+                              {categoryName}{itemName}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground space-x-1.5">
+                              <span>SN: <strong className="font-mono text-foreground">{serialNo}</strong></span>
+                              {propertyNo && (
+                                <span>PN: <strong className="font-mono text-foreground">{propertyNo}</strong></span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <div className="flex items-center gap-1.5 text-foreground font-medium">
+                              <span className="text-muted-foreground">From: {fromUser}</span>
+                              <ArrowRight className="h-3 w-3 text-primary shrink-0" />
+                              <span>To: {toUser}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-[180px] truncate text-muted-foreground text-sm" title={t.description}>
+                            {t.description || '—'}
+                          </TableCell>
+                          <TableCell className="max-w-[160px] truncate text-muted-foreground text-sm" title={t.reason}>
+                            {t.reason || '—'}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground text-sm">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3.5 w-3.5 text-muted-foreground/70" />
+                              <span>{t.transfer_date || '—'}</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* STREAMLINED MOBILE & TABLET VIEW (Only Essential Information) */}
+              <div className="divide-y divide-border xl:hidden">
+                {paginatedTransfers.map((t) => {
                   const isReturn = t.transfer_type === 'RETURN';
                   const fromUser = t.transferred_from?.name || t.user?.name || 'N/A';
                   const toUser = t.transferred_to?.name || t.recipient?.name || 'N/A';
@@ -291,162 +370,130 @@ export default function TransferHistoryTable({ refreshKey }) {
                   const propertyNo = t.serialized_asset?.property_number;
 
                   return (
-                    <tr key={t.id} className="hover:bg-muted/30 transition-colors">
-                      {/* Doc Number */}
-                      <td className="p-3 font-mono font-medium text-foreground whitespace-nowrap">
-                        {t.document_number || `PTR-${t.id}`}
-                      </td>
-
-                      {/* Type Badge */}
-                      <td className="p-3 whitespace-nowrap">
-                        <Badge
-                          className={`text-[10px] px-2 py-0.5 font-semibold ${
-                            isReturn
-                              ? ''
-                              : ''
-                          }`}
-                        >
-                          {t.transfer_type}
-                        </Badge>
-                      </td>
-
-                      {/* Item & Serial Number */}
-                      <td className="p-3">
-                        <div className="font-semibold text-foreground">
-                          {categoryName}{itemName}
+                    <div key={`mob-${t.id}`} className="p-4 space-y-2.5 min-w-0">
+                      <div className="flex items-start justify-between gap-2 min-w-0">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-xs font-semibold text-primary">
+                              {t.document_number || `PTR-${t.id}`}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={`capitalize text-[10px] px-1.5 py-0 ${
+                                isReturn
+                                  ? 'border-warning-border bg-warning-soft text-warning-text'
+                                  : 'border-info-border bg-info-soft text-info-text'
+                              }`}
+                            >
+                              {t.transfer_type}
+                            </Badge>
+                          </div>
+                          <h4 className="font-semibold text-sm text-foreground break-words">
+                            {categoryName}{itemName}
+                          </h4>
                         </div>
-                        <div className="text-[10px] text-muted-foreground space-x-1.5">
-                          <span>SN: <strong className="font-mono">{serialNo}</strong></span>
-                          {propertyNo && (
-                            <span>PN: <strong className="font-mono">{propertyNo}</strong></span>
-                          )}
+                      </div>
+
+                      {/* Streamlined Key Details */}
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                        <div>
+                          <span className="block text-[10px] uppercase font-semibold text-muted-foreground">Serial No.</span>
+                          <span className="font-mono text-foreground font-medium">{serialNo}</span>
                         </div>
-                      </td>
-
-                      {/* Route */}
-                      <td className="p-3 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 text-foreground font-medium">
-                          <span className="text-muted-foreground">{fromUser}</span>
-                          <ArrowRight className="h-3 w-3 text-primary shrink-0" />
-                          <span>{toUser}</span>
+                        {propertyNo && (
+                          <div>
+                            <span className="block text-[10px] uppercase font-semibold text-muted-foreground">Property No.</span>
+                            <span className="font-mono text-foreground">{propertyNo}</span>
+                          </div>
+                        )}
+                        <div className="col-span-2">
+                          <span className="block text-[10px] uppercase font-semibold text-muted-foreground">Route</span>
+                          <div className="flex items-center gap-1.5 text-foreground font-medium pt-0.5">
+                            <span className="text-muted-foreground">From: {fromUser}</span>
+                            <ArrowRight className="h-3 w-3 text-primary shrink-0" />
+                            <span>To: {toUser}</span>
+                          </div>
                         </div>
-                      </td>
+                        {t.description && (
+                          <div className="col-span-2">
+                            <span className="block text-[10px] uppercase font-semibold text-muted-foreground">Description</span>
+                            <span className="text-muted-foreground truncate block">{t.description}</span>
+                          </div>
+                        )}
+                        {t.reason && (
+                          <div className="col-span-2">
+                            <span className="block text-[10px] uppercase font-semibold text-muted-foreground">Reason</span>
+                            <span className="text-muted-foreground truncate block">{t.reason}</span>
+                          </div>
+                        )}
+                      </div>
 
-                      {/* Description */}
-                      <td className="p-3 max-w-[180px] truncate text-muted-foreground" title={t.description}>
-                        {t.description || '—'}
-                      </td>
-
-                      {/* Reason */}
-                      <td className="p-3 max-w-[160px] truncate text-muted-foreground" title={t.reason}>
-                        {t.reason || '—'}
-                      </td>
-
-                      {/* Date */}
-                      <td className="p-3 whitespace-nowrap text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-muted-foreground/70" />
+                      <div className="pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1 text-[11px]">
+                          <Calendar className="h-3 w-3 shrink-0" />
                           <span>{t.transfer_date || '—'}</span>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   );
-                })
-              )}
-            </tbody>
-          </table>
+                })}
+              </div>
+            </>
+          )}
         </div>
-      </CardContent>
 
-      {/* Nova Preset Footer / ShadcnUI Pagination Bar */}
-      {!isLoading && totalItems > 0 && (
-        <CardFooter className="border-t bg-muted/10 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-          {/* Row Count Info */}
-          <div className="flex items-center gap-2">
-            <span>
-              Showing{' '}
-              <strong className="font-medium text-foreground">
-                {Math.min((currentPage - 1) * pageSize + 1, totalItems)}
-              </strong>{' '}
-              to{' '}
-              <strong className="font-medium text-foreground">
-                {Math.min(currentPage * pageSize, totalItems)}
-              </strong>{' '}
-              of <strong className="font-medium text-foreground">{totalItems}</strong> entries
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {/* Rows Per Page Selector */}
-            <div className="flex items-center gap-2">
-              <span className="whitespace-nowrap">Rows per page</span>
-              <Select
-                value={String(pageSize)}
-                onValueChange={(val) => setPageSize(Number(val))}
-              >
-                <SelectTrigger className="h-8 w-[70px] text-xs bg-background">
-                  <SelectValue placeholder={pageSize} />
+        {/* Footer Controls */}
+        {!isLoading && totalItems > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+            <Field orientation="horizontal" className="w-fit flex items-center gap-2">
+              <FieldLabel htmlFor="select-rows-per-page" className="text-xs text-muted-foreground">
+                Rows per page
+              </FieldLabel>
+              <Select value={String(itemsPerPage)} onValueChange={handleRowsPerPageChange}>
+                <SelectTrigger className="w-20 h-8 text-xs bg-card border-border" id="select-rows-per-page">
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="z-50 text-xs">
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
+                <SelectContent align="start" className="border-border z-50">
+                  <SelectGroup>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
 
-            {/* Current Page Indicator */}
-            <div className="flex items-center justify-center font-medium min-w-[80px]">
-              Page {currentPage} of {totalPages}
-            </div>
-
-            {/* Navigation Controls */}
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                title="First Page"
-              >
-                <ChevronsLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                title="Previous Page"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                title="Next Page"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                title="Last Page"
-              >
-                <ChevronsRight className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-muted-foreground">
+                Showing {totalItems === 0 ? 0 : startIndex + 1} to {Math.min(startIndex + itemsPerPage, totalItems)} of {totalItems}
+              </span>
+              <Pagination className="mx-0 w-auto">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage((prev) => Math.max(prev - 1, 1));
+                      }}
+                      className={validPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+                      }}
+                      className={validPage >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
             </div>
           </div>
-        </CardFooter>
-      )}
-    </Card>
+        )}
+      </div>
+    </div>
   );
 }

@@ -2,12 +2,12 @@ import React, { useEffect, useState } from "react";
 import Logo from "./Logo.jsx";
 import { User, LogOut, ChevronDown } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useAuth } from "../context/AuthContext.jsx"; // Adjust relative path if needed
+import { useAuth } from "../context/AuthContext.jsx";
 
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup, // 👈 Added DropdownMenuGroup import
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -19,10 +19,9 @@ export default function Header() {
   const [appConfig, setAppConfig] = useState(null);
   const [error, setError] = useState(null);
 
-  // Safe fallback parsing for strings
   const userName = typeof user?.name === "string" ? user.name : "User";
 
-   const getUserRole = () => {
+  const getUserRole = () => {
     if (!user) return "DOH NIR CHD Employee";
     
     if (typeof user.designation === "string" && user.designation.trim() !== "") {
@@ -66,14 +65,14 @@ export default function Header() {
 
   if (error) {
     return (
-      <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:px-6">
+      <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-header-border bg-header text-header-foreground px-4 lg:px-6">
         <div className="flex items-center gap-3">
-          <SidebarTrigger />
+          <SidebarTrigger className="text-header-foreground hover:bg-white/10" />
           <Logo size={28} />
-          <span className="h-4 w-px bg-border" aria-hidden="true" />
+          <span className="h-4 w-px bg-header-border" aria-hidden="true" />
           <div className="flex flex-col">
-            <span className="text-xs font-medium text-muted-foreground">Configuration Error</span>
-            <span className="text-sm font-semibold">{error}</span>
+            <span className="text-xs font-medium text-header-foreground/70">Configuration Error</span>
+            <span className="text-sm font-semibold text-header-foreground">{error}</span>
           </div>
         </div>
       </header>
@@ -81,33 +80,32 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:px-6">
+    <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-header-border bg-header text-header-foreground px-4 lg:px-6">
       {/* Left Side: Mobile Sidebar Trigger */}
       <div className="flex items-center gap-2">
-        <SidebarTrigger className="-ml-1 md:hidden" />
+        <SidebarTrigger className="-ml-1 text-header-foreground hover:bg-white/10 md:hidden" />
       </div>
 
       {/* Right Side: User Dropdown Menu */}
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex h-9 items-center gap-2 rounded-lg border border-border px-2.5 text-left transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer">
-          <div className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <DropdownMenuTrigger className="flex h-9 items-center gap-2 rounded-lg border border-header-border px-2.5 text-left transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-sidebar-ring cursor-pointer">
+          <div className="flex size-6 items-center justify-center rounded-full bg-white/15 text-header-foreground">
             <User className="size-3.5" />
           </div>
 
           <div className="hidden flex-col sm:flex">
-            <span className="text-xs font-semibold leading-none">
+            <span className="text-xs font-semibold leading-none text-header-foreground">
               {userName}
             </span>
-            <span className="text-[10px] leading-tight text-muted-foreground capitalize">
+            <span className="text-[10px] leading-tight text-header-foreground/70 capitalize">
               {userRole}
             </span>
           </div>
 
-          <ChevronDown className="size-3.5 text-muted-foreground" />
+          <ChevronDown className="size-3.5 text-header-foreground/70" />
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="end" className="w-56">
-          {/* Wrap DropdownMenuLabel inside DropdownMenuGroup */}
+        <DropdownMenuContent align="end" className="w-56 bg-popover text-popover-foreground border-border">
           <DropdownMenuGroup>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">

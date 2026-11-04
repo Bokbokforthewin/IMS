@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import api from '../../api/client'; // Import configured Axios client with auth headers
+import api from '../../api/client';
 import {
   Download,
   FileSpreadsheet,
@@ -74,7 +74,6 @@ function groupReceiptsIntoBundles(receipts) {
   const bundleMap = new Map();
 
   receipts.forEach((receipt) => {
-    // 🔍 Safely check camelCase, snake_case, and nested object or fallback name
     const mrUser = 
       receipt.receivedMrBy || 
       receipt.received_mr_by || 
@@ -87,7 +86,7 @@ function groupReceiptsIntoBundles(receipts) {
     if (!bundleMap.has(key)) {
       bundleMap.set(key, {
         key,
-        user: mrUser, // ✅ Correctly displays the MR at the header
+        user: mrUser,
         issuedBy: receipt.issuedBy,
         date_issued: receipt.date_issued,
         remarks: receipt.remarks,
@@ -111,9 +110,8 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
   const [receipts, setReceipts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5); // Set initial/minimum pagination to 5
+  const [pageSize, setPageSize] = useState(5);
 
-  // Fetch receipts using the authenticated api instance
   const fetchReceipts = useCallback(async () => {
     try {
       const response = await api.get('/v1/accountability/receipts');
@@ -129,15 +127,12 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
     fetchReceipts();
   }, [fetchReceipts, refreshKey]);
 
-  // Fetch distribution status for each receipt
   const dist = useDistribution(fetchReceipts);
 
-  // Reset to page 1 when search query changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery]);
 
-  // Authenticated Excel Download
   const handleDownload = async (receiptId, documentNumber) => {
     try {
       const response = await api.get(
@@ -158,7 +153,6 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
     }
   };
 
-  // Authenticated PDF Tag Download
   const handleDownloadTagPdf = async (assetId) => {
     try {
       const response = await api.get(
@@ -174,7 +168,6 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
     }
   };
 
-  // Authenticated Bulk PDF Tag Download
   const handleDownloadBulkTags = async (bundleLines) => {
     try {
       const assetIds = bundleLines
@@ -197,10 +190,8 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
     }
   };
 
-  // Group receipts into transaction bundles
   const bundles = useMemo(() => groupReceiptsIntoBundles(receipts), [receipts]);
 
-  // Filter bundles based on search query
   const filteredBundles = useMemo(() => {
     if (!searchQuery.trim()) return bundles;
 
@@ -257,14 +248,12 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
     });
   }, [bundles, searchQuery]);
 
-  // Pagination Calculations
   const totalPages = Math.ceil(filteredBundles.length / pageSize) || 1;
   const paginatedBundles = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredBundles.slice(start, start + pageSize);
   }, [filteredBundles, currentPage, pageSize]);
 
-  // Ensure current page doesn't exceed total pages if filters change
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(1);
@@ -272,53 +261,53 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
   }, [totalPages, currentPage]);
 
   return (
-    <Card className="w-full">
+    <Card className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
       {/* Header with Title and Search Input */}
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-4 border-b">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-3">
         <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
-          <CardTitle className="text-lg sm:text-xl font-bold tracking-tight">
+          <FileText className="h-4 w-4 text-primary shrink-0" />
+          <h3 className="text-xs font-semibold tracking-wider uppercase text-muted-foreground">
             Issued Accountability Receipts ({filteredBundles.length})
-          </CardTitle>
+          </h3>
         </div>
 
         {/* Search Bar */}
         <div className="relative w-full sm:w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
             type="search"
             placeholder="Search receiver, unit, doc #, SN..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 text-sm"
+            className="pl-8 h-9 text-xs"
           />
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="pt-4 sm:pt-6 space-y-4">
+      <div className="space-y-4">
         {filteredBundles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
-            <PackageOpen className="h-8 w-8 opacity-40" />
-            <p className="text-sm">
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-xs text-muted-foreground border border-dashed border-border rounded-lg bg-muted/20">
+            <PackageOpen className="h-8 w-8 text-muted-foreground/50" />
+            <p>
               {searchQuery
                 ? `No accountability receipts matching "${searchQuery}"`
                 : 'No accountability receipts generated yet.'}
             </p>
           </div>
         ) : (
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-4 sm:space-y-5">
             {paginatedBundles.map((bundle) => {
               return (
                 <div
                   key={bundle.key}
-                  className="rounded-xl border bg-card text-card-foreground shadow-xs overflow-hidden transition-all"
+                  className="rounded-xl border border-border bg-card shadow-2xs overflow-hidden transition-all"
                 >
                   {/* TOP MAIN HEADER */}
-                  <div className="bg-muted/50 p-3 sm:p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="bg-muted/40 p-3 sm:p-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <User className="h-4 w-4 text-primary shrink-0" />
-                        <span className="font-semibold text-sm sm:text-base truncate">
+                        <span className="font-semibold text-sm text-foreground truncate">
                           {bundle.user?.name || 'Unassigned Primary Receiver'}
                         </span>
                         <span className="text-xs text-muted-foreground font-normal shrink-0">
@@ -337,11 +326,11 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 text-xs gap-1.5 bg-background shadow-xs hover:bg-accent w-full sm:w-auto"
+                        className="h-8 text-xs gap-1.5 border-border bg-card shadow-2xs w-full sm:w-auto"
                         onClick={() => handleDownloadBulkTags(bundle.allLines)}
                         title="Print all asset tags for this bundle"
                       >
-                        <PackageOpen className="w-3.5 h-3.5 text-blue-600" />
+                        <PackageOpen className="w-3.5 h-3.5 text-info-text" />
                         <span>Print Sticker Bundle</span>
                       </Button>
                     </div>
@@ -356,16 +345,16 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                       return (
                         <div
                           key={rcpt.id}
-                          className="rounded-lg border bg-card shadow-2xs overflow-hidden"
+                          className="rounded-lg border border-border bg-card shadow-2xs overflow-hidden"
                         >
                           {/* Sub-Card Header */}
-                          <div className="bg-background px-3 py-2.5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="bg-card px-3 py-2.5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                              <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
-                              <span className="font-semibold text-xs sm:text-sm">
+                              <FileSpreadsheet className="w-4 h-4 text-success-text shrink-0" />
+                              <span className="font-semibold text-xs sm:text-sm text-foreground">
                                 {rcpt.document_number}
                               </span>
-                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] border border-border">
                                 {rcpt.receipt_type}
                               </Badge>
                               <span className="text-xs text-muted-foreground">
@@ -373,28 +362,27 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                               </span>
                             </div>
 
-                         <div className="flex flex-wrap items-center gap-2">
-                            <ReceiptDistributeButtons rcpt={rcpt} dist={dist} />
-                            {/* Excel Download Button */}
-                            <Button
-                              size="sm"
-                              variant="default"
-                              className="h-7 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs w-full sm:w-auto shrink-0 justify-center"
-                              onClick={() => handleDownload(rcpt.id, rcpt.document_number)}
-                              title={`Download ${rcpt.receipt_type} Excel Form`}
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              <span>Download Sheet</span>
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <ReceiptDistributeButtons rcpt={rcpt} dist={dist} />
+                              {/* Excel Download Button */}
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs gap-1.5 bg-success text-success-foreground hover:bg-success/90 shadow-2xs w-full sm:w-auto shrink-0 justify-center"
+                                onClick={() => handleDownload(rcpt.id, rcpt.document_number)}
+                                title={`Download ${rcpt.receipt_type} Excel Form`}
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>Download Sheet</span>
+                              </Button>
                             </div>
                           </div>
 
-                          {/* Desktop Layout: Table View (hidden on small screens) */}
+                          {/* Desktop Layout: Table View */}
                           <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-xs text-left">
-                              <thead className="bg-muted/30 text-muted-foreground border-b">
+                              <thead className="bg-muted/40 text-muted-foreground border-b border-border">
                                 <tr>
-                                  <th className="py-2 px-3 font-medium">Item Details</th>
+                                  <th className="py-2 px-3 font-medium">Item Name</th>
                                   <th className="py-2 px-3 font-medium">Property No. / SN</th>
                                   <th className="py-2 px-3 font-medium">End User</th>
                                   <th className="py-2 px-3 font-medium text-right">Unit Cost</th>
@@ -402,7 +390,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                   <th className="py-2 px-3 font-medium text-center w-[70px]">Tag</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y">
+                              <tbody className="divide-y divide-border/60">
                                 {groupedLines.map(({ primary, children }) => {
                                   const primarySecondaryHolder = getSecondaryReceiver(
                                     primary,
@@ -411,8 +399,8 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
 
                                   return (
                                     <React.Fragment key={primary.id}>
-                                      <tr className="hover:bg-muted/20">
-                                        <td className="py-2 px-3 font-medium">
+                                      <tr className="hover:bg-muted/20 transition-colors">
+                                        <td className="py-2 px-3 font-medium text-foreground">
                                           {primary.serialized_asset?.item?.name || 'N/A'}
                                         </td>
                                         <td className="py-2 px-3 font-mono text-muted-foreground">
@@ -429,17 +417,18 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                             {primarySecondaryHolder}
                                           </span>
                                         </td>
-                                        <td className="py-2 px-3 text-right font-mono">
+                                        <td className="py-2 px-3 text-right font-mono text-foreground font-medium">
                                           {money(primary.serialized_asset?.unit_cost)}
                                         </td>
-                                           <td className="py-2 px-3"><AssetStatusCell line={primary} rcpt={rcpt} dist={dist} />
-                                           </td>
+                                        <td className="py-2 px-3">
+                                          <AssetStatusCell line={primary} rcpt={rcpt} dist={dist} />
+                                        </td>
                                         <td className="py-2 px-3 text-center">
                                           {primary.serialized_asset?.id && (
                                             <Button
                                               size="sm"
                                               variant="outline"
-                                              className="h-6 text-[10px] px-2"
+                                              className="h-6 text-[10px] px-2 border-border"
                                               onClick={() => handleDownloadTagPdf(primary.serialized_asset.id)}
                                             >
                                               Print Sticker
@@ -455,7 +444,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                         );
 
                                         return (
-                                          <tr key={child.id} className="bg-muted/10 hover:bg-muted/20">
+                                          <tr key={child.id} className="bg-muted/10 hover:bg-muted/20 transition-colors">
                                             <td className="py-1.5 px-3 pl-6 text-muted-foreground">
                                               <span className="inline-flex items-center gap-1">
                                                 <Paperclip className="h-3 w-3 text-primary/70 shrink-0" />
@@ -475,17 +464,18 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                                 {childSecondaryHolder}
                                               </span>
                                             </td>
-                                            <td className="py-1.5 px-3 text-right font-mono text-[11px]">
+                                            <td className="py-1.5 px-3 text-right font-mono text-[11px] text-foreground font-medium">
                                               {money(child.serialized_asset?.unit_cost)}
                                             </td>
-                                               <td className="py-1.5 px-3"><AssetStatusCell line={child} rcpt={rcpt} dist={dist} />
-                                               </td>
+                                            <td className="py-1.5 px-3">
+                                              <AssetStatusCell line={child} rcpt={rcpt} dist={dist} />
+                                            </td>
                                             <td className="py-1.5 px-3 text-center">
                                               {child.serialized_asset?.id && (
                                                 <Button
                                                   size="sm"
                                                   variant="outline"
-                                                  className="h-6 text-[10px] px-2"
+                                                  className="h-6 text-[10px] px-2 border-border"
                                                   onClick={() => handleDownloadTagPdf(child.serialized_asset.id)}
                                                 >
                                                   Print Sticker
@@ -502,8 +492,8 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                             </table>
                           </div>
 
-                          {/* Mobile Layout: Compact Card View (shown on mobile, hidden on desktop) */}
-                          <div className="block md:hidden divide-y">
+                          {/* Mobile Layout: Compact Card View */}
+                          <div className="block md:hidden divide-y divide-border">
                             {groupedLines.map(({ primary, children }) => {
                               const primarySecondaryHolder = getSecondaryReceiver(
                                 primary,
@@ -525,7 +515,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        className="h-6 text-[10px] px-2 shrink-0"
+                                        className="h-6 text-[10px] px-2 shrink-0 border-border"
                                         onClick={() => handleDownloadTagPdf(primary.serialized_asset.id)}
                                       >
                                         Print Sticker
@@ -584,9 +574,9 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
           </div>
         )}
 
-        {/* Pagination Footer with Minimum of 5 Rows */}
+        {/* Pagination Footer */}
         {filteredBundles.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between px-1 pt-4 border-t gap-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between px-1 pt-4 border-t border-border gap-3">
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs text-muted-foreground">
               <span>Rows per page</span>
               <Select
@@ -596,10 +586,10 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="h-8 w-[65px]">
+                <SelectTrigger className="h-8 w-[65px] border-border">
                   <SelectValue placeholder={pageSize} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-border">
                   <SelectItem value="5">5</SelectItem>
                   <SelectItem value="10">10</SelectItem>
                   <SelectItem value="20">20</SelectItem>
@@ -621,7 +611,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 border-border"
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
                 >
@@ -630,7 +620,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 border-border"
                   onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                   disabled={currentPage === 1}
                 >
@@ -639,7 +629,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 border-border"
                   onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
                   disabled={currentPage === totalPages}
                 >
@@ -648,7 +638,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 border-border"
                   onClick={() => setCurrentPage(totalPages)}
                   disabled={currentPage === totalPages}
                 >
@@ -658,7 +648,8 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
             </div>
           </div>
         )}
-      </CardContent>
+      </div>
+
       <DistributionDialogs dist={dist} />
     </Card>
   );

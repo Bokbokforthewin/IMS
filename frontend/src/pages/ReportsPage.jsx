@@ -8,11 +8,15 @@ export default function ReportsPage({ activeTab }) {
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
 
-  const initialType = activeTab === "reports-consumables" ? "consumables" : "assets";
+  const resolveInitialType = (tab) => {
+    if (tab === "reports-consumables") return "consumables";
+    if (tab === "reports-assets") return "assets";
+    return "both"; // Default to All Records
+  };
 
   const [filters, setFilters] = useState({
-    report_type: initialType,
-    filter_mode: "month",
+    report_type: resolveInitialType(activeTab),
+    filter_mode: "year", // Default to By Year
     year: currentYear,
     month: currentMonth,
     start_year: currentYear - 2,
@@ -37,6 +41,8 @@ export default function ReportsPage({ activeTab }) {
       setFilters((f) => ({ ...f, report_type: "consumables" }));
     } else if (activeTab === "reports-assets") {
       setFilters((f) => ({ ...f, report_type: "assets" }));
+    } else if (activeTab === "reports-overview" || activeTab === "reports") {
+      setFilters((f) => ({ ...f, report_type: "both" }));
     }
   }, [activeTab]);
 
@@ -91,18 +97,18 @@ export default function ReportsPage({ activeTab }) {
     ];
 
     const rows = reportData.map((row) => [
-      row.type.toUpperCase(),
-      `"${row.item_name}"`,
-      `"${row.brand}"`,
-      `"${row.category}"`,
-      `"${row.code_or_serial}"`,
-      row.quantity,
-      row.unit_cost,
-      row.total_cost,
+      row.type ? row.type.toUpperCase() : "—",
+      `"${row.item_name || ""}"`,
+      `"${row.brand || ""}"`,
+      `"${row.category || ""}"`,
+      `"${row.code_or_serial || ""}"`,
+      row.quantity || 0,
+      row.unit_cost || 0,
+      row.total_cost || 0,
       row.date || "—",
-      `"${row.recipient_or_holder}"`,
-      `"${row.management_receipt}"`,
-      `"${row.issued_by}"`,
+      `"${row.recipient_or_holder || ""}"`,
+      `"${row.management_receipt || ""}"`,
+      `"${row.issued_by || ""}"`,
       `"${(row.remarks || "").replace(/"/g, '""')}"`,
     ]);
 

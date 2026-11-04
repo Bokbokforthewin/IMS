@@ -24,9 +24,12 @@ class ItemController extends Controller
 
     public function store(Request $request)
     {
-        // Log incoming payload details
         Log::info('Store Request Inputs:', $request->all());
-        Log::info('Has image file?', ['hasFile' => $request->hasFile('image')]);
+
+        // Default reorder_level to 0/5 if not provided for assets
+        if (!$request->has('reorder_level') || $request->input('reorder_level') === '') {
+            $request->merge(['reorder_level' => 5]);
+        }
 
         $validatedData = $request->validate([
             'category_id' => 'required|exists:categories,id',
@@ -35,7 +38,7 @@ class ItemController extends Controller
             'specifications' => 'nullable|string|max:255',
             'type' => 'nullable|string|max:255',
             'unit_of_measure' => 'required|string|max:50',
-            'reorder_level' => 'required|integer|min:0',
+            'reorder_level' => 'nullable|integer|min:0',
             'tracking_type' => 'required|in:asset,consumable',
             'estimated_useful_life' => 'nullable|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
@@ -69,7 +72,6 @@ class ItemController extends Controller
 
                 $itemCode = sprintf('%s%03d', $prefixPattern, $nextSeq);
 
-                // Store image file
                 $imagePath = null;
                 if ($request->hasFile('image')) {
                     $imagePath = $request->file('image')->store('items', 'public');
@@ -83,7 +85,7 @@ class ItemController extends Controller
                     'specifications' => $validatedData['specifications'] ?? null,
                     'type' => $validatedData['type'] ?? null,
                     'unit_of_measure' => $validatedData['unit_of_measure'],
-                    'reorder_level' => $validatedData['reorder_level'],
+                    'reorder_level' => $validatedData['reorder_level'] ?? 5,
                     'tracking_type' => $validatedData['tracking_type'],
                     'estimated_useful_life' => $validatedData['estimated_useful_life'] ?? null,
                     'image_path' => $imagePath,
@@ -111,7 +113,7 @@ class ItemController extends Controller
             'specifications' => 'nullable|string|max:255',
             'type' => 'nullable|string|max:255',
             'unit_of_measure' => 'required|string|max:50',
-            'reorder_level' => 'required|integer|min:0',
+            'reorder_level' => 'nullable|integer|min:0',
             'tracking_type' => 'required|in:asset,consumable',
             'estimated_useful_life' => 'nullable|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
@@ -119,7 +121,6 @@ class ItemController extends Controller
 
         try {
             if ($request->hasFile('image')) {
-                // Delete existing photo if present
                 if ($item->image_path && Storage::disk('public')->exists($item->image_path)) {
                     Storage::disk('public')->delete($item->image_path);
                 }

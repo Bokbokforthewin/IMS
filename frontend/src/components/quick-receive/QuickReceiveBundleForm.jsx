@@ -1,13 +1,147 @@
-import React, { useState } from 'react';
-import { Field, FieldLabel, FieldGroup, FieldDescription } from '@/components/ui/field';
+import React, { useState, useEffect } from 'react';
+import { 
+  Boxes, Plus, Trash2, Save, Layers, Calendar as CalendarIconLucide, 
+  DollarSign, ShieldCheck, Globe, Search, Scale, Tag 
+} from 'lucide-react';
+import { Field, FieldLabel, FieldGroup, FieldDescription, FieldSet, FieldLegend } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import SerialNumberScanner from '../receive/SerialNumberScanner.jsx';
 import ItemPickerDialog from '@/components/ItemPickerDialog.jsx';
 import ImageCaptureInput from '@/components/ImageCaptureInput.jsx';
+
+// --- Date Helpers ---
+function formatDateDisplay(date) {
+  if (!date || isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function formatISO(date) {
+  if (!date || isNaN(date.getTime())) return '';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function parseISO(isoString) {
+  if (!isoString) return undefined;
+  const [y, m, d] = isoString.split('-').map(Number);
+  if (y && m && d) return new Date(y, m - 1, d);
+  const date = new Date(isoString);
+  return isNaN(date.getTime()) ? undefined : date;
+}
+
+function isValidDate(date) {
+  return !!date && !isNaN(date.getTime());
+}
+
+// --- DatePicker Component using Shadcn InputGroup + Popover + Calendar ---
+function ArrivalDatePicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const currentDate = parseISO(value);
+  const [month, setMonth] = useState(currentDate || new Date());
+  const [inputValue, setInputValue] = useState(formatDateDisplay(currentDate));
+
+  useEffect(() => {
+    const parsed = parseISO(value);
+    setInputValue(formatDateDisplay(parsed));
+    if (parsed) setMonth(parsed);
+  }, [value]);
+
+  const handleInputChange = (e) => {
+    const rawVal = e.target.value;
+    setInputValue(rawVal);
+    const parsed = new Date(rawVal);
+    if (isValidDate(parsed)) {
+      onChange(formatISO(parsed));
+      setMonth(parsed);
+    }
+  };
+
+  const handleSelectDate = (selectedDate) => {
+    if (selectedDate) {
+      onChange(formatISO(selectedDate));
+      setInputValue(formatDateDisplay(selectedDate));
+    } else {
+      onChange('');
+      setInputValue('');
+    }
+    setOpen(false);
+  };
+
+  return (
+    <InputGroup className="mt-1.5 w-full">
+      <InputGroupInput
+        id="arrival_date"
+        value={inputValue}
+        placeholder="e.g., June 01, 2026"
+        onChange={handleInputChange}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+        required
+      />
+      <InputGroupAddon align="inline-end">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger
+            render={
+              <InputGroupButton
+                id="date-picker-trigger"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Select arrival date"
+                type="button"
+              >
+                <CalendarIconLucide className="size-4 text-muted-foreground" />
+                <span className="sr-only">Select arrival date</span>
+              </InputGroupButton>
+            }
+          />
+          <PopoverContent
+            className="w-auto overflow-hidden p-0 border border-border"
+            align="end"
+            alignOffset={-8}
+            sideOffset={10}
+          >
+            <Calendar
+              mode="single"
+              selected={currentDate}
+              month={month}
+              onMonthChange={setMonth}
+              onSelect={handleSelectDate}
+            />
+          </PopoverContent>
+        </Popover>
+      </InputGroupAddon>
+    </InputGroup>
+  );
+}
 
 function emptyComponent() {
   return {
@@ -80,149 +214,352 @@ export default function QuickReceiveBundleForm({ categories, items, handleApiCal
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-7xl mx-auto px-2 sm:px-4">
-      <FieldGroup className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field>
-          <FieldLabel>Number of Sets *</FieldLabel>
-          <Input type="number" min="1" required value={sets} onChange={(e) => setSets(e.target.value)} />
-          <FieldDescription>How many identical sets/boxes arrived.</FieldDescription>
-        </Field>
-        <Field>
-          <FieldLabel>Arrival Date *</FieldLabel>
-          <Input type="date" required value={arrivalDate} onChange={(e) => setArrivalDate(e.target.value)} />
-        </Field>
-      </FieldGroup>
-
-      <Card>
-        <CardHeader className="px-4 sm:px-6"><CardTitle className="text-base">Main Unit</CardTitle></CardHeader>
-        <CardContent className="px-4 sm:px-6">
-          <ComponentFields label="Main Item" items={items} categories={categories} value={main} onChange={setMain} sets={setsNum} />
-          {peripherals.length > 0 && !main.has_property_number && (
-            <p className="text-sm text-destructive mt-2">Peripherals need the main unit to have a property number.</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {peripherals.map((p, index) => (
-        <Card key={index}>
-          <CardHeader className="flex flex-row items-center justify-between px-4 sm:px-6">
-            <CardTitle className="text-base">Peripheral #{index + 1}</CardTitle>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setPeripherals(peripherals.filter((_, i) => i !== index))}>Remove</Button>
-          </CardHeader>
-          <CardContent className="px-4 sm:px-6">
-            <ComponentFields
-              label={`Peripheral #${index + 1}`}
-              items={items} categories={categories} value={p} sets={setsNum}
-              onChange={(updated) => setPeripherals(peripherals.map((x, i) => (i === index ? updated : x)))}
-            />
-          </CardContent>
-        </Card>
-      ))}
-
-      <div className="flex flex-col sm:flex-row gap-4">
-        <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setPeripherals([...peripherals, emptyComponent()])} disabled={setsNum <= 0}>
-          + Add Peripheral
-        </Button>
-
-        <Button type="submit" className="w-full sm:w-auto min-w-[200px]" disabled={!isReady || submitting}>
-          {submitting ? 'Processing...' : 'Process Bundle Delivery'}
-        </Button>
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
+      {/* Prominent Task Title Header */}
+      <div className="flex items-center gap-2 border-b border-border pb-3">
+        <Boxes className="h-4 w-4 text-primary" />
+        <h3 className="text-xs font-semibold tracking-wider uppercase text-muted-foreground">
+          Quick Receive Bundled Assets & Equipment Sets
+        </h3>
       </div>
-    </form>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <FieldGroup className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field>
+              <FieldLabel htmlFor="sets" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+                Number of Bundles (Sets) <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input
+                id="sets"
+                type="number"
+                min="1"
+                required
+                placeholder="e.g., 5"
+                value={sets}
+                onChange={(e) => setSets(e.target.value)}
+                className="mt-1.5 w-full"
+              />
+              <FieldDescription className="text-[11px] text-muted-foreground mt-1">
+                Total number of identical composite equipment sets receiving stock.
+              </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="arrival_date" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <CalendarIconLucide className="w-3.5 h-3.5 text-muted-foreground" />
+                Arrival Date <span className="text-destructive">*</span>
+              </FieldLabel>
+              <ArrivalDatePicker
+                value={arrivalDate}
+                onChange={(dateStr) => setArrivalDate(dateStr)}
+              />
+            </Field>
+          </div>
+
+          {/* Main System Unit Card */}
+          <Card className="rounded-lg border border-border bg-card shadow-2xs">
+            <CardHeader className="border-b border-border py-3 px-4 sm:px-6">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                <ShieldCheck className="size-4 text-primary" />
+                Main System Unit
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-5">
+              <ComponentFields
+                label="Main Component"
+                items={items}
+                categories={categories}
+                value={main}
+                onChange={setMain}
+                sets={setsNum}
+              />
+              {peripherals.length > 0 && !main.has_property_number && (
+                <p className="text-xs text-destructive mt-3 font-medium flex items-center gap-1.5">
+                  Peripherals require the main system unit to have an assigned property number.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Peripherals Cards */}
+          {peripherals.map((p, index) => (
+            <Card key={index} className="rounded-lg border border-border bg-card shadow-2xs">
+              <CardHeader className="flex flex-row items-center justify-between border-b border-border py-2.5 px-4 sm:px-6">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                  <Boxes className="size-4 text-muted-foreground" />
+                  Peripheral {index + 1} (e.g., Monitor, UPS, Keyboard)
+                </CardTitle>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setPeripherals(peripherals.filter((_, i) => i !== index))}
+                  className="h-7 text-xs gap-1.5"
+                >
+                  <Trash2 className="size-3.5" />
+                  Remove
+                </Button>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-5">
+                <ComponentFields
+                  label={`Peripheral ${index + 1}`}
+                  items={items}
+                  categories={categories}
+                  value={p}
+                  sets={setsNum}
+                  onChange={(updated) =>
+                    setPeripherals(peripherals.map((x, i) => (i === index ? updated : x)))
+                  }
+                />
+              </CardContent>
+            </Card>
+          ))}
+
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 text-xs"
+              onClick={() => setPeripherals([...peripherals, emptyComponent()])}
+              disabled={setsNum <= 0}
+            >
+              <Plus className="size-4" />
+              Add Peripheral Component
+            </Button>
+          </div>
+        </FieldGroup>
+
+        <div className="pt-2 border-t border-border">
+          <Button
+            type="submit"
+            className="w-full sm:w-auto min-w-[200px] flex items-center justify-center gap-2"
+            disabled={!isReady || submitting}
+          >
+            <Save className="w-4 h-4" />
+            {submitting ? 'Processing Entry...' : 'Process Bundle Delivery'}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }
 
 function ComponentFields({ label, items, categories, value, onChange, sets }) {
+  const categoryOptions = (categories || []).map((c) => ({ value: String(c.id), label: c.name }));
+
   return (
     <FieldGroup className="space-y-4">
-      <RadioGroup value={value.item_mode} onValueChange={(v) => onChange({ ...value, item_mode: v, item_id: '' })} className="flex flex-col sm:flex-row gap-3 sm:gap-6">
+      {/* Item Mode Switcher */}
+      <RadioGroup
+        value={value.item_mode}
+        onValueChange={(v) => onChange({ ...value, item_mode: v, item_id: '' })}
+        className="flex flex-col sm:flex-row gap-3 sm:gap-6 border-b border-border/60 pb-3"
+      >
         <Field orientation="horizontal" className="space-x-2">
           <RadioGroupItem value="new" id={`bundle-mode-new-${label}`} />
-          <FieldLabel htmlFor={`bundle-mode-new-${label}`} className="font-normal cursor-pointer">New catalog item</FieldLabel>
+          <FieldLabel htmlFor={`bundle-mode-new-${label}`} className="font-medium text-xs sm:text-sm cursor-pointer text-foreground">
+            Encode new catalog item
+          </FieldLabel>
         </Field>
         <Field orientation="horizontal" className="space-x-2">
           <RadioGroupItem value="existing" id={`bundle-mode-existing-${label}`} />
-          <FieldLabel htmlFor={`bundle-mode-existing-${label}`} className="font-normal cursor-pointer">Existing catalog item</FieldLabel>
+          <FieldLabel htmlFor={`bundle-mode-existing-${label}`} className="font-medium text-xs sm:text-sm cursor-pointer text-foreground">
+            Existing asset catalog item
+          </FieldLabel>
         </Field>
       </RadioGroup>
 
       {value.item_mode === 'existing' ? (
         <Field>
-          <FieldLabel>{label} *</FieldLabel>
-          <ItemPickerDialog
-            items={items}
-            categories={categories}
-            value={value.item_id}
-            filterTrackingType="asset"
-            onSelect={(item) => onChange({ ...value, item_id: String(item.id) })}
-          />
+          <FieldLabel className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Search className="w-3.5 h-3.5 text-muted-foreground" />
+            Select {label} <span className="text-destructive">*</span>
+          </FieldLabel>
+          <div className="mt-1.5">
+            <ItemPickerDialog
+              items={items}
+              categories={categories}
+              value={value.item_id}
+              filterTrackingType="asset"
+              onSelect={(item) => onChange({ ...value, item_id: String(item.id) })}
+            />
+          </div>
         </Field>
       ) : (
-        <>
+        <FieldGroup className="space-y-4">
           <Field>
-            <FieldLabel>Category *</FieldLabel>
-            <select
-              required
-              className="border rounded-md h-9 px-2 w-full bg-background text-xs"
-              value={value.category_id}
-              onChange={(e) => onChange({ ...value, category_id: e.target.value })}
+            <FieldLabel className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Tag className="w-3.5 h-3.5 text-muted-foreground" />
+              Category <span className="text-destructive">*</span>
+            </FieldLabel>
+            <Select 
+              items={categoryOptions} 
+              value={value.category_id} 
+              onValueChange={(v) => onChange({ ...value, category_id: v })}
             >
-              <option value="">Select category...</option>
-              {(categories || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+              <SelectTrigger className="w-full mt-1.5">
+                <SelectValue placeholder="Select asset category..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {categoryOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </Field>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field><FieldLabel>Item Name *</FieldLabel><Input required value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} /></Field>
-            <Field><FieldLabel>Unit of Measure *</FieldLabel><Input required value={value.unit_of_measure} onChange={(e) => onChange({ ...value, unit_of_measure: e.target.value })} /></Field>
+            <Field>
+              <FieldLabel className="text-xs font-medium text-muted-foreground">
+                Item Name <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input
+                required
+                placeholder="e.g., Desktop System Unit"
+                value={value.name}
+                onChange={(e) => onChange({ ...value, name: e.target.value })}
+                className="mt-1.5 w-full"
+              />
+            </Field>
+            <Field>
+              <FieldLabel className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Scale className="w-3.5 h-3.5 text-muted-foreground" />
+                Unit of Measure <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input
+                required
+                placeholder="e.g., unit, set, piece"
+                value={value.unit_of_measure}
+                onChange={(e) => onChange({ ...value, unit_of_measure: e.target.value })}
+                className="mt-1.5 w-full"
+              />
+            </Field>
           </div>
 
-          {/* ADDED: Image Capture & Upload Field */}
+          {/* Image Capture & Upload Field */}
           <ImageCaptureInput
             onImageSelected={(file) => onChange({ ...value, image: file })}
             currentImageUrl={value.image ? URL.createObjectURL(value.image) : null}
           />
-        </>
+        </FieldGroup>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+      {/* Pricing & Serial Switches Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Field>
-          <FieldLabel>Unit Cost (₱) *</FieldLabel>
-          <Input type="number" step="0.01" min="0" required value={value.unit_cost} onChange={(e) => onChange({ ...value, unit_cost: e.target.value })} />
+          <FieldLabel className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+            Unit Cost (₱) <span className="text-destructive">*</span>
+          </FieldLabel>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            required
+            placeholder="0.00"
+            value={value.unit_cost}
+            onChange={(e) => onChange({ ...value, unit_cost: e.target.value })}
+            className="mt-1.5 w-full"
+          />
         </Field>
 
-        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 pt-2 sm:pt-6">
-          <Field orientation="horizontal" className="space-x-3">
-            <Switch checked={value.has_property_number} onCheckedChange={(c) => onChange({ ...value, has_property_number: c })} />
-            <FieldLabel className="cursor-pointer">Assign Property Number</FieldLabel>
-          </Field>
-
-          <Field orientation="horizontal" className="space-x-3">
-            <Switch 
-              checked={value.has_serial_number} 
-              onCheckedChange={(c) => onChange({ ...value, has_serial_number: c, serial_numbers: c ? value.serial_numbers : [] })} 
+        {/* Toggle Property Number */}
+        <Field className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-3">
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={value.has_property_number}
+              onCheckedChange={(c) => onChange({ ...value, has_property_number: c })}
             />
-            <FieldLabel className="cursor-pointer">Track Serial Numbers</FieldLabel>
-          </Field>
-        </div>
+            <FieldLabel className="cursor-pointer text-xs font-semibold text-foreground">
+              Assign Property Number
+            </FieldLabel>
+          </div>
+        </Field>
+
+        {/* Toggle Serial Number Tracking */}
+        <Field className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-3">
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={value.has_serial_number}
+              onCheckedChange={(c) =>
+                onChange({
+                  ...value,
+                  has_serial_number: c,
+                  serial_numbers: c ? value.serial_numbers : [],
+                })
+              }
+            />
+            <FieldLabel className="cursor-pointer text-xs font-semibold text-foreground">
+              Track Serial Numbers
+            </FieldLabel>
+          </div>
+        </Field>
       </div>
 
+      {/* Model Specs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Field><FieldLabel>Model</FieldLabel><Input value={value.model} onChange={(e) => onChange({ ...value, model: e.target.value })} /></Field>
-        <Field><FieldLabel>Manufacturer</FieldLabel><Input value={value.manufacturer_name} onChange={(e) => onChange({ ...value, manufacturer_name: e.target.value })} /></Field>
-        <Field><FieldLabel>Country of Origin</FieldLabel><Input value={value.country_of_origin} onChange={(e) => onChange({ ...value, country_of_origin: e.target.value })} /></Field>
+        <Field>
+          <FieldLabel className="text-xs font-medium text-muted-foreground">Model</FieldLabel>
+          <Input
+            placeholder="e.g., OptiPlex 7090"
+            value={value.model}
+            onChange={(e) => onChange({ ...value, model: e.target.value })}
+            className="mt-1.5 w-full"
+          />
+        </Field>
+        <Field>
+          <FieldLabel className="text-xs font-medium text-muted-foreground">Manufacturer</FieldLabel>
+          <Input
+            placeholder="e.g., Dell Inc."
+            value={value.manufacturer_name}
+            onChange={(e) => onChange({ ...value, manufacturer_name: e.target.value })}
+            className="mt-1.5 w-full"
+          />
+        </Field>
+        <Field>
+          <FieldLabel className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Globe className="w-3.5 h-3.5" />
+            Country of Origin
+          </FieldLabel>
+          <Input
+            placeholder="e.g., Philippines, Japan"
+            value={value.country_of_origin}
+            onChange={(e) => onChange({ ...value, country_of_origin: e.target.value })}
+            className="mt-1.5 w-full"
+          />
+        </Field>
       </div>
 
       {value.item_mode === 'new' && (
         <Field>
-          <FieldLabel>Estimated Useful Life</FieldLabel>
-          <Input placeholder="e.g. 5 Years" value={value.estimated_useful_life} onChange={(e) => onChange({ ...value, estimated_useful_life: e.target.value })} />
+          <FieldLabel className="text-xs font-medium text-muted-foreground">
+            Estimated Useful Life (in years)
+          </FieldLabel>
+          <Input
+            placeholder="e.g., 5"
+            value={value.estimated_useful_life}
+            onChange={(e) => onChange({ ...value, estimated_useful_life: e.target.value })}
+            className="mt-1.5 w-full"
+          />
         </Field>
       )}
 
       {value.has_serial_number && sets > 0 && (
-        <Field>
-          <FieldLabel>Serial Numbers * ({sets} needed)</FieldLabel>
-          <SerialNumberScanner quantity={sets} serials={value.serial_numbers} onChange={(serials) => onChange({ ...value, serial_numbers: serials })} />
+        <Field className="pt-2">
+          <FieldLabel className="text-xs font-medium text-muted-foreground mb-1.5">
+            Serial Numbers <span className="text-destructive">*</span> ({sets} needed)
+          </FieldLabel>
+          <SerialNumberScanner
+            quantity={sets}
+            serials={value.serial_numbers}
+            onChange={(serials) => onChange({ ...value, serial_numbers: serials })}
+          />
         </Field>
       )}
     </FieldGroup>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Tag, Package, Badge, Ruler, 
-  Layers, TrendingDown, Save, Clock, FileText, Sliders, Check, X
+  Layers, TrendingDown, Save, Clock, FileText, Sliders, Check, X, PackagePlus
 } from 'lucide-react';
 import { 
   Field, FieldLabel, FieldGroup, FieldSet, FieldLegend 
@@ -17,7 +17,6 @@ function CategorySearch({ categories = [], categoryId, onSelectCategory }) {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
 
-  // Sync internal search input state when form value is reset externally
   useEffect(() => {
     if (!categoryId) {
       setSearchTerm('');
@@ -29,7 +28,6 @@ function CategorySearch({ categories = [], categoryId, onSelectCategory }) {
     }
   }, [categoryId, categories]);
 
-  // Handle clicking outside to close suggestions
   useEffect(() => {
     function handleClickOutside(event) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
@@ -49,7 +47,6 @@ function CategorySearch({ categories = [], categoryId, onSelectCategory }) {
     setSearchTerm(val);
     setIsOpen(true);
 
-    // Auto-match exact category name (case-insensitive)
     const exactMatch = categories.find(
       (c) => c.name.trim().toLowerCase() === val.trim().toLowerCase()
     );
@@ -74,7 +71,7 @@ function CategorySearch({ categories = [], categoryId, onSelectCategory }) {
   };
 
   return (
-    <div ref={wrapperRef} className="relative w-full">
+    <div ref={wrapperRef} className="relative w-full mt-1.5">
       <div className="relative flex items-center">
         <Input
           id="category_id"
@@ -101,7 +98,7 @@ function CategorySearch({ categories = [], categoryId, onSelectCategory }) {
 
       {/* Recommendations Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-56 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border border-border shadow-md max-h-56 overflow-y-auto">
           {filteredCategories.length > 0 ? (
             <ul className="py-1 text-sm">
               {filteredCategories.map((cat) => {
@@ -142,7 +139,6 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
     e.preventDefault();
     if (!itemForm.category_id) return;
 
-    // Build FormData payload to support file upload
     const formData = new FormData();
     formData.append('category_id', itemForm.category_id);
     formData.append('name', itemForm.name);
@@ -161,7 +157,6 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
       }
     }
 
-    // Attach photo file if present
     if (itemForm.image) {
       formData.append('image', itemForm.image);
     }
@@ -181,157 +176,178 @@ export default function ItemForm({ itemForm, setItemForm, categories, handleApiC
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <FieldGroup>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field data-invalid={!itemForm.category_id ? undefined : false}>
-            <FieldLabel htmlFor="category_id" className="flex items-center gap-2">
-              <Tag className="w-4 h-4 text-muted-foreground" /> Category <span className="text-destructive">*</span>
-            </FieldLabel>
-            <CategorySearch
-              categories={categories}
-              categoryId={itemForm.category_id}
-              onSelectCategory={(id) => setItemForm({ ...itemForm, category_id: id })}
-            />
-          </Field>
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
+      {/* Task Header */}
+      <div className="flex items-center gap-2 border-b border-border pb-3">
+        <PackagePlus className="h-4 w-4 text-primary" />
+        <h3 className="text-xs font-semibold tracking-wider uppercase text-muted-foreground">
+          Create Master Catalog Item
+        </h3>
+      </div>
 
-          <Field>
-            <FieldLabel htmlFor="name" className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-muted-foreground" /> Item Name <span className="text-destructive">*</span>
-            </FieldLabel>
-            <Input
-              id="name"
-              required
-              placeholder="e.g., Office Chair, Dell Monitor, Printer Paper"
-              value={itemForm.name || ''}
-              onChange={e => setItemForm({ ...itemForm, name: e.target.value })}
-            />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field>
-            <FieldLabel htmlFor="brand" className="flex items-center gap-2">
-              <Badge className="w-4 h-4 text-muted-foreground" /> Brand
-            </FieldLabel>
-            <Input
-              id="brand"
-              placeholder="e.g., HP, Epson, Logitech"
-              value={itemForm.brand || ''}
-              onChange={e => setItemForm({ ...itemForm, brand: e.target.value })}
-            />
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="type" className="flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-muted-foreground" /> Type
-            </FieldLabel>
-            <Input
-              id="type"
-              placeholder="e.g., Peripheral, Hardware, Office Supply"
-              value={itemForm.type || ''}
-              onChange={e => setItemForm({ ...itemForm, type: e.target.value })}
-            />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field>
-            <FieldLabel htmlFor="specifications" className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-muted-foreground" /> Specifications
-            </FieldLabel>
-            <Input
-              id="specifications"
-              placeholder="e.g., Short, A4, 70gsm, 27-inch 4K IPS"
-              value={itemForm.specifications || ''}
-              onChange={e => setItemForm({ ...itemForm, specifications: e.target.value })}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="unit_of_measure" className="flex items-center gap-2">
-              <Ruler className="w-4 h-4 text-muted-foreground" /> Unit of Measure <span className="text-destructive">*</span>
-            </FieldLabel>
-            <Input
-              id="unit_of_measure"
-              required
-              placeholder="pcs, ream, box, set, roll, liter"
-              value={itemForm.unit_of_measure || ''}
-              onChange={e => setItemForm({ ...itemForm, unit_of_measure: e.target.value })}
-            />
-          </Field>
-        </div>
-
-        {/* Camera Capture & File Upload Input */}
-        <div className="pt-2">
-          <ImageCaptureInput
-            onImageSelected={(file) => setItemForm({ ...itemForm, image: file })}
-            currentImageUrl={itemForm.image ? URL.createObjectURL(itemForm.image) : null}
-          />
-        </div>
-
-        <FieldSet className="w-full mt-4 pt-4 border-t">
-          <FieldLegend variant="label" className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-muted-foreground" />
-            Tracking Type 
-          </FieldLegend>
-
-          <RadioGroup
-            value={trackingType}
-            onValueChange={(value) => setItemForm({ ...itemForm, tracking_type: value })}
-          >
-            <Field orientation="horizontal">
-              <RadioGroupItem value="asset" id="track-asset" />
-              <FieldLabel htmlFor="track-asset" className="font-normal cursor-pointer">
-                Asset <span className="text-muted-foreground text-sm">(Equipment requiring serials / property numbers)</span>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <FieldGroup className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field data-invalid={!itemForm.category_id ? undefined : false}>
+              <FieldLabel htmlFor="category_id" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Tag className="w-4 h-4 text-muted-foreground" /> Category <span className="text-destructive">*</span>
               </FieldLabel>
+              <CategorySearch
+                categories={categories}
+                categoryId={itemForm.category_id}
+                onSelectCategory={(id) => setItemForm({ ...itemForm, category_id: id })}
+              />
             </Field>
 
-            <Field orientation="horizontal">
-              <RadioGroupItem value="consumable" id="track-consumable" />
-              <FieldLabel htmlFor="track-consumable" className="font-normal cursor-pointer">
-                Consumable <span className="text-muted-foreground text-sm">(Quantity-based inventory supplies)</span>
-              </FieldLabel>
-            </Field>
-          </RadioGroup>
-        </FieldSet>
-
-        <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 mt-2">
-          {isConsumable && (
             <Field>
-              <FieldLabel htmlFor="reorder_level" className="flex items-center gap-2">
-                <TrendingDown className="w-4 h-4 text-muted-foreground" /> Reorder Level <span className="text-destructive">*</span>
+              <FieldLabel htmlFor="name" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Package className="w-4 h-4 text-muted-foreground" /> Item Name <span className="text-destructive">*</span>
               </FieldLabel>
               <Input
-                id="reorder_level"
-                type="number"
-                min="0"
+                id="name"
                 required
-                placeholder="5"
-                value={itemForm.reorder_level ?? '5'}
-                onChange={e => setItemForm({ ...itemForm, reorder_level: e.target.value })}
+                placeholder="e.g., Office Chair, Dell Monitor, Printer Paper"
+                value={itemForm.name || ''}
+                onChange={e => setItemForm({ ...itemForm, name: e.target.value })}
+                className="mt-1.5 w-full"
               />
             </Field>
-          )}
+          </div>
 
-          {isAsset && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field>
-              <FieldLabel htmlFor="estimated_useful_life" className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-muted-foreground" /> Estimated Useful Life <span className="text-destructive">*</span>
+              <FieldLabel htmlFor="brand" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Badge className="w-4 h-4 text-muted-foreground" /> Brand
               </FieldLabel>
               <Input
-                id="estimated_useful_life"
-                placeholder="e.g., 3 Years, 5 Years"
-                value={itemForm.estimated_useful_life || ''}
-                onChange={e => setItemForm({ ...itemForm, estimated_useful_life: e.target.value })}
+                id="brand"
+                placeholder="e.g., HP, Epson, Logitech"
+                value={itemForm.brand || ''}
+                onChange={e => setItemForm({ ...itemForm, brand: e.target.value })}
+                className="mt-1.5 w-full"
               />
             </Field>
-          )}
-        </div>
-      </FieldGroup>
 
-      <Button type="submit" className="mt-6 flex items-center gap-2">
-        <Save className="w-4 h-4" /> Save Item
-      </Button>
-    </form>
+            <Field>
+              <FieldLabel htmlFor="type" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Sliders className="w-4 h-4 text-muted-foreground" /> Type
+              </FieldLabel>
+              <Input
+                id="type"
+                placeholder="e.g., Peripheral, Hardware, Office Supply"
+                value={itemForm.type || ''}
+                onChange={e => setItemForm({ ...itemForm, type: e.target.value })}
+                className="mt-1.5 w-full"
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field>
+              <FieldLabel htmlFor="specifications" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <FileText className="w-4 h-4 text-muted-foreground" /> Specifications
+              </FieldLabel>
+              <Input
+                id="specifications"
+                placeholder="e.g., Short, A4, 70gsm, 27-inch 4K IPS"
+                value={itemForm.specifications || ''}
+                onChange={e => setItemForm({ ...itemForm, specifications: e.target.value })}
+                className="mt-1.5 w-full"
+              />
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="unit_of_measure" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Ruler className="w-4 h-4 text-muted-foreground" /> Unit of Measure <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input
+                id="unit_of_measure"
+                required
+                placeholder="pcs, ream, box, set, roll, liter"
+                value={itemForm.unit_of_measure || ''}
+                onChange={e => setItemForm({ ...itemForm, unit_of_measure: e.target.value })}
+                className="mt-1.5 w-full"
+              />
+            </Field>
+          </div>
+
+          {/* Camera Capture & File Upload Input */}
+          <div className="pt-2">
+            <ImageCaptureInput
+              onImageSelected={(file) => setItemForm({ ...itemForm, image: file })}
+              currentImageUrl={itemForm.image ? URL.createObjectURL(itemForm.image) : null}
+            />
+          </div>
+
+          <FieldSet className="w-full pt-4 border-t border-border">
+            <FieldLegend variant="label" className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2">
+              <Layers className="w-4 h-4 text-muted-foreground" />
+              Tracking Type 
+            </FieldLegend>
+
+            <RadioGroup
+              value={trackingType}
+              onValueChange={(value) => setItemForm({ ...itemForm, tracking_type: value })}
+              className="gap-3"
+            >
+              <Field orientation="horizontal" className="flex items-center gap-2">
+                <RadioGroupItem value="asset" id="track-asset" />
+                <FieldLabel htmlFor="track-asset" className="font-normal cursor-pointer text-sm">
+                  Asset <span className="text-muted-foreground text-xs">(Equipment requiring serials / property numbers)</span>
+                </FieldLabel>
+              </Field>
+
+              <Field orientation="horizontal" className="flex items-center gap-2">
+                <RadioGroupItem value="consumable" id="track-consumable" />
+                <FieldLabel htmlFor="track-consumable" className="font-normal cursor-pointer text-sm">
+                  Consumable <span className="text-muted-foreground text-xs">(Quantity-based inventory supplies)</span>
+                </FieldLabel>
+              </Field>
+            </RadioGroup>
+          </FieldSet>
+
+          <div className="grid grid-cols-1 gap-4">
+            {isConsumable && (
+              <Field>
+                <FieldLabel htmlFor="reorder_level" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <TrendingDown className="w-4 h-4 text-muted-foreground" /> Reorder Level <span className="text-destructive">*</span>
+                </FieldLabel>
+                <Input
+                  id="reorder_level"
+                  type="number"
+                  min="0"
+                  required
+                  placeholder="5"
+                  value={itemForm.reorder_level ?? '5'}
+                  onChange={e => setItemForm({ ...itemForm, reorder_level: e.target.value })}
+                  className="mt-1.5 w-full"
+                />
+              </Field>
+            )}
+
+            {isAsset && (
+              <Field>
+                <FieldLabel htmlFor="estimated_useful_life" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <Clock className="w-4 h-4 text-muted-foreground" /> Estimated Useful Life <span className="text-destructive">*</span>
+                </FieldLabel>
+                <Input
+                  id="estimated_useful_life"
+                  placeholder="e.g., 3 Years, 5 Years"
+                  value={itemForm.estimated_useful_life || ''}
+                  onChange={e => setItemForm({ ...itemForm, estimated_useful_life: e.target.value })}
+                  className="mt-1.5 w-full"
+                />
+              </Field>
+            )}
+          </div>
+        </FieldGroup>
+
+        <div className="pt-2">
+          <Button type="submit" className="w-full sm:w-auto min-w-[140px] flex items-center justify-center gap-2">
+            <Save className="w-4 h-4" /> Save Item
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }

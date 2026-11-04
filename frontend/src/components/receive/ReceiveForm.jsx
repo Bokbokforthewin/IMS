@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { CalendarIcon, Search, Check, X } from 'lucide-react';
+import { 
+  CalendarIcon, Search, Check, X, PackageCheck, 
+  DollarSign, Calendar as CalendarIconLucide, Layers, Globe, ShieldCheck, Save 
+} from 'lucide-react';
 
 import {
   Field,
@@ -57,7 +60,7 @@ function isValidDate(date) {
   return !!date && !isNaN(date.getTime());
 }
 
-// --- DatePicker Component using Shadcn InputGroup + Popover + Calendar ---
+// --- DatePicker Component ---
 function ArrivalDatePicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const currentDate = parseISO(value);
@@ -92,7 +95,7 @@ function ArrivalDatePicker({ value, onChange }) {
   };
 
   return (
-    <InputGroup>
+    <InputGroup className="mt-1.5 w-full">
       <InputGroupInput
         id="arrival_date"
         value={inputValue}
@@ -117,13 +120,13 @@ function ArrivalDatePicker({ value, onChange }) {
                 aria-label="Select arrival date"
                 type="button"
               >
-                <CalendarIcon className="size-4" />
+                <CalendarIcon className="size-4 text-muted-foreground" />
                 <span className="sr-only">Select arrival date</span>
               </InputGroupButton>
             }
           />
           <PopoverContent
-            className="w-auto overflow-hidden p-0"
+            className="w-auto overflow-hidden p-0 border border-border"
             align="end"
             alignOffset={-8}
             sideOffset={10}
@@ -233,7 +236,7 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
   };
 
   return (
-    <div ref={wrapperRef} className="relative w-full">
+    <div ref={wrapperRef} className="relative w-full mt-1.5">
       <div className="relative flex items-center">
         <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />
         <Input
@@ -260,7 +263,7 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-lg max-h-64 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border border-border shadow-md max-h-64 overflow-y-auto">
           {filteredItems.length > 0 ? (
             <ul className="py-1 divide-y divide-border/40 text-sm">
               {filteredItems.map((item) => {
@@ -290,8 +293,8 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider ${
                             item.tracking_type === 'asset'
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-                              : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                              ? 'bg-info-soft text-info-text border border-info-border'
+                              : 'bg-success-soft text-success-text border border-success-border'
                           }`}
                         >
                           {item.tracking_type === 'asset'
@@ -341,7 +344,6 @@ export default function ReceiveForm({
   const isAsset = selectedItem?.tracking_type === 'asset';
   const quantity = Number(receiveForm.quantity) || 0;
 
-  // Set default has_serial_number to true if not defined
   const hasSerialNumber = receiveForm.has_serial_number ?? true;
 
   useEffect(() => {
@@ -352,7 +354,6 @@ export default function ReceiveForm({
     e.preventDefault();
     if (!receiveForm.item_id) return;
     
-    // Check serial number length requirement ONLY if serial number tracking is enabled
     if (isAsset && hasSerialNumber && serials.length !== quantity) return;
 
     const payload = isAsset
@@ -382,13 +383,23 @@ export default function ReceiveForm({
   };
 
   return (
-    <div className="receive-panel">
-      <h2 className="receive-panel__title">Receive Stock / Inbound Delivery</h2>
-      <form className="receive-form" onSubmit={handleSubmit}>
-        <FieldGroup>
-          {/* Responsive Auto-Matching Catalog Item Search */}
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
+      {/* Prominent Task Title Header */}
+      <div className="flex items-center gap-2 border-b border-border pb-3">
+        <PackageCheck className="h-4 w-4 text-primary" />
+        <h3 className="text-xs font-semibold tracking-wider uppercase text-muted-foreground">
+          Receive Stock / Inbound Delivery
+        </h3>
+      </div>
+
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <FieldGroup className="space-y-4">
+          {/* Item Search */}
           <Field data-invalid={!receiveForm.item_id ? undefined : false}>
-            <FieldLabel htmlFor="item_id">Select Catalog Item <span className="text-destructive">*</span></FieldLabel>
+            <FieldLabel htmlFor="item_id" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Search className="w-3.5 h-3.5 text-muted-foreground" />
+              Select Catalog Item <span className="text-destructive">*</span>
+            </FieldLabel>
             <ItemSearch
               items={items}
               itemId={receiveForm.item_id}
@@ -398,150 +409,182 @@ export default function ReceiveForm({
             />
           </Field>
 
-          {/* Unit Cost */}
-          <Field>
-            <FieldLabel htmlFor="unit_cost">Unit Cost (₱) <span className="text-destructive">*</span></FieldLabel>
-            <Input
-              id="unit_cost"
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              value={receiveForm.unit_cost || ''}
-              onChange={(e) =>
-                setReceiveForm({ ...receiveForm, unit_cost: e.target.value })
-              }
-            />
-          </Field>
+          {/* Unit Cost, Date, and Quantity Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Field>
+              <FieldLabel htmlFor="unit_cost" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                Unit Cost (₱) <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input
+                id="unit_cost"
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                placeholder="0.00"
+                value={receiveForm.unit_cost || ''}
+                onChange={(e) =>
+                  setReceiveForm({ ...receiveForm, unit_cost: e.target.value })
+                }
+                className="mt-1.5 w-full"
+              />
+            </Field>
 
-          {/* Custom DatePicker Input */}
-          <Field>
-            <FieldLabel htmlFor="arrival_date">Arrival Date <span className="text-destructive">*</span></FieldLabel>
-            <ArrivalDatePicker
-              value={receiveForm.arrival_date || ''}
-              onChange={(dateStr) =>
-                setReceiveForm({ ...receiveForm, arrival_date: dateStr })
-              }
-            />
-          </Field>
+            <Field>
+              <FieldLabel htmlFor="arrival_date" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <CalendarIconLucide className="w-3.5 h-3.5 text-muted-foreground" />
+                Arrival Date <span className="text-destructive">*</span>
+              </FieldLabel>
+              <ArrivalDatePicker
+                value={receiveForm.arrival_date || ''}
+                onChange={(dateStr) =>
+                  setReceiveForm({ ...receiveForm, arrival_date: dateStr })
+                }
+              />
+            </Field>
 
-          {/* Quantity */}
-          <Field>
-            <FieldLabel htmlFor="quantity">Quantity <span className="text-destructive">*</span></FieldLabel>
-            <Input
-              id="quantity"
-              type="number"
-              min="1"
-              required
-              value={receiveForm.quantity || ''}
-              onChange={(e) =>
-                setReceiveForm({ ...receiveForm, quantity: e.target.value })
-              }
-            />
-          </Field>
+            <Field>
+              <FieldLabel htmlFor="quantity" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+                Quantity <span className="text-destructive">*</span>
+              </FieldLabel>
+              <Input
+                id="quantity"
+                type="number"
+                min="1"
+                required
+                placeholder="e.g., 10"
+                value={receiveForm.quantity || ''}
+                onChange={(e) =>
+                  setReceiveForm({ ...receiveForm, quantity: e.target.value })
+                }
+                className="mt-1.5 w-full"
+              />
+            </Field>
+          </div>
 
-          {/* Asset Specific Details */}
+          {/* Asset Specific Details Sub-Panel */}
           {isAsset && (
-            <FieldSet>
-              <FieldLegend>Asset Stock Details</FieldLegend>
-              <FieldGroup className="gap-4">
-                {/* Switch for Property Number */}
-                <Field className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      id="has_property_number"
-                      checked={Boolean(receiveForm.has_property_number)}
-                      onCheckedChange={(checked) =>
-                        setReceiveForm({
-                          ...receiveForm,
-                          has_property_number: checked,
-                        })
-                      }
-                    />
-                    <FieldLabel
-                      htmlFor="has_property_number"
-                      className="cursor-pointer font-medium"
-                    >
-                      Assign Property Number
-                    </FieldLabel>
-                  </div>
-                  <FieldDescription>
-                    Turn on to automatically assign a property number.
-                  </FieldDescription>
-                </Field>
+            <FieldSet className="rounded-lg border border-border bg-muted/30 p-4 space-y-4">
+              <FieldLegend className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border pb-2">
+                <ShieldCheck className="w-4 h-4 text-primary" />
+                Asset Tracking & Serial Details
+              </FieldLegend>
 
-                {/* Switch for Serial Number Tracking */}
-                <Field className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      id="has_serial_number"
-                      checked={hasSerialNumber}
-                      onCheckedChange={(checked) =>
-                        setReceiveForm({
-                          ...receiveForm,
-                          has_serial_number: checked,
-                        })
-                      }
-                    />
-                    <FieldLabel
-                      htmlFor="has_serial_number"
-                      className="cursor-pointer font-medium"
-                    >
-                      Track Serial Number
-                    </FieldLabel>
-                  </div>
-                  <FieldDescription>
-                    Turn on to require entering or scanning serial numbers per unit. Turn off for assets without serial numbers.
-                  </FieldDescription>
-                </Field>
+              <FieldGroup className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Property Number Toggle */}
+                  <Field className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-3">
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        id="has_property_number"
+                        checked={Boolean(receiveForm.has_property_number)}
+                        onCheckedChange={(checked) =>
+                          setReceiveForm({
+                            ...receiveForm,
+                            has_property_number: checked,
+                          })
+                        }
+                      />
+                      <FieldLabel
+                        htmlFor="has_property_number"
+                        className="cursor-pointer text-xs font-semibold text-foreground"
+                      >
+                        Assign Property Number
+                      </FieldLabel>
+                    </div>
+                    <FieldDescription className="text-[11px] text-muted-foreground pl-1">
+                      Automatically generate or assign property inventory tags.
+                    </FieldDescription>
+                  </Field>
 
-                <Field>
-                  <FieldLabel htmlFor="model">Model</FieldLabel>
-                  <Input
-                    id="model"
-                    value={receiveForm.model || ''}
-                    onChange={(e) =>
-                      setReceiveForm({ ...receiveForm, model: e.target.value })
-                    }
-                  />
-                </Field>
+                  {/* Serial Tracking Toggle */}
+                  <Field className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-3">
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        id="has_serial_number"
+                        checked={hasSerialNumber}
+                        onCheckedChange={(checked) =>
+                          setReceiveForm({
+                            ...receiveForm,
+                            has_serial_number: checked,
+                          })
+                        }
+                      />
+                      <FieldLabel
+                        htmlFor="has_serial_number"
+                        className="cursor-pointer text-xs font-semibold text-foreground"
+                      >
+                        Track Serial Number
+                      </FieldLabel>
+                    </div>
+                    <FieldDescription className="text-[11px] text-muted-foreground pl-1">
+                      Require entering or scanning distinct serial numbers per unit.
+                    </FieldDescription>
+                  </Field>
+                </div>
 
-                <Field>
-                  <FieldLabel htmlFor="manufacturer_name">
-                    Manufacturer
-                  </FieldLabel>
-                  <Input
-                    id="manufacturer_name"
-                    value={receiveForm.manufacturer_name || ''}
-                    onChange={(e) =>
-                      setReceiveForm({
-                        ...receiveForm,
-                        manufacturer_name: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="country_of_origin">
-                    Country of Origin
-                  </FieldLabel>
-                  <Input
-                    id="country_of_origin"
-                    value={receiveForm.country_of_origin || ''}
-                    onChange={(e) =>
-                      setReceiveForm({
-                        ...receiveForm,
-                        country_of_origin: e.target.value,
-                      })
-                    }
-                  />
-                </Field>
-
-                {/* Render Serial Scanner only if quantity > 0 AND serial tracking is turned ON */}
-                {quantity > 0 && hasSerialNumber && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <Field>
-                    <FieldLabel>Serial Numbers <span className="text-destructive">*</span></FieldLabel>
+                    <FieldLabel htmlFor="model" className="text-xs font-medium text-muted-foreground">
+                      Model
+                    </FieldLabel>
+                    <Input
+                      id="model"
+                      placeholder="e.g., XPS 15 9520"
+                      value={receiveForm.model || ''}
+                      onChange={(e) =>
+                        setReceiveForm({ ...receiveForm, model: e.target.value })
+                      }
+                      className="mt-1.5 w-full"
+                    />
+                  </Field>
+
+                  <Field>
+                    <FieldLabel htmlFor="manufacturer_name" className="text-xs font-medium text-muted-foreground">
+                      Manufacturer
+                    </FieldLabel>
+                    <Input
+                      id="manufacturer_name"
+                      placeholder="e.g., Dell Inc."
+                      value={receiveForm.manufacturer_name || ''}
+                      onChange={(e) =>
+                        setReceiveForm({
+                          ...receiveForm,
+                          manufacturer_name: e.target.value,
+                        })
+                      }
+                      className="mt-1.5 w-full"
+                    />
+                  </Field>
+
+                  <Field>
+                    <FieldLabel htmlFor="country_of_origin" className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <Globe className="w-3.5 h-3.5" />
+                      Country of Origin
+                    </FieldLabel>
+                    <Input
+                      id="country_of_origin"
+                      placeholder="e.g., Philippines, Japan"
+                      value={receiveForm.country_of_origin || ''}
+                      onChange={(e) =>
+                        setReceiveForm({
+                          ...receiveForm,
+                          country_of_origin: e.target.value,
+                        })
+                      }
+                      className="mt-1.5 w-full"
+                    />
+                  </Field>
+                </div>
+
+                {/* Serial Scanner */}
+                {quantity > 0 && hasSerialNumber && (
+                  <Field className="pt-2">
+                    <FieldLabel className="text-xs font-medium text-muted-foreground mb-1.5">
+                      Serial Numbers <span className="text-destructive">*</span>
+                    </FieldLabel>
                     <SerialNumberScanner
                       quantity={quantity}
                       serials={serials}
@@ -554,13 +597,16 @@ export default function ReceiveForm({
           )}
         </FieldGroup>
 
-        <Button
-          type="submit"
-          className="mt-4"
-          disabled={isAsset && hasSerialNumber && serials.length !== quantity}
-        >
-          Process Inbound Stock
-        </Button>
+        <div className="pt-2">
+          <Button
+            type="submit"
+            className="w-full sm:w-auto min-w-[160px] flex items-center justify-center gap-2"
+            disabled={isAsset && hasSerialNumber && serials.length !== quantity}
+          >
+            <Save className="w-4 h-4" />
+            Process Inbound Stock
+          </Button>
+        </div>
       </form>
     </div>
   );

@@ -95,7 +95,7 @@ export default function StatCard({
 
         {/* Bottom Row: Context Label */}
         {timeframe && (
-          <p className="mt-1.5 text-[11px] text-muted-foreground/70 truncate">
+          <p className="mt-1.5 text-[13px] text-muted-foreground/70 truncate">
             {timeframe}
           </p>
         )}

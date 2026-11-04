@@ -33,10 +33,22 @@ export default function ConsumablesPage({ activeTab, handleApiCall, refreshData 
   };
 
   return (
-    <div className="consumables-page-container">
+    <div className="space-y-6 p-4 md:p-6">
+      {/* Prominent Page Header matching system patterns */}
+      <div>
+        <h2 className="text-xl font-bold tracking-tight text-foreground">
+          {activeTab === 'consumables-issue' ? 'Consumable Stocks & Issuance' : 'Consumable Issuance History'}
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          {activeTab === 'consumables-issue'
+            ? 'Manage available stock levels and process FIFO item issuances.'
+            : 'Track historical Requisition and Issue Slip (RIS) logs and batch breakdowns.'}
+        </p>
+      </div>
+
       {/* 1. Issue Consumables / FIFO Stock Status Table */}
       {activeTab === 'consumables-issue' && (
-        <div className="consumables-page__section">
+        <div className="space-y-4">
           <StockStatusTable
             stockStatus={stockStatus}
             onChanged={fetchStockStatus}
@@ -48,7 +60,7 @@ export default function ConsumablesPage({ activeTab, handleApiCall, refreshData 
 
       {/* 2. Issuance Logs & History */}
       {activeTab === 'consumables-history' && (
-        <div className="consumables-page__section">
+        <div className="space-y-4">
           <IssuanceHistoryTable 
             refreshKey={refreshKey} 
             handleApiCall={handleApiCall}

@@ -30,10 +30,10 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
   }, [totalPages, currentPage]);
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 w-full space-y-4">
       {/* Table Action Bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Filtered Entries
           </span>
@@ -55,7 +55,7 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
       </div>
 
       {/* Main Container */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="w-full min-w-0 overflow-hidden rounded-xl border bg-card shadow-sm">
         {loading ? (
           <div className="text-center py-16">
             <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
@@ -73,8 +73,8 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
           </div>
         ) : (
           <>
-            {/* Desktop Table View (Hidden on Mobile) */}
-            <div className="hidden md:block overflow-x-auto">
+            {/* Wide table is reserved for extra-large screens; tablets use cards. */}
+            <div className="hidden overflow-x-auto xl:block">
               <Table className="min-w-[1200px]">
                 <TableHeader className="bg-muted/50">
                   <TableRow>
@@ -138,13 +138,13 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
               </Table>
             </div>
 
-            {/* Mobile Card Stack View (Shown on Mobile, Hidden on Desktop) */}
-            <div className="block md:hidden divide-y">
+            {/* Stacked records fit phones and portrait tablet widths without scrolling. */}
+            <div className="divide-y xl:hidden">
               {paginatedData.map((row, idx) => (
-                <div key={`mob-${row.type}-${row.id}-${idx}`} className="p-4 space-y-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                <div key={`mob-${row.type}-${row.id}-${idx}`} className="min-w-0 space-y-2.5 p-4">
+                  <div className="flex min-w-0 items-start justify-between gap-2">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
                         {row.type === "asset" ? (
                           <Badge className="flex items-center gap-1.5 mb-2">
                             ASSET
@@ -154,11 +154,11 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
                             CONSUMABLE
                           </Badge>
                         )}
-                        <span className="text-xs font-mono text-muted-foreground">{row.code_or_serial}</span>
+                        <span className="break-all text-xs font-mono text-muted-foreground">{row.code_or_serial}</span>
                       </div>
-                      <h4 className="font-semibold text-sm text-foreground">{row.item_name}</h4>
+                      <h4 className="break-words text-sm font-semibold text-foreground">{row.item_name}</h4>
                     </div>
-                    <div className="text-right font-mono text-sm font-semibold text-foreground">
+                    <div className="shrink-0 text-right font-mono text-sm font-semibold text-foreground">
                       {formatCurrency(row.total_cost)}
                     </div>
                   </div>
@@ -166,7 +166,7 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
                   <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-1">
                     <div>
                       <span className="block text-[10px] uppercase font-semibold">Holder / Recipient</span>
-                      <span className="text-foreground font-medium">{row.recipient_or_holder}</span>
+                      <span className="break-words text-foreground font-medium">{row.recipient_or_holder}</span>
                     </div>
                     <div>
                       <span className="block text-[10px] uppercase font-semibold">Date</span>
@@ -181,7 +181,7 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
 
         {/* Pagination Footer */}
         {!loading && reportData.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t bg-muted/20 gap-3">
+          <div className="flex min-w-0 flex-col items-center justify-between gap-3 border-t bg-muted/20 px-3 py-3 sm:flex-row sm:px-4">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>Rows per page</span>
               <Select
@@ -203,8 +203,8 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
               </Select>
             </div>
 
-            <div className="flex items-center gap-6">
-              <span className="text-xs text-muted-foreground font-medium">
+            <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3 sm:w-auto sm:justify-end sm:gap-6">
+              <span className="text-xs font-medium text-muted-foreground">
                 Page <span className="text-foreground">{currentPage}</span> of <span className="text-foreground">{totalPages}</span>
               </span>
               <div className="flex items-center gap-1">

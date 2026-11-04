@@ -6,8 +6,8 @@ import ItemForm from '../components/catalog/ItemForm.jsx';
 import CategoryTable from '../components/catalog/CategoryTable.jsx';
 import ItemTable from '../components/catalog/ItemTable.jsx';
 
-import EditCategoryModal from '../components/catalog/EditCategoryModal.jsx';
-import EditItemModal from '../components/catalog/EditItemModal.jsx';
+// import EditCategoryModal from '../components/catalog/EditCategoryModal.jsx';
+// import EditItemModal from '../components/catalog/EditItemModal.jsx';
 
 export default function CatalogPage({ 
   activeTab,
@@ -89,52 +89,58 @@ export default function CatalogPage({
   };
 
   return (
-    <div className="catalog-page-container">
+    <div className="space-y-6 p-4">
+      {/* Prominent Page Header */}
+      <div>
+        <h2 className="text-xl font-bold tracking-tight">
+          {activeTab === 'catalog-categories' ? 'Category Management' : 'Item Catalog'}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          {activeTab === 'catalog-categories'
+            ? 'Manage inventory item classification groups and descriptions.'
+            : 'Maintain master list definitions for consumables and serialized equipment.'}
+        </p>
+      </div>
+
       {/* Sub-view: Categories */}
       {activeTab === 'catalog-categories' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Inline Add Category Form */}
-          <div className="catalog-form-container" style={{ marginBottom: '10px' }}>
-            <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Add Category</h3>
-            <CategoryForm 
-              categoryForm={categoryForm} 
-              setCategoryForm={setCategoryForm} 
-              handleApiCall={handleApiCall} 
-            />
-          </div>
+        <div className="flex flex-col gap-6">
+          <CategoryForm 
+            categoryForm={categoryForm} 
+            setCategoryForm={setCategoryForm} 
+            handleApiCall={handleApiCall} 
+          />
 
           <CategoryTable 
             categories={categories} 
             handleSaveCategory={handleSaveCategory}
             handleDeleteCategory={handleDeleteCategory}
+            handleOpenEditModal={handleOpenEditCategoryModal}
           />
         </div>
       )}
 
       {/* Sub-view: Items */}
       {activeTab === 'catalog-items' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Inline Add Item Form */}
-          <div className="catalog-form-container" style={{ marginBottom: '10px' }}>
-            <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Add Items</h3>
-            <ItemForm 
-              itemForm={itemForm} 
-              setItemForm={setItemForm} 
-              categories={categories} 
-              handleApiCall={handleApiCall} 
-            />
-          </div>
+        <div className="flex flex-col gap-6">
+          <ItemForm 
+            itemForm={itemForm} 
+            setItemForm={setItemForm} 
+            categories={categories} 
+            handleApiCall={handleApiCall} 
+          />
 
           <ItemTable 
             items={items} 
             handleSaveItem={handleSaveItem}
             handleDeleteItem={handleDeleteItem} 
+            handleOpenEditModal={handleOpenEditItemModal}
           />
         </div>
       )}
 
-      {/* Edit Modals remain available for row modifications */}
-      <EditCategoryModal 
+      {/* Edit Modals */}
+      {/* <EditCategoryModal 
         isOpen={isEditCategoryModalOpen}
         onClose={() => setIsEditCategoryModalOpen(false)}
         editingCategory={editingCategory}
@@ -149,7 +155,7 @@ export default function CatalogPage({
         setEditingItem={setEditingItem}
         categories={categories}
         handleUpdateItem={handleUpdateItem}
-      />
+      /> */}
     </div>
   );
 }

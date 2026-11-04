@@ -46,15 +46,15 @@ class QuickReceiveController extends Controller
         $assetFields = null;
 
         if ($trackingType === 'asset') {
-            $hasSerial = $request->boolean('has_serial_number', true);
+            $hasSerial = filter_var($request->input('has_serial_number', true), FILTER_VALIDATE_BOOLEAN);
 
             $assetFields = $request->validate([
                 'has_property_number' => 'required|boolean',
-                'has_serial_number' => 'sometimes|boolean',
+                'has_serial_number' => 'nullable|boolean',
                 'serial_numbers' => $hasSerial
-                    ? 'required|array|size:' . $envelope['quantity']
+                    ? 'nullable|array'
                     : 'nullable|array',
-                'serial_numbers.*' => 'nullable|string|max:255|distinct|unique:serialized_assets,serial_number',
+                'serial_numbers.*' => 'nullable|string|max:255',
                 'model' => 'nullable|string|max:255',
                 'manufacturer_name' => 'nullable|string|max:255',
                 'country_of_origin' => 'nullable|string|max:255',

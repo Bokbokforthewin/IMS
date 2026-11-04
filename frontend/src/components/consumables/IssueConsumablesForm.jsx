@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { CalendarIcon, Search, Check, X } from 'lucide-react';
+import { CalendarIcon, Search, Check, X, Send } from 'lucide-react';
 import api from '../../api/client';
 
 import {
@@ -99,7 +99,7 @@ function IssuanceDatePicker({ value, onChange }) {
   };
 
   return (
-    <InputGroup>
+    <InputGroup className="w-full overflow-hidden rounded-lg border border-input bg-card shadow-2xs focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
       <InputGroupInput
         id="issuance_date"
         value={inputValue}
@@ -110,6 +110,8 @@ function IssuanceDatePicker({ value, onChange }) {
             setOpen(true);
           }
         }}
+        placeholder="Select issuance date..."
+        className="h-8 text-xs bg-transparent border-0 focus-visible:ring-0 shadow-none"
         required
       />
       <InputGroupAddon align="inline-end">
@@ -123,13 +125,13 @@ function IssuanceDatePicker({ value, onChange }) {
                 aria-label="Select issuance date"
                 type="button"
               >
-                <CalendarIcon className="size-4" />
+                <CalendarIcon className="size-4 text-muted-foreground" />
                 <span className="sr-only">Select issuance date</span>
               </InputGroupButton>
             }
           />
           <PopoverContent
-            className="w-auto overflow-hidden p-0"
+            className="w-auto overflow-hidden p-0 border border-border z-50 bg-popover"
             align="end"
             alignOffset={-8}
             sideOffset={10}
@@ -164,7 +166,6 @@ function UserSearch({ users = [], userId, onSelectUser }) {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
 
-  // Sync search input when userId changes externally or on user list load
   useEffect(() => {
     if (!userId) {
       setSearchTerm('');
@@ -179,7 +180,7 @@ function UserSearch({ users = [], userId, onSelectUser }) {
     }
   }, [userId, users, isOpen]);
 
-  // Click outside listener
+  // Robust click-outside listener
   useEffect(() => {
     function handleClickOutside(event) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
@@ -190,7 +191,6 @@ function UserSearch({ users = [], userId, onSelectUser }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter users based on input query
   const filteredUsers = useMemo(() => {
     if (!searchTerm.trim()) return users;
     const q = searchTerm.toLowerCase().trim();
@@ -215,7 +215,7 @@ function UserSearch({ users = [], userId, onSelectUser }) {
   const handleInputChange = (e) => {
     const val = e.target.value;
     setSearchTerm(val);
-    setIsOpen(true);
+    setIsOpen(true); // Open dropdown when typing
 
     const exactMatch = users.find((u) => {
       const label = getUserLabel(u).toLowerCase();
@@ -246,34 +246,36 @@ function UserSearch({ users = [], userId, onSelectUser }) {
   return (
     <div ref={wrapperRef} className="relative w-full">
       <div className="relative flex items-center">
-        <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <Search className="absolute left-2.5 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         <Input
           id="issued_to_id"
           type="text"
           required
+          placeholder="Search employee name or department..."
           value={searchTerm}
-          onFocus={() => setIsOpen(true)}
+          // Changed from opening immediately on focus to only opening if there is text or explicit click
+          onClick={() => setIsOpen(true)}
           onChange={handleInputChange}
-          className="pl-9 pr-8"
+          className="pl-8 pr-7 h-8 text-xs bg-card border-border"
           autoComplete="off"
         />
         {searchTerm && (
           <button
             type="button"
             onClick={handleClear}
-            className="absolute right-2.5 text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute right-2 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Clear employee search"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         )}
       </div>
 
       {/* Employee List Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-lg max-h-64 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border border-border shadow-md max-h-56 overflow-y-auto">
           {filteredUsers.length > 0 ? (
-            <ul className="py-1 divide-y divide-border/40 text-sm">
+            <ul className="py-1 divide-y divide-border/40 text-xs">
               {filteredUsers.map((u) => {
                 const isSelected = String(u.id) === String(userId);
                 const unitStr = u.unit?.name || u.unit;
@@ -284,26 +286,26 @@ function UserSearch({ users = [], userId, onSelectUser }) {
                   <li
                     key={u.id}
                     onClick={() => handleSelectOption(u)}
-                    className={`flex flex-col gap-0.5 p-2.5 cursor-pointer transition-colors ${
+                    className={`flex flex-col gap-0.5 p-2 cursor-pointer transition-colors ${
                       isSelected
                         ? 'bg-accent text-accent-foreground font-medium'
                         : 'hover:bg-muted/80'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-sm">
+                      <span className="font-semibold text-foreground text-xs">
                         {u.name}
                         {u.designation && (
-                          <span className="ml-1 text-xs text-muted-foreground font-normal">
+                          <span className="ml-1 text-[11px] text-muted-foreground font-normal">
                             — {u.designation?.name || u.designation}
                           </span>
                         )}
                       </span>
-                      {isSelected && <Check className="w-4 h-4 text-primary shrink-0" />}
+                      {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
                     </div>
 
                     {dept && (
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-[10px] text-muted-foreground">
                         {dept}
                       </div>
                     )}
@@ -312,7 +314,7 @@ function UserSearch({ users = [], userId, onSelectUser }) {
               })}
             </ul>
           ) : (
-            <div className="p-3 text-sm text-muted-foreground text-center">
+            <div className="p-2.5 text-xs text-muted-foreground text-center">
               No matching employees found
             </div>
           )}
@@ -339,7 +341,6 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
   const [successMessage, setSuccessMessage] = useState(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
-  // Fetch options list via central Axios instance
   const fetchUsers = useCallback(async () => {
     try {
       const response = await api.get('/v1/users/options');
@@ -364,7 +365,6 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
     fetchUsers();
   }, [fetchUsers]);
 
-  // Combine user list with current session user as fallback
   const combinedUsers = useMemo(() => {
     if (!currentUser?.id) return users;
     const exists = users.some((u) => String(u.id) === String(currentUser.id));
@@ -383,14 +383,12 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
     return users;
   }, [users, currentUser]);
 
-  // Keep item_id in sync when item prop updates
   useEffect(() => {
     setForm((f) => ({ ...f, item_id: item?.id || '' }));
   }, [item]);
 
   const selectedUser = combinedUsers.find((u) => String(u.id) === String(form.issued_to_id));
 
-  // Pre-validate form before opening confirmation modal
   const handlePreSubmit = (e) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -441,39 +439,38 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
   if (!item) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Alert Notifications */}
       {errorMessage && (
-        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive font-medium">
+        <div className="rounded-lg border border-destructive-border bg-destructive-soft p-3 text-xs text-destructive-text font-medium">
           {errorMessage}
         </div>
       )}
 
       {successMessage && (
-        <div className="rounded-md border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-600 font-medium">
+        <div className="rounded-lg border border-success-border bg-success-soft p-3 text-xs text-success-text font-medium">
           {successMessage}
         </div>
       )}
 
       {/* Target Item Summary Card */}
-      <div className="rounded-lg border bg-muted/40 p-4 space-y-1">
-        <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Issuing Item</span>
-        <h4 className="text-base font-semibold">{item.name}</h4>
+      <div className="rounded-lg border border-border bg-muted/30 p-3.5 space-y-1">
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Issuing Item</span>
+        <h4 className="text-sm font-semibold text-foreground">{item.name}</h4>
         <p className="text-xs text-muted-foreground">
-          <span> Available: </span>
+          <span>Available: </span>
           <strong className="text-foreground">{item.total_stock} {item.unit_of_measure}</strong>
         </p>
-        <p className="text-xs text-muted-foreground">
-          <span className="font-mono">[{item.item_code}]</span>
+        <p className="text-xs text-muted-foreground font-mono">
+          [{item.item_code}]
         </p>
       </div>
 
       <form onSubmit={handlePreSubmit}>
         <FieldGroup className="space-y-4">
-
           {/* Searchable Issued To Employee Field */}
           <Field>
-            <FieldLabel htmlFor="issued_to_id">
+            <FieldLabel htmlFor="issued_to_id" className="text-xs font-semibold text-muted-foreground">
               Issued To <span className="text-destructive">*</span>
             </FieldLabel>
             <UserSearch
@@ -485,7 +482,7 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
 
           {/* Quantity Field */}
           <Field>
-            <FieldLabel htmlFor="quantity_requested">
+            <FieldLabel htmlFor="quantity_requested" className="text-xs font-semibold text-muted-foreground">
               Quantity to Issue <span className="text-destructive">*</span>
             </FieldLabel>
             <Input
@@ -494,14 +491,16 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
               required
               min="1"
               max={item.total_stock}
+              placeholder="e.g., 5"
               value={form.quantity_requested}
               onChange={(e) => setForm({ ...form, quantity_requested: e.target.value })}
+              className="h-8 text-xs bg-card border-border"
             />
           </Field>
 
           {/* Custom Issuance DatePicker Field */}
           <Field>
-            <FieldLabel htmlFor="issuance_date">
+            <FieldLabel htmlFor="issuance_date" className="text-xs font-semibold text-muted-foreground">
               Issuance Date <span className="text-destructive">*</span>
             </FieldLabel>
             <IssuanceDatePicker
@@ -512,19 +511,22 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
 
           {/* Purpose / Remarks Field */}
           <Field>
-            <FieldLabel htmlFor="purpose">Purpose / Remarks</FieldLabel>
+            <FieldLabel htmlFor="purpose" className="text-xs font-semibold text-muted-foreground">Purpose / Remarks</FieldLabel>
             <Input
               id="purpose"
               type="text"
+              placeholder="Optional additional context..."
               value={form.purpose}
               onChange={(e) => setForm({ ...form, purpose: e.target.value })}
+              className="h-8 text-xs bg-card border-border"
             />
           </Field>
         </FieldGroup>
 
         {/* Action Button */}
-        <div className="mt-6 flex justify-end">
-          <Button type="submit" disabled={loading} className="w-full sm:w-auto">
+        <div className="mt-5 pt-3 border-t border-border flex justify-end">
+          <Button type="submit" size="sm" disabled={loading} className="gap-1.5 text-xs h-8 w-full sm:w-auto">
+            <Send className="h-3.5 w-3.5" />
             {loading ? 'Processing...' : 'Issue Consumables & Generate RIS'}
           </Button>
         </div>
@@ -532,16 +534,16 @@ export default function IssueConsumablesForm({ item, handleApiCall, onSuccess })
 
       {/* Confirmation Modal */}
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Consumable Issuance</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to issue <strong>{form.quantity_requested} {item.unit_of_measure}</strong> of <strong>{item.name}</strong> to <strong>{selectedUser?.name || 'the selected employee'}</strong>? This action will decrement inventory stock and generate a Requisition and Issue Slip (RIS).
+            <AlertDialogTitle className="text-base font-semibold">Confirm Consumable Issuance</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-muted-foreground">
+              Are you sure you want to issue <strong className="text-foreground">{form.quantity_requested} {item.unit_of_measure}</strong> of <strong className="text-foreground">{item.name}</strong> to <strong className="text-foreground">{selectedUser?.name || 'the selected employee'}</strong>? This action will decrement inventory stock and generate a Requisition and Issue Slip (RIS).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={executeSubmit}>
+            <AlertDialogCancel className="text-xs h-8">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={executeSubmit} className="text-xs h-8">
               Confirm & Issue
             </AlertDialogAction>
           </AlertDialogFooter>

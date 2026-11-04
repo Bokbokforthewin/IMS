@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import api from '../../api/client'; // Import configured central Axios instance
+import api from '../../api/client';
 import {
   User,
   UserCheck,
@@ -158,7 +158,7 @@ function IssuanceDatePicker({ value, onChange, id = "date_issued" }) {
             }
           />
           <PopoverContent
-            className="w-auto overflow-hidden p-0"
+            className="w-auto overflow-hidden p-0 border border-border"
             align="end"
             alignOffset={-8}
             sideOffset={10}
@@ -270,7 +270,7 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
           value={searchTerm}
           onFocus={() => setIsOpen(true)}
           onChange={handleInputChange}
-          className="pl-8 pr-7 h-8 text-xs"
+          className="pl-8 pr-7 h-8 text-xs bg-card"
           autoComplete="off"
         />
         {searchTerm && (
@@ -286,7 +286,7 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-56 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border border-border shadow-md max-h-56 overflow-y-auto">
           {filteredUsers.length > 0 ? (
             <ul className="py-1 divide-y divide-border/40 text-xs">
               {filteredUsers.map((u) => {
@@ -313,7 +313,7 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
                     {(unitStr || desigStr || divStr) && (
                       <div className="text-[10px] text-muted-foreground flex flex-wrap gap-x-1.5 gap-y-0.5">
                         {desigStr && <span>{desigStr}</span>}
-                        {unitStr && <span>• {unitStr}</span>}
+                        {unitStr && <span>{unitStr}</span>}
                         {divStr && <span>({divStr})</span>}
                       </div>
                     )}
@@ -332,7 +332,7 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
   );
 }
 
-// --- Main Delivery Form ---
+// --- Main Delivery Form Component ---
 export default function DeliveryForm({
   cart = [],
   initialDetails,
@@ -376,15 +376,13 @@ export default function DeliveryForm({
     return initialMap;
   });
 
-  // Fetch user list options directly via central Axios instance (api/client.js)
+  // Fetch user list options directly via central Axios instance
   const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
     try {
-      // Axios baseURL is '/api', so '/v1/users/options' resolves to '/api/v1/users/options'
       const response = await api.get('/v1/users/options');
       const data = response.data;
 
-      // Resolve payload whether returned directly or nested under data/users keys
       const userList = Array.isArray(data)
         ? data
         : Array.isArray(data?.data)
@@ -493,21 +491,21 @@ export default function DeliveryForm({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6">
-      {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <NotebookPen className="h-5 w-5 text-primary" />
-            Asset Details & End User Assignments
-          </h2>
-        </div>
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
+      {/* Prominent Section Task Title Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-3">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs px-2.5 py-1 gap-1">
+          <NotebookPen className="h-4 w-4 text-primary" />
+          <h3 className="text-xs font-semibold tracking-wider uppercase text-muted-foreground">
+            Asset Details & End User Assignments
+          </h3>
+        </div>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Badge variant="outline" className="text-xs px-2.5 py-0.5 gap-1 border-border">
             <Package className="h-3.5 w-3.5 text-muted-foreground" />
             {cart.length} {cart.length === 1 ? 'Item' : 'Items'}
           </Badge>
-          <Badge variant="secondary" className="text-xs px-2.5 py-1 font-mono">
+          <Badge variant="secondary" className="text-xs px-2.5 py-0.5 font-medium">
             ₱{total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </Badge>
         </div>
@@ -524,7 +522,7 @@ export default function DeliveryForm({
             return (
               <Card 
                 key={item.key} 
-                className="shadow-xs overflow-visible relative transition-all focus-within:z-30 hover:z-20"
+                className="rounded-lg border border-border bg-card shadow-2xs overflow-visible relative transition-all focus-within:z-30 hover:z-20"
               >
                 <CardContent className="p-4 overflow-visible">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 overflow-visible">
@@ -532,27 +530,27 @@ export default function DeliveryForm({
                       
                       {/* Asset Header Info */}
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-sm">{item.name}</span>
+                        <span className="font-semibold text-sm text-foreground">{item.name}</span>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         {item.property_number && (
                           <span>
-                            Property No: <code>{item.property_number}</code>
+                            Property No: <code className="font-medium text-foreground">{item.property_number}</code>
                           </span>
                         )}
                         {item.serial_number && (
                           <span>
-                            Serial Number: <code>{item.serial_number}</code>
+                            Serial Number: <code className="font-medium text-foreground">{item.serial_number}</code>
                           </span>
                         )}
                         <span>
-                          Item Price: <code>₱{itemCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</code>
+                          Item Price: <code className="font-medium text-foreground">₱{itemCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</code>
                         </span>
                       </div>
 
                       {/* Item Controls Row */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t overflow-visible">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-border/60 overflow-visible">
                         
                         {/* Per-Item End User Selector */}
                         <div className="space-y-1 relative z-30 overflow-visible">
@@ -573,7 +571,7 @@ export default function DeliveryForm({
                         {validTargets.length > 0 && (
                           <div className="space-y-1 relative z-10">
                             <label className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
-                              <Paperclip className="h-3.5 w-3.5" /> Attach to Main Asset:
+                              <Paperclip className="h-3.5 w-3.5 text-muted-foreground" /> Attach to Main Asset:
                             </label>
                             <Select
                               value={item.attachToKey || 'NONE'}
@@ -581,10 +579,10 @@ export default function DeliveryForm({
                                 onUpdateAttachment(item.key, val === 'NONE' ? null : val)
                               }
                             >
-                              <SelectTrigger className="h-9 text-xs w-full bg-background">
+                              <SelectTrigger className="h-8 text-xs w-full bg-card border-border">
                                 <SelectValue placeholder="Standalone" />
                               </SelectTrigger>
-                              <SelectContent className="z-50">
+                              <SelectContent className="z-50 border-border">
                                 <SelectItem value="NONE" className="text-xs">
                                   Standalone (not attached)
                                 </SelectItem>
@@ -606,7 +604,7 @@ export default function DeliveryForm({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 text-xs gap-1.5 self-start sm:self-auto shrink-0"
+                      className="text-destructive hover:text-destructive hover:bg-destructive-soft h-8 text-xs gap-1.5 self-start sm:self-auto shrink-0"
                       onClick={() => onRemove(item.key)}
                     >
                       <Trash2 className="h-3.5 w-3.5" /> Remove
@@ -619,19 +617,19 @@ export default function DeliveryForm({
         </div>
 
         {/* Primary Receiver / Issuer / Date / Remarks Card */}
-        <Card className="shadow-sm border-primary/20">
-          <CardHeader className="border-b bg-muted/20 pb-4">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
+        <Card className="rounded-lg border border-border bg-card shadow-2xs">
+          <CardHeader className="border-b border-border py-3 px-4 sm:px-6">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
               <Users className="h-4 w-4 text-primary" />
               Document Signatory & Delivery Details
             </CardTitle>
           </CardHeader>
 
-          <CardContent className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CardContent className="p-4 sm:p-5 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Issued To Field */}
-              <div className="space-y-2">
-                <Label htmlFor="received_mr_by_id" className="text-xs font-semibold flex items-center gap-1.5">
+              <div className="space-y-1.5">
+                <Label htmlFor="received_mr_by_id" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <User className="h-3.5 w-3.5 text-primary" />
                   Issued To (Accountable Receiver) <span className="text-destructive">*</span>
                 </Label>
@@ -645,8 +643,8 @@ export default function DeliveryForm({
               </div>
 
               {/* Issued By Field */}
-              <div className="space-y-2">
-                <Label htmlFor="issued_by_id" className="text-xs font-semibold flex items-center gap-1.5">
+              <div className="space-y-1.5">
+                <Label htmlFor="issued_by_id" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                   Issued By <span className="text-destructive">*</span>
                 </Label>
@@ -660,8 +658,8 @@ export default function DeliveryForm({
               </div>
 
               {/* Date Issued Field */}
-              <div className="space-y-2">
-                <Label htmlFor="date_issued" className="text-xs font-semibold flex items-center gap-1.5">
+              <div className="space-y-1.5">
+                <Label htmlFor="date_issued" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <CalendarIcon className="h-3.5 w-3.5 text-primary" />
                   Issuance Date <span className="text-destructive">*</span>
                 </Label>
@@ -673,40 +671,41 @@ export default function DeliveryForm({
               </div>
 
               {/* Remarks Field */}
-              <div className="space-y-2">
-                <Label htmlFor="remarks" className="text-xs font-semibold flex items-center gap-1.5">
+              <div className="space-y-1.5">
+                <Label htmlFor="remarks" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <MessageSquare className="h-3.5 w-3.5 text-primary" />
                   Purpose / Remarks
                 </Label>
                 <Input
                   id="remarks"
                   type="text"
+                  placeholder="Enter optional issuance notes..."
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  className="h-8 text-xs"
+                  className="h-8 text-xs bg-card"
                 />
               </div>
             </div>
           </CardContent>
 
-          {/* Form Actions */}
-          <div className="p-4 border-t bg-muted/10 flex items-center justify-between">
+          {/* Form Actions Footer */}
+          <div className="p-3.5 border-t border-border bg-muted/20 flex items-center justify-between">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={onBack}
-              className="gap-1.5 text-xs"
+              className="gap-1.5 text-xs h-8"
             >
-              <ArrowLeft className="h-4 w-4" /> Back
+              <ArrowLeft className="h-3.5 w-3.5" /> Back
             </Button>
             <Button
               type="submit"
               size="sm"
               disabled={!receivedMrById || !issuedById || !dateIssued || cart.length === 0}
-              className="gap-1.5 text-xs"
+              className="gap-1.5 text-xs h-8"
             >
-              Next Step <ArrowRight className="h-4 w-4" />
+              Next Step <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </Card>

@@ -33,7 +33,6 @@ export default function SerialNumberScanner({ quantity, serials, onChange }) {
           }}
           placeholder={remaining > 0 ? `Scan or type serial number (${remaining} remaining)` : 'All serial numbers entered'}
           disabled={remaining <= 0}
-          autoFocus
         />
         <Button type="button" onClick={addSerial} disabled={!current.trim() || remaining <= 0}>
           Add

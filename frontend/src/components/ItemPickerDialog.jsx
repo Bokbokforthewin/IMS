@@ -23,16 +23,13 @@ export default function ItemPickerDialog({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
 
-  // Find currently selected item
   const selectedItem = useMemo(() => {
     if (!value) return null;
     return items.find((item) => String(item.id) === String(value));
   }, [items, value]);
 
-  // Filter items by category and search query
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      // 1. Filter by Category
       if (selectedCategory !== 'ALL') {
         const itemCatId = item.category_id || item.category?.id;
         if (String(itemCatId) !== String(selectedCategory)) {
@@ -40,7 +37,6 @@ export default function ItemPickerDialog({
         }
       }
 
-      // 2. Filter by Search Query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const name = item.name || item.item_name || '';
@@ -80,52 +76,54 @@ export default function ItemPickerDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          disabled={disabled}
-          className="w-full justify-between font-normal text-left h-9 px-3"
-        >
-          <span className="truncate pr-2">
-            {selectedItem
-              ? `${selectedItem.name || selectedItem.item_name} ${
-                  selectedItem.code || selectedItem.item_code
-                    ? `(${selectedItem.code || selectedItem.item_code})`
-                    : ''
-                }`
-              : placeholder}
-          </span>
-          <div className="flex items-center gap-1.5 shrink-0 opacity-50">
-            {selectedItem && (
-              <X
-                className="h-4 w-4 hover:opacity-100 transition-opacity cursor-pointer"
-                onClick={handleClear}
-              />
-            )}
-            <Search className="h-4 w-4" />
-          </div>
-        </Button>
-      </DialogTrigger>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            disabled={disabled}
+            className="w-full block w-full flex items-center justify-between font-normal text-left h-9 px-3 rounded-lg border-input hover:bg-accent hover:text-accent-foreground"
+            style={{ width: '100%' }}
+          >
+            <span className="truncate pr-2 flex-1 text-left">
+              {selectedItem
+                ? `${selectedItem.name || selectedItem.item_name} ${
+                    selectedItem.code || selectedItem.item_code
+                      ? `(${selectedItem.code || selectedItem.item_code})`
+                      : ''
+                  }`
+                : placeholder}
+            </span>
+            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+              {selectedItem && (
+                <X
+                  className="h-4 w-4 hover:text-foreground transition-colors cursor-pointer"
+                  onClick={handleClear}
+                />
+              )}
+              <Search className="h-4 w-4" />
+            </div>
+          </Button>
+        </DialogTrigger>
 
-      <DialogContent className="w-[92vw] sm:max-w-[550px] p-0 overflow-hidden gap-0 box-border rounded-xl">
+      {/* Added flex flex-col and max-h-[85vh] to encapsulate content properly */}
+      <DialogContent className="w-[92vw] sm:max-w-[550px] max-h-[85vh] p-0 flex flex-col overflow-hidden rounded-2xl bg-card text-card-foreground border-border shadow-lg">
         {/* Header */}
-        <DialogHeader className="px-5 pt-5 pb-3 w-full overflow-hidden box-border">
-          <DialogTitle className="text-lg font-semibold flex items-center gap-2 min-w-0">
+        <DialogHeader className="px-5 pt-5 pb-3 w-full shrink-0 border-b border-border/60">
+          <DialogTitle className="text-lg font-semibold flex items-center gap-2 min-w-0 text-foreground">
             <Package className="h-5 w-5 text-muted-foreground shrink-0" />
             <span className="truncate">Select Item</span>
           </DialogTitle>
         </DialogHeader>
 
         {/* Filter and Search Controls */}
-        <div className="px-5 pb-4 space-y-3 border-b w-full box-border overflow-hidden">
+        <div className="px-5 py-4 space-y-3 border-b border-border w-full shrink-0 bg-muted/20">
           <div className="relative w-full">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search item name, code, SKU..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 w-full box-border"
+              className="pl-9 h-9 w-full rounded-lg bg-background"
               autoFocus
             />
           </div>
@@ -138,8 +136,8 @@ export default function ItemPickerDialog({
                   onClick={() => setSelectedCategory('ALL')}
                   className={`px-3 py-1.5 rounded-full whitespace-nowrap transition-colors shrink-0 ${
                     selectedCategory === 'ALL'
-                      ? 'bg-primary text-primary-foreground font-medium'
-                      : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
+                      ? 'bg-primary text-primary-foreground font-medium shadow-2xs'
+                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                   }`}
                 >
                   All Categories
@@ -151,8 +149,8 @@ export default function ItemPickerDialog({
                     onClick={() => setSelectedCategory(String(cat.id))}
                     className={`px-3 py-1.5 rounded-full whitespace-nowrap transition-colors shrink-0 ${
                       String(selectedCategory) === String(cat.id)
-                        ? 'bg-primary text-primary-foreground font-medium'
-                        : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
+                        ? 'bg-primary text-primary-foreground font-medium shadow-2xs'
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
                     }`}
                   >
                     {cat.name}
@@ -163,8 +161,8 @@ export default function ItemPickerDialog({
           )}
         </div>
 
-        {/* Items Scroll Area */}
-        <div className="max-h-[350px] overflow-y-auto px-4 py-3 w-full box-border">
+        {/* Items Scroll Area - flex-1 allows it to scroll cleanly inside the constrained modal box */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 w-full">
           {filteredItems.length === 0 ? (
             <div className="py-10 text-center text-sm text-muted-foreground">
               No items found matching your filter criteria.
@@ -183,10 +181,10 @@ export default function ItemPickerDialog({
                   <div
                     key={item.id}
                     onClick={() => handleSelect(item)}
-                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors w-full box-border ${
+                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors w-full ${
                       isSelected
-                        ? 'bg-accent text-accent-foreground font-medium'
-                        : 'hover:bg-muted/60'
+                        ? 'bg-accent text-accent-foreground font-medium border border-border/40'
+                        : 'hover:bg-muted/60 text-foreground'
                     }`}
                   >
                     <div className="flex flex-col min-w-0 flex-1 pr-3 space-y-0.5">
@@ -195,7 +193,7 @@ export default function ItemPickerDialog({
                           {item.name || item.item_name}
                         </span>
                         {categoryName && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 bg-secondary text-secondary-foreground border-transparent">
                             {categoryName}
                           </Badge>
                         )}

@@ -123,7 +123,8 @@ function TransferDatePicker({ value, onChange, id = 'transfer_date' }) {
   };
 
   return (
-    <InputGroup className="w-full">
+    // Added overflow-hidden, rounded-lg, border, and focus-within states to the wrapper group
+    <InputGroup className="w-full overflow-hidden rounded-lg border border-input bg-card shadow-2xs focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
       <InputGroupInput
         id={id}
         value={inputValue}
@@ -135,7 +136,8 @@ function TransferDatePicker({ value, onChange, id = 'transfer_date' }) {
           }
         }}
         placeholder="Select transaction date..."
-        className="h-8 text-xs"
+        // Removed default border-border from the input so it doesn't paint over the parent container's frame
+        className="h-8 text-xs bg-transparent border-0 focus-visible:ring-0 shadow-none"
         required
       />
       <InputGroupAddon align="inline-end">
@@ -155,7 +157,7 @@ function TransferDatePicker({ value, onChange, id = 'transfer_date' }) {
             }
           />
           <PopoverContent
-            className="w-auto overflow-hidden p-0 z-50"
+            className="w-auto overflow-hidden p-0 border border-border z-50"
             align="end"
             alignOffset={-8}
             sideOffset={10}
@@ -269,7 +271,7 @@ function UserSearch({
             e.target.select();
           }}
           onChange={handleInputChange}
-          className="pl-8 pr-7 h-8 text-xs"
+          className="pl-8 pr-7 h-8 text-xs bg-card border-border"
           autoComplete="off"
         />
         {searchTerm && (
@@ -285,7 +287,7 @@ function UserSearch({
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-56 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border border-border shadow-md max-h-56 overflow-y-auto">
           {filteredUsers.length > 0 ? (
             <ul className="py-1 divide-y divide-border/40 text-xs">
               {filteredUsers.map((u) => {
@@ -303,7 +305,7 @@ function UserSearch({
                     }`}
                   >
                     <div className="flex flex-col">
-                      <span className="font-semibold">{u.name}</span>
+                      <span className="font-semibold text-foreground">{u.name}</span>
                       {subText && (
                         <span className="text-[10px] text-muted-foreground">{subText}</span>
                       )}
@@ -426,7 +428,7 @@ function AssetSearch({
             e.target.select();
           }}
           onChange={handleInputChange}
-          className="pl-8 pr-7 h-8 text-xs"
+          className="pl-8 pr-7 h-8 text-xs bg-card border-border"
           autoComplete="off"
         />
         {searchTerm && (
@@ -442,7 +444,7 @@ function AssetSearch({
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-md max-h-60 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border border-border shadow-md max-h-60 overflow-y-auto">
           {filteredAssets.length > 0 ? (
             <ul className="py-1 divide-y divide-border/40 text-xs">
               {filteredAssets.map((a) => {
@@ -470,7 +472,7 @@ function AssetSearch({
                     }`}
                   >
                     <div className="flex flex-col">
-                      <span className="font-semibold">
+                      <span className="font-semibold text-foreground">
                         {categoryName} {itemName} {brandModel}
                       </span>
                       <span className="text-[10px] text-muted-foreground">{subText}</span>
@@ -514,7 +516,6 @@ export default function TransferOrReturnForm({
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch lightweight user options directly via central Axios instance
   const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
     try {
@@ -541,7 +542,6 @@ export default function TransferOrReturnForm({
     fetchUsers();
   }, [fetchUsers]);
 
-  // Ensure current logged-in user exists in user dropdown
   const combinedUsers = useMemo(() => {
     if (!currentUser?.id) return users;
     const exists = users.some((u) => String(u.id) === String(currentUser.id));
@@ -562,7 +562,6 @@ export default function TransferOrReturnForm({
   const handleAssetChange = (assetId) => {
     const selectedAsset = serializedAssets.find((a) => String(a.id) === String(assetId));
 
-    // Auto-fill "user_id" (Return From / Transferring From) with asset's current holder
     const derivedHolderId = selectedAsset?.current_holder_id
       ? String(selectedAsset.current_holder_id)
       : '';
@@ -597,242 +596,240 @@ export default function TransferOrReturnForm({
   };
 
   return (
-    <div className="w-full mx-auto space-y-6">
-      <Card className="shadow-sm border-primary/20">
-        <CardHeader className="border-b bg-muted/20 pb-4">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <RotateCcw className="h-4 w-4 text-primary" />
-            Equipment Return & Property Transfer
-          </CardTitle>
-        </CardHeader>
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
+      {/* Task Header Bar */}
+      <div className="flex items-center gap-2 border-b border-border pb-3">
+        <RotateCcw className="h-4 w-4 text-primary shrink-0" />
+        <h3 className="text-xs font-semibold tracking-wider uppercase text-muted-foreground">
+          Equipment Return & Property Transfer
+        </h3>
+      </div>
 
-        <CardContent className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Action Type Toggle */}
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold flex items-center gap-1.5">
-                <FileText className="h-3.5 w-3.5 text-primary" />
-                Action Type <span className="text-destructive">*</span>
-              </Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label
-                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                    form.transfer_type === 'RETURN'
-                      ? 'border-primary bg-primary/5 shadow-xs'
-                      : 'border-border hover:bg-muted/50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="transfer_type"
-                    value="RETURN"
-                    checked={form.transfer_type === 'RETURN'}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        transfer_type: e.target.value,
-                        serialized_asset_id: '',
-                        user_id: '',
-                      })
-                    }
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <span className="font-medium cursor-pointer">Return Equipment</span>
-                    <p className="text-xs text-muted-foreground">
-                      Transfer item back to warehouse stock (Status becomes Available)
-                    </p>
-                  </div>
-                </label>
-
-                <label
-                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                    form.transfer_type === 'TRANSFER'
-                      ? 'border-primary bg-primary/5 shadow-xs'
-                      : 'border-border hover:bg-muted/50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="transfer_type"
-                    value="TRANSFER"
-                    checked={form.transfer_type === 'TRANSFER'}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        transfer_type: e.target.value,
-                        serialized_asset_id: '',
-                        user_id: '',
-                      })
-                    }
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <span className="font-medium cursor-pointer">Transfer Equipment</span>
-                    <p className="text-xs text-muted-foreground">
-                      Reassign item from employee to employee (PTR Document)
-                    </p>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="asset_search" className="text-xs font-semibold flex items-center gap-1.5">
-                <Package className="h-3.5 w-3.5 text-primary" />
-                Select Serialized Asset <span className="text-destructive">*</span>
-              </Label>
-              <AssetSearch
-                id="asset_search"
-                assets={serializedAssets}
-                assetId={form.serialized_asset_id}
-                onSelectAsset={(id) => handleAssetChange(id)}
-                transferType={form.transfer_type}
-                placeholder="Search by asset name, SN, or property number..."
-              />
-              {form.transfer_type === 'RETURN' && (
-                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3 text-amber-500 shrink-0" />
-                  Assets marked as <b>[Available]</b> are already in warehouse stock and cannot be returned.
-                </p>
-              )}
-            </div>
-
-            {/* User Selectors Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t">
-              {/* Return From / Transferring From -> user_id */}
-              <div className="space-y-2">
-                <Label htmlFor="user_id" className="text-xs font-semibold flex items-center gap-1.5">
-                  <UserCheck className="h-3.5 w-3.5 text-primary" />
-                  {form.transfer_type === 'RETURN' ? 'Return From' : 'Transferring From'} (Current Holder) <span className="text-destructive">*</span>
-                </Label>
-                <UserSearch
-                  id="user_id"
-                  users={combinedUsers}
-                  userId={form.user_id}
-                  onSelectUser={(id) => setForm((prev) => ({ ...prev, user_id: id }))}
-                  placeholder="Search current holder..."
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Auto-filled from asset record — update only if actual holder differs.
-                </p>
-              </div>
-
-              {/* Receiving Officer / Transferring To -> transfered_to */}
-              <div className="space-y-2">
-                <Label htmlFor="transfered_to" className="text-xs font-semibold flex items-center gap-1.5">
-                  <User className="h-3.5 w-3.5 text-primary" />
-                  {form.transfer_type === 'RETURN' ? 'Receiving Officer (Warehouse)' : 'Transferring To (Recipient)'} <span className="text-destructive">*</span>
-                </Label>
-                <UserSearch
-                  id="transfered_to"
-                  users={combinedUsers}
-                  userId={form.transfered_to}
-                  onSelectUser={(id) => setForm((prev) => ({ ...prev, transfered_to: id }))}
-                  placeholder={
-                    form.transfer_type === 'RETURN'
-                      ? 'Search warehouse receiving officer...'
-                      : 'Search recipient employee...'
-                  }
-                />
-              </div>
-            </div>
-
-            {/* Context Inputs Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Description */}
-              <div className="space-y-2">
-                <Label htmlFor="description" className="text-xs font-semibold">
-                  Description / Title <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="description"
-                  type="text"
-                  required
-                  placeholder="e.g., Laptop reassignment, unit relocation"
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="h-8 text-xs"
-                />
-              </div>
-
-              {/* Reason */}
-              <div className="space-y-2">
-                <Label htmlFor="reason" className="text-xs font-semibold">
-                  Reason for {form.transfer_type === 'RETURN' ? 'Return' : 'Transfer'} <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="reason"
-                  type="text"
-                  required
-                  placeholder={
-                    form.transfer_type === 'RETURN'
-                      ? 'e.g., Resigned, Retired, Defective'
-                      : 'e.g., Departmental Reassignment'
-                  }
-                  value={form.reason}
-                  onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                  className="h-8 text-xs"
-                />
-              </div>
-
-              {/* Transaction Date */}
-              <div className="space-y-2">
-                <Label htmlFor="transfer_date" className="text-xs font-semibold flex items-center gap-1.5">
-                  <CalendarIcon className="h-3.5 w-3.5 text-primary" />
-                  Transaction Date <span className="text-destructive">*</span>
-                </Label>
-                <TransferDatePicker
-                  id="transfer_date"
-                  value={form.transfer_date}
-                  onChange={(date) => setForm({ ...form, transfer_date: date })}
-                />
-              </div>
-
-              {/* Remarks */}
-              <div className="space-y-2">
-                <Label htmlFor="remarks" className="text-xs font-semibold flex items-center gap-1.5">
-                  <MessageSquare className="h-3.5 w-3.5 text-primary" />
-                  Remarks / Notes
-                </Label>
-                <Input
-                  id="remarks"
-                  type="text"
-                  placeholder="Optional additional context..."
-                  value={form.remarks}
-                  onChange={(e) => setForm({ ...form, remarks: e.target.value })}
-                  className="h-8 text-xs"
-                />
-              </div>
-            </div>
-
-            {/* Form Submit Button */}
-            <div className="pt-4 border-t flex justify-end">
-              <Button
-                type="submit"
-                size="sm"
-                disabled={
-                  submitting ||
-                  !form.serialized_asset_id ||
-                  !form.user_id ||
-                  !form.transfered_to ||
-                  !form.description ||
-                  !form.reason ||
-                  !form.transfer_date
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Action Type Toggle */}
+        <div className="space-y-1.5">
+          <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+            <FileText className="h-3.5 w-3.5 text-primary" />
+            Action Type <span className="text-destructive">*</span>
+          </Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label
+              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                form.transfer_type === 'RETURN'
+                  ? 'border-primary bg-accent/40 shadow-2xs'
+                  : 'border-border hover:bg-muted/30'
+              }`}
+            >
+              <input
+                type="radio"
+                name="transfer_type"
+                value="RETURN"
+                checked={form.transfer_type === 'RETURN'}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    transfer_type: e.target.value,
+                    serialized_asset_id: '',
+                    user_id: '',
+                  })
                 }
-                className="gap-1.5 text-xs"
-              >
-                <Send className="h-3.5 w-3.5" />
-                {submitting
-                  ? 'Processing...'
-                  : form.transfer_type === 'RETURN'
-                  ? 'Process Equipment Return'
-                  : 'Generate Property Transfer Report (PTR)'}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+                className="mt-0.5 accent-primary"
+              />
+              <div>
+                <span className="font-semibold text-xs text-foreground cursor-pointer">Return Equipment</span>
+                <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                  Transfer item back to warehouse stock (Status becomes Available)
+                </p>
+              </div>
+            </label>
+
+            <label
+              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                form.transfer_type === 'TRANSFER'
+                  ? 'border-primary bg-accent/40 shadow-2xs'
+                  : 'border-border hover:bg-muted/30'
+              }`}
+            >
+              <input
+                type="radio"
+                name="transfer_type"
+                value="TRANSFER"
+                checked={form.transfer_type === 'TRANSFER'}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    transfer_type: e.target.value,
+                    serialized_asset_id: '',
+                    user_id: '',
+                  })
+                }
+                className="mt-0.5 accent-primary"
+              />
+              <div>
+                <span className="font-semibold text-xs text-foreground cursor-pointer">Transfer Equipment</span>
+                <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                  Reassign item from employee to employee (PTR Document)
+                </p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        {/* Asset Selection */}
+        <div className="space-y-1.5">
+          <Label htmlFor="asset_search" className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+            <Package className="h-3.5 w-3.5 text-primary" />
+            Select Serialized Asset <span className="text-destructive">*</span>
+          </Label>
+          <AssetSearch
+            id="asset_search"
+            assets={serializedAssets}
+            assetId={form.serialized_asset_id}
+            onSelectAsset={(id) => handleAssetChange(id)}
+            transferType={form.transfer_type}
+            placeholder="Search by asset name, SN, or property number..."
+          />
+          {form.transfer_type === 'RETURN' && (
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+              <AlertCircle className="h-3 w-3 text-warning-text shrink-0" />
+              Assets marked as <b className="text-foreground">[Available]</b> are already in warehouse stock and cannot be returned.
+            </p>
+          )}
+        </div>
+
+        {/* User Selectors Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border">
+          {/* Return From / Transferring From -> user_id */}
+          <div className="space-y-1.5">
+            <Label htmlFor="user_id" className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+              <UserCheck className="h-3.5 w-3.5 text-primary" />
+              {form.transfer_type === 'RETURN' ? 'Return From' : 'Transferring From'} (Current Holder) <span className="text-destructive">*</span>
+            </Label>
+            <UserSearch
+              id="user_id"
+              users={combinedUsers}
+              userId={form.user_id}
+              onSelectUser={(id) => setForm((prev) => ({ ...prev, user_id: id }))}
+              placeholder="Search current holder..."
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Auto-filled from asset record — update only if actual holder differs.
+            </p>
+          </div>
+
+          {/* Receiving Officer / Transferring To -> transfered_to */}
+          <div className="space-y-1.5">
+            <Label htmlFor="transfered_to" className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-primary" />
+              {form.transfer_type === 'RETURN' ? 'Receiving Officer (Warehouse)' : 'Transferring To (Recipient)'} <span className="text-destructive">*</span>
+            </Label>
+            <UserSearch
+              id="transfered_to"
+              users={combinedUsers}
+              userId={form.transfered_to}
+              onSelectUser={(id) => setForm((prev) => ({ ...prev, transfered_to: id }))}
+              placeholder={
+                form.transfer_type === 'RETURN'
+                  ? 'Search warehouse receiving officer...'
+                  : 'Search recipient employee...'
+              }
+            />
+          </div>
+        </div>
+
+        {/* Context Inputs Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Description */}
+          <div className="space-y-1.5">
+            <Label htmlFor="description" className="text-xs font-semibold text-muted-foreground">
+              Description / Title <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="description"
+              type="text"
+              required
+              placeholder="e.g., Laptop reassignment, unit relocation"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="h-8 text-xs bg-card border-border"
+            />
+          </div>
+
+          {/* Reason */}
+          <div className="space-y-1.5">
+            <Label htmlFor="reason" className="text-xs font-semibold text-muted-foreground">
+              Reason for {form.transfer_type === 'RETURN' ? 'Return' : 'Transfer'} <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="reason"
+              type="text"
+              required
+              placeholder={
+                form.transfer_type === 'RETURN'
+                  ? 'e.g., Resigned, Retired, Defective'
+                  : 'e.g., Departmental Reassignment'
+              }
+              value={form.reason}
+              onChange={(e) => setForm({ ...form, reason: e.target.value })}
+              className="h-8 text-xs bg-card border-border"
+            />
+          </div>
+
+          {/* Transaction Date */}
+          <div className="space-y-1.5">
+            <Label htmlFor="transfer_date" className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+              <CalendarIcon className="h-3.5 w-3.5 text-primary" />
+              Transaction Date <span className="text-destructive">*</span>
+            </Label>
+            <TransferDatePicker
+              id="transfer_date"
+              value={form.transfer_date}
+              onChange={(date) => setForm({ ...form, transfer_date: date })}
+            />
+          </div>
+
+          {/* Remarks */}
+          <div className="space-y-1.5">
+            <Label htmlFor="remarks" className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+              <MessageSquare className="h-3.5 w-3.5 text-primary" />
+              Remarks / Notes
+            </Label>
+            <Input
+              id="remarks"
+              type="text"
+              placeholder="Optional additional context..."
+              value={form.remarks}
+              onChange={(e) => setForm({ ...form, remarks: e.target.value })}
+              className="h-8 text-xs bg-card border-border"
+            />
+          </div>
+        </div>
+
+        {/* Form Submit Button */}
+        <div className="pt-3 border-t border-border flex justify-end">
+          <Button
+            type="submit"
+            size="sm"
+            disabled={
+              submitting ||
+              !form.serialized_asset_id ||
+              !form.user_id ||
+              !form.transfered_to ||
+              !form.description ||
+              !form.reason ||
+              !form.transfer_date
+            }
+            className="gap-1.5 text-xs h-8"
+          >
+            <Send className="h-3.5 w-3.5" />
+            {submitting
+              ? 'Processing...'
+              : form.transfer_type === 'RETURN'
+              ? 'Process Equipment Return'
+              : 'Generate Property Transfer Report (PTR)'}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

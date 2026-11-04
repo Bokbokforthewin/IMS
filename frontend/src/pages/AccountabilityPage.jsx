@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '@/api/client'; // Uses standard path alias (same as '@/components/ui/badge')
+import api from '@/api/client';
 
 import AssetCatalogBrowse from '../components/assets/AssetCatalogBrowse.jsx';
 import DeliveryForm from '../components/assets/DeliveryForm.jsx';
 import CartReview from '../components/assets/CartReview.jsx';
 import AccountabilityReceiptsTable from '../components/assets/AccountabilityReceiptsTable.jsx';
 import { Badge } from '@/components/ui/badge';
+import { Check, ChevronRight } from 'lucide-react';
 
 // Helper to extract clean numeric unit cost
 function parseCost(asset) {
@@ -32,7 +33,7 @@ export default function AccountabilityPage({ activeTab, handleApiCall }) {
     } catch (err) {
       console.error('Failed to load accountability catalog:', err);
     }
-  }, []); // No unstable dependencies
+  }, []);
 
   useEffect(() => {
     fetchCatalog();
@@ -136,8 +137,44 @@ export default function AccountabilityPage({ activeTab, handleApiCall }) {
     setRefreshKey((k) => k + 1);
   };
 
+  const stepsList = [
+    { id: 'browse', label: 'Select Assets' },
+    { id: 'delivery', label: 'Assign to Users' },
+    { id: 'review', label: 'Review & Issue' },
+  ];
+
   const renderWizardContent = () => (
     <div className="space-y-6">
+      {/* Wizard Progress Stepper */}
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-card p-3 shadow-2xs overflow-x-auto justify-center">
+        {stepsList.map((s, idx) => {
+          const isActive = step === s.id;
+          const isCompleted =
+            (step === 'delivery' && s.id === 'browse') ||
+            (step === 'review' && (s.id === 'browse' || s.id === 'delivery'));
+
+          return (
+            <React.Fragment key={s.id}>
+              <div
+                className={`flex items-center gap-2 text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground font-semibold'
+                    : isCompleted
+                    ? 'text-foreground hover:bg-muted/50'
+                    : 'text-muted-foreground'
+                }`}
+              >
+                {isCompleted ? <Check className="size-3.5" /> : null}
+                <span>{s.label}</span>
+              </div>
+              {idx < stepsList.length - 1 && (
+                <ChevronRight className="size-4 text-muted-foreground/60 shrink-0" />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+
       {/* Step 1: Browse Catalog */}
       {step === 'browse' && (
         <AssetCatalogBrowse
@@ -173,9 +210,33 @@ export default function AccountabilityPage({ activeTab, handleApiCall }) {
     </div>
   );
 
+  const getPageTitle = () => {
+    if (activeTab === 'accountability-assign') return 'Asset Accountability Assignment';
+    if (activeTab === 'accountability-list') return 'Accountability Receipts Registry';
+    return 'Asset Accountability & Custodianship';
+  };
+
+  const getPageDescription = () => {
+    if (activeTab === 'accountability-assign')
+      return 'Issue assets to designated personnel, pair equipment sets, and generate PAR/ICS receipts.';
+    if (activeTab === 'accountability-list')
+      return 'View, filter, and manage active asset accountability receipts and issued equipment.';
+    return 'Manage equipment allocation, custodian assignments, and accountability receipt records.';
+  };
+
   return (
-    <div className="w-full space-y-6">
-      {/* If activeTab is provided, render according to tab selection */}
+    <div className="space-y-6 p-4">
+      {/* Prominent Page Header */}
+      <div>
+        <h2 className="text-xl font-bold tracking-tight text-foreground">
+          {getPageTitle()}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          {getPageDescription()}
+        </p>
+      </div>
+
+      {/* View Routing */}
       {activeTab ? (
         <>
           {activeTab === 'accountability-assign' && renderWizardContent()}
@@ -184,10 +245,10 @@ export default function AccountabilityPage({ activeTab, handleApiCall }) {
           )}
         </>
       ) : (
-        /* Standalone mode: Render wizard and history table together */
+        /* Standalone mode: Render wizard and receipts table together */
         <>
           {renderWizardContent()}
-          <div className="pt-6 border-t">
+          <div className="pt-6 border-t border-border">
             <AccountabilityReceiptsTable refreshKey={refreshKey} />
           </div>
         </>

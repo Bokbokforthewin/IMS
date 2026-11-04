@@ -1,10 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { CalendarIcon, Search, Check, X } from 'lucide-react';
+import { 
+  CalendarIcon, Search, Check, X, Boxes, Layers, 
+  Trash2, Plus, DollarSign, Calendar as CalendarIconLucide, Globe, ShieldCheck, Save 
+} from 'lucide-react';
 
 import {
   Field,
   FieldLabel,
+  FieldDescription,
   FieldGroup,
+  FieldSet,
+  FieldLegend,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -90,7 +96,7 @@ function ArrivalDatePicker({ value, onChange }) {
   };
 
   return (
-    <InputGroup>
+    <InputGroup className="mt-1.5 w-full">
       <InputGroupInput
         id="arrival_date"
         value={inputValue}
@@ -115,13 +121,13 @@ function ArrivalDatePicker({ value, onChange }) {
                 aria-label="Select arrival date"
                 type="button"
               >
-                <CalendarIcon className="size-4" />
+                <CalendarIcon className="size-4 text-muted-foreground" />
                 <span className="sr-only">Select arrival date</span>
               </InputGroupButton>
             }
           />
           <PopoverContent
-            className="w-auto overflow-hidden p-0"
+            className="w-auto overflow-hidden p-0 border border-border"
             align="end"
             alignOffset={-8}
             sideOffset={10}
@@ -238,14 +244,14 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
   };
 
   return (
-    <div ref={wrapperRef} className="relative w-full">
+    <div ref={wrapperRef} className="relative w-full mt-1.5">
       <div className="relative flex items-center">
         <Search className="absolute left-3 w-4 h-4 text-muted-foreground pointer-events-none" />
         <Input
           id="item_id"
           type="text"
           required
-          placeholder="Search item name, brand, type, specs, category..."
+          placeholder="Search asset item name, brand, type, specs, category..."
           value={searchTerm}
           onFocus={() => setIsOpen(true)}
           onChange={handleInputChange}
@@ -265,7 +271,7 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border shadow-lg max-h-64 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border border-border shadow-md max-h-64 overflow-y-auto">
           {filteredItems.length > 0 ? (
             <ul className="py-1 divide-y divide-border/40 text-sm">
               {filteredItems.map((item) => {
@@ -295,8 +301,8 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider ${
                             item.tracking_type === 'asset'
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-                              : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                              ? 'bg-info-soft text-info-text border border-info-border'
+                              : 'bg-success-soft text-success-text border border-success-border'
                           }`}
                         >
                           {item.tracking_type === 'asset'
@@ -322,7 +328,7 @@ function ItemSearch({ items = [], itemId, onSelectItem }) {
             </ul>
           ) : (
             <div className="p-3 text-sm text-muted-foreground text-center">
-              No matching catalog items found
+              No matching asset catalog items found
             </div>
           )}
         </div>
@@ -337,7 +343,7 @@ function emptyComponent() {
     item_id: '',
     unit_cost: '',
     has_property_number: false,
-    has_serial_number: true, // Default ON
+    has_serial_number: true,
     model: '',
     manufacturer_name: '',
     country_of_origin: '',
@@ -351,9 +357,12 @@ function ComponentFields({ label, items, value, onChange, sets }) {
   const fieldKey = label.replace(/\s+/g, '_').toLowerCase();
 
   return (
-    <FieldGroup>
+    <FieldGroup className="space-y-4">
       <Field data-invalid={!value.item_id ? undefined : false}>
-        <FieldLabel>{label} <span className="text-destructive">*</span></FieldLabel>
+        <FieldLabel className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <Search className="w-3.5 h-3.5 text-muted-foreground" />
+          {label} <span className="text-destructive">*</span>
+        </FieldLabel>
         <ItemSearch
           items={assetItems}
           itemId={value.item_id}
@@ -361,88 +370,115 @@ function ComponentFields({ label, items, value, onChange, sets }) {
         />
       </Field>
 
-      <div className="grid grid-cols-3 gap-4 items-center">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Field>
-          <FieldLabel>Unit Cost (₱) <span className="text-destructive">*</span></FieldLabel>
+          <FieldLabel className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+            Unit Cost (₱) <span className="text-destructive">*</span>
+          </FieldLabel>
           <Input
             type="number"
             step="0.01"
             min="0"
             required
+            placeholder="0.00"
             value={value.unit_cost}
             onChange={(e) => onChange({ ...value, unit_cost: e.target.value })}
+            className="mt-1.5 w-full"
           />
         </Field>
 
-        <Field orientation="horizontal" className="flex items-center gap-3 pt-4">
-          <Switch
-            id={`has_property_number_${fieldKey}`}
-            checked={value.has_property_number}
-            onCheckedChange={(checked) =>
-              onChange({ ...value, has_property_number: checked })
-            }
-          />
-          <FieldLabel
-            htmlFor={`has_property_number_${fieldKey}`}
-            className="cursor-pointer font-medium text-xs sm:text-sm"
-          >
-            Assign Property Number
-          </FieldLabel>
+        {/* Toggle Property Number */}
+        <Field className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-3">
+          <div className="flex items-center gap-3">
+            <Switch
+              id={`has_property_number_${fieldKey}`}
+              checked={value.has_property_number}
+              onCheckedChange={(checked) =>
+                onChange({ ...value, has_property_number: checked })
+              }
+            />
+            <FieldLabel
+              htmlFor={`has_property_number_${fieldKey}`}
+              className="cursor-pointer text-xs font-semibold text-foreground"
+            >
+              Assign Property Number
+            </FieldLabel>
+          </div>
+          <FieldDescription className="text-[11px] text-muted-foreground pl-1">
+            Auto-generate or assign property tags per unit.
+          </FieldDescription>
         </Field>
 
         {/* Toggle Serial Number Tracking */}
-        <Field orientation="horizontal" className="flex items-center gap-3 pt-4">
-          <Switch
-            id={`has_serial_number_${fieldKey}`}
-            checked={value.has_serial_number}
-            onCheckedChange={(checked) =>
-              onChange({
-                ...value,
-                has_serial_number: checked,
-                serial_numbers: checked ? value.serial_numbers : [],
-              })
-            }
-          />
-          <FieldLabel
-            htmlFor={`has_serial_number_${fieldKey}`}
-            className="cursor-pointer font-medium text-xs sm:text-sm"
-          >
-            Track Serial Number
-          </FieldLabel>
+        <Field className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-3">
+          <div className="flex items-center gap-3">
+            <Switch
+              id={`has_serial_number_${fieldKey}`}
+              checked={value.has_serial_number}
+              onCheckedChange={(checked) =>
+                onChange({
+                  ...value,
+                  has_serial_number: checked,
+                  serial_numbers: checked ? value.serial_numbers : [],
+                })
+              }
+            />
+            <FieldLabel
+              htmlFor={`has_serial_number_${fieldKey}`}
+              className="cursor-pointer text-xs font-semibold text-foreground"
+            >
+              Track Serial Number
+            </FieldLabel>
+          </div>
+          <FieldDescription className="text-[11px] text-muted-foreground pl-1">
+            Require entering/scanning serials per unit.
+          </FieldDescription>
         </Field>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Field>
-          <FieldLabel>Model</FieldLabel>
+          <FieldLabel className="text-xs font-medium text-muted-foreground">Model</FieldLabel>
           <Input
+            placeholder="e.g., UltraSharp U2723QE"
             value={value.model}
             onChange={(e) => onChange({ ...value, model: e.target.value })}
+            className="mt-1.5 w-full"
           />
         </Field>
         <Field>
-          <FieldLabel>Manufacturer</FieldLabel>
+          <FieldLabel className="text-xs font-medium text-muted-foreground">Manufacturer</FieldLabel>
           <Input
+            placeholder="e.g., Dell Inc."
             value={value.manufacturer_name}
             onChange={(e) =>
               onChange({ ...value, manufacturer_name: e.target.value })
             }
+            className="mt-1.5 w-full"
           />
         </Field>
         <Field>
-          <FieldLabel>Country of Origin</FieldLabel>
+          <FieldLabel className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Globe className="w-3.5 h-3.5" />
+            Country of Origin
+          </FieldLabel>
           <Input
+            placeholder="e.g., Philippines, Japan"
             value={value.country_of_origin}
             onChange={(e) =>
               onChange({ ...value, country_of_origin: e.target.value })
             }
+            className="mt-1.5 w-full"
           />
         </Field>
       </div>
 
       {sets > 0 && value.has_serial_number && (
-        <Field>
-          <FieldLabel>Serial Numbers <span className="text-destructive">*</span></FieldLabel>
+        <Field className="pt-2">
+          <FieldLabel className="text-xs font-medium text-muted-foreground mb-1.5">
+            Serial Numbers <span className="text-destructive">*</span>
+          </FieldLabel>
           <SerialNumberScanner
             quantity={sets}
             serials={value.serial_numbers}
@@ -483,10 +519,8 @@ export default function ReceiveBundleForm({ items, handleApiCall, onSuccess }) {
 
     if (numSets < 1) return;
 
-    // Validate main serial numbers if serial tracking is turned ON
     if (main.has_serial_number && main.serial_numbers.length !== numSets) return;
 
-    // Validate peripheral serial numbers if serial tracking is turned ON
     for (const p of peripherals) {
       if (p.has_serial_number && p.serial_numbers.length !== numSets) return;
     }
@@ -508,25 +542,40 @@ export default function ReceiveBundleForm({ items, handleApiCall, onSuccess }) {
   };
 
   return (
-    <div className="receive-panel">
-      <h2 className="receive-panel__title">Receive Bundled Assets</h2>
-      <form className="receive-form" onSubmit={handleSubmit}>
-        <FieldGroup>
-          <div className="grid grid-cols-2 gap-4">
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
+      {/* Prominent Task Title Header */}
+      <div className="flex items-center gap-2 border-b border-border pb-3">
+        <Boxes className="h-4 w-4 text-primary" />
+        <h3 className="text-xs font-semibold tracking-wider uppercase text-muted-foreground">
+          Receive Bundled Assets & Equipment Sets
+        </h3>
+      </div>
+
+      <form className="space-y-6" onSubmit={handleSubmit}>
+        <FieldGroup className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field>
-              <FieldLabel htmlFor="sets">Number of Bundles (Sets) <span className="text-destructive">*</span></FieldLabel>
+              <FieldLabel htmlFor="sets" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+                Number of Bundles (Sets) <span className="text-destructive">*</span>
+              </FieldLabel>
               <Input
                 id="sets"
                 type="number"
                 min="1"
                 required
+                placeholder="e.g., 5"
                 value={sets}
                 onChange={(e) => setSets(e.target.value)}
+                className="mt-1.5 w-full"
               />
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="arrival_date">Arrival Date <span className="text-destructive">*</span></FieldLabel>
+              <FieldLabel htmlFor="arrival_date" className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <CalendarIconLucide className="w-3.5 h-3.5 text-muted-foreground" />
+                Arrival Date <span className="text-destructive">*</span>
+              </FieldLabel>
               <ArrivalDatePicker
                 value={arrivalDate}
                 onChange={setArrivalDate}
@@ -534,13 +583,17 @@ export default function ReceiveBundleForm({ items, handleApiCall, onSuccess }) {
             </Field>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Main Unit</CardTitle>
+          {/* Main Unit Card */}
+          <Card className="rounded-lg border border-border bg-card shadow-2xs">
+            <CardHeader className="border-b border-border py-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                <ShieldCheck className="size-4 text-primary" />
+                Main System Unit
+              </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 pt-4">
               <ComponentFields
-                label="Main Component"
+                label="Main System Component"
                 items={items}
                 value={main}
                 onChange={setMain}
@@ -549,19 +602,26 @@ export default function ReceiveBundleForm({ items, handleApiCall, onSuccess }) {
             </CardContent>
           </Card>
 
+          {/* Peripherals Cards */}
           {peripherals.map((p, idx) => (
-            <Card key={idx} className="mt-4">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Peripheral {idx + 1} (e.g., Monitor, UPS)</CardTitle>
+            <Card key={idx} className="rounded-lg border border-border bg-card shadow-2xs">
+              <CardHeader className="flex flex-row items-center justify-between border-b border-border py-2.5 px-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                  <Boxes className="size-4 text-muted-foreground" />
+                  Peripheral {idx + 1} (e.g., Monitor, UPS, Keyboard)
+                </CardTitle>
                 <Button
                   type="button"
                   variant="destructive"
+                  size="sm"
                   onClick={() => removePeripheral(idx)}
+                  className="h-7 text-xs gap-1.5"
                 >
+                  <Trash2 className="size-3.5" />
                   Remove
                 </Button>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 pt-4">
                 <ComponentFields
                   label={`Peripheral ${idx + 1}`}
                   items={items}
@@ -573,19 +633,25 @@ export default function ReceiveBundleForm({ items, handleApiCall, onSuccess }) {
             </Card>
           ))}
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={addPeripheral}
-            className="mt-4"
-          >
-            + Add Peripheral
-          </Button>
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addPeripheral}
+              className="gap-2 text-xs"
+            >
+              <Plus className="size-4" />
+              Add Peripheral Component
+            </Button>
+          </div>
         </FieldGroup>
 
-        <Button type="submit" className="mt-6 w-full">
-          Process Bundle Stock
-        </Button>
+        <div className="pt-2 border-t border-border">
+          <Button type="submit" className="w-full sm:w-auto min-w-[180px] flex items-center justify-center gap-2">
+            <Save className="w-4 h-4" />
+            Process Bundle Stock
+          </Button>
+        </div>
       </form>
     </div>
   );
