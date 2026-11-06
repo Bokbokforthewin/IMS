@@ -18,12 +18,11 @@ class ImportLegacyAllocation extends Command
         {file : Path to Bacolod_Inventory.csv}
         {--dry-run : Show what would be imported without writing anything}';
 
-    protected $description = 'Import Bacolod inventory and allocation data into the database from a single CSV file.';
+    protected $description = 'Import Bacolod inventory and allocation data using official Seeder categories.';
 
     private const PLACEHOLDER_SERIALS = ['cpu clone', 'unknown', 'n/a', 'na', 'none'];
 
     private array $stats = [
-        'categories_created' => 0,
         'items_created' => 0,
         'assets_created' => 0,
         'receipts_created' => 0,
@@ -35,6 +34,7 @@ class ImportLegacyAllocation extends Command
 
     private ?array $userMap = null;
     private array $generatedItemCodes = [];
+    private array $generatedPpeNumbers = [];
 
     public function handle(): int
     {
@@ -60,10 +60,6 @@ class ImportLegacyAllocation extends Command
         }
 
         DB::transaction(function () use ($rows) {
-            $processedProperties = [];
-            $processedSerials = [];
-
-            // --- STEP 1: PRE-PROCESS & ENSURE NO ROWS ARE SKIPPED ---
             $validRows = [];
             foreach ($rows as $index => $row) {
                 $propertyNumber = trim($row['Property Number'] ?? '');
@@ -71,16 +67,12 @@ class ImportLegacyAllocation extends Command
                 $lowerSerial = Str::lower($serialNumber);
                 $isPlaceholderSerial = in_array($lowerSerial, self::PLACEHOLDER_SERIALS, true);
                 
-                // If property number is empty, missing, or a generic placeholder like "faded sticker", 
-                // generate a unique property number so it never triggers a duplicate or skip!
                 if ($propertyNumber === '' || Str::lower($propertyNumber) === 'faded sticker') {
-                    $generated = 'DOH-NIR-BAC-' . date('Y') . '-' . sprintf('%04d', $index + 1);
+                    $generated = 'NIR CHD-BAC-' . date('Y') . '-' . sprintf('%04d', $index + 1);
                     $this->stats['warnings'][] = "Row {$index}: Property Number was '" . ($propertyNumber ?: 'empty') . "'. Assigned unique: {$generated}";
                     $row['Property Number'] = $generated;
                 }
 
-                // If serial number is a duplicate or placeholder, but we want to import it anyway,
-                // we can append a unique identifier to the serial number instead of skipping it.
                 if ($serialNumber !== '' && !$isPlaceholderSerial) {
                     if (SerializedAsset::where('serial_number', $serialNumber)->exists()) {
                         $uniqueSerial = $serialNumber . '-' . ($row['Property Number'] ?? uniqid());
@@ -92,7 +84,6 @@ class ImportLegacyAllocation extends Command
                 $validRows[] = $row;
             }
 
-            // --- STEP 2: BUILD ASSETS & RECEIPT GROUPS ---
             $receiptGroups = [];
 
             foreach ($validRows as $index => $row) {
@@ -101,17 +92,21 @@ class ImportLegacyAllocation extends Command
                     $rawDesc = 'Unknown Item';
                 }
 
-                $categoryName = explode(' ', $rawDesc)[0] ?: 'General';
-                if (strlen($categoryName) < 3) $categoryName = 'General';
+                // Strict Category Seeder Mapping
+                $categoryName = $this->matchSeederCategory($rawDesc);
+                $category = Category::where('name', $categoryName)->first();
 
-                // Ensure Category
-                $category = Category::firstOrCreate(
-                    ['name' => $categoryName],
-                    ['description' => 'Imported from Bacolod inventory']
-                );
-                if ($category->wasRecentlyCreated) $this->stats['categories_created']++;
+                if (!$category) {
+                    // Fallback to first available category if seeder hasn't run yet
+                    $category = Category::first() ?? Category::create([
+                        'name' => $categoryName,
+                        'sub_major_account_code' => '05',
+                        'gl_account_code' => '03',
+                        'semi_expendable_gl_code' => '03',
+                        'description' => 'Default Category'
+                    ]);
+                }
 
-                // Ensure Item
                 $item = Item::firstOrCreate(
                     [
                         'category_id' => $category->id,
@@ -130,19 +125,17 @@ class ImportLegacyAllocation extends Command
                 );
                 if ($item->wasRecentlyCreated) $this->stats['items_created']++;
 
-                // --- USER RESOLUTION ---
                 $endUserName = trim($row['End User'] ?? '');
                 $mrHolderName = trim($row['Name'] ?? '');
 
                 $endUserId = $endUserName !== '' ? $this->resolveUserId($endUserName) : null;
                 $mrHolderId = $mrHolderName !== '' ? $this->resolveUserId($mrHolderName) : $this->resolveUserId('Adrian Hort D. Ramos');
 
-                // Physical Asset Holder (current_holder_id): End User if available; falls back to MR Holder
                 $physicalHolderId = $endUserId ?? $mrHolderId;
 
                 $propertyNumber = trim($row['Property Number'] ?? '');
                 if ($propertyNumber === '') {
-                    $propertyNumber = 'DOH NIR-' . uniqid();
+                    $propertyNumber = 'NIR CHD-' . uniqid();
                     $this->stats['warnings'][] = "Row {$index}: Missing Property Number. Generated {$propertyNumber}";
                 }
 
@@ -162,11 +155,14 @@ class ImportLegacyAllocation extends Command
                 $dateAcquired = $this->parseDate($row['Date Acquired'] ?? null) ?? now();
                 $status = ($physicalHolderId !== null || $mrHolderId !== null) ? 'Assigned' : 'Available';
 
-                // Create Serialized Asset
+                // Format: YEAR-SUB_MAJOR-GL-SEQUENCE(4 digits)-NIR CHD
+                $ppeNumber = $this->generatePpeNumber($category, $dateAcquired->format('Y'));
+
                 $asset = SerializedAsset::create([
                     'item_id' => $item->id,
                     'serial_number' => $finalSerialNumber,
                     'property_number' => $propertyNumber,
+                    'ppe_number' => $ppeNumber,
                     'model' => null,
                     'manufacturer_name' => null,
                     'country_of_origin' => null,
@@ -180,11 +176,8 @@ class ImportLegacyAllocation extends Command
                 ]);
                 $this->stats['assets_created']++;
 
-                // Group assets into Accountability Receipts
                 if ($mrHolderId !== null || $physicalHolderId !== null) {
                     $dateKey = $dateAcquired->format('Y-m-d');
-                    
-                    // Grouping key by MR Holder, End User, and Date
                     $groupKey = "mr_{$mrHolderId}_end_{$physicalHolderId}_date_{$dateKey}";
 
                     if (!isset($receiptGroups[$groupKey])) {
@@ -205,7 +198,6 @@ class ImportLegacyAllocation extends Command
                 }
             }
 
-            // --- STEP 3: CREATE ACCOUNTABILITY RECEIPTS ---
             foreach ($receiptGroups as $group) {
                 $receiptType = $group['unit_cost'] >= 50000 ? 'PAR' : 'ICS';
 
@@ -239,7 +231,6 @@ class ImportLegacyAllocation extends Command
         $this->line('');
         $this->info('Import complete.');
         $this->table(['Metric', 'Count'], [
-            ['Categories created', $this->stats['categories_created']],
             ['Catalog items created', $this->stats['items_created']],
             ['Serialized assets created', $this->stats['assets_created']],
             ['Accountability receipts created', $this->stats['receipts_created']],
@@ -253,6 +244,92 @@ class ImportLegacyAllocation extends Command
         return self::SUCCESS;
     }
 
+    private function matchSeederCategory(string $rawName, string $brand = '', string $model = ''): string
+    {
+        $text = Str::lower($rawName . ' ' . $brand . ' ' . $model);
+
+        // Priority 1: ICT Equipment - Computing Hardware (Matched BEFORE Furniture to prevent 'desktop' matching 'desk')
+        if (Str::contains($text, [
+            'desktop', 'laptop', 'notebook', 'server', 'system unit', 
+            'workstation', 'air purifier', 'ipad', 'tablet'
+        ])) {
+            return 'ICT Equipment - Computing Hardware';
+        }
+
+        // Priority 2: ICT Equipment - Network & Infrastructure
+        if (Str::contains($text, [
+            'switch', 'router', 'access point', 'access-point', 
+            'server rack', 'firewall', 'gateway', 'patch panel'
+        ])) {
+            return 'ICT Equipment - Network & Infrastructure';
+        }
+
+        // Priority 3: ICT Peripherals & Printers (UPS, AVR, Printers, Monitors, Cameras, Keyboards, etc.)
+        if (Str::contains($text, [
+            'printer', 'scanner', 'monitor', 'keyboard', 'mouse', 
+            'ups', 'avr', 'uninterrupted', 'uninterruptible', 'power supply', 
+            'camera', 'webcam', 'projector', 'speaker', 'headset', 'tv', 
+            'external drive', 'pencil', 'presenter'
+        ])) {
+            return 'ICT Peripherals & Printers';
+        }
+
+        // Priority 4: Communication Equipment
+        if (Str::contains($text, [
+            'phone', 'cellular', 'smartphone', 'radio', 'pabx', 
+            'communication', 'talkie', 'handset', 'voice recorder'
+        ])) {
+            return 'Communication Equipment';
+        }
+
+        // Priority 5: ICT Consumables & Supplies
+        if (Str::contains($text, [
+            'paper', 'ink', 'toner', 'ribbon', 'rj45', 
+            'patch cable', 'connector', 'cartridge', 'supplies'
+        ])) {
+            return 'ICT Consumables & Supplies';
+        }
+
+        // Priority 6: Furniture and Fixtures (Evaluated only after all ICT equipment/peripherals)
+        if (Str::contains($text, [
+            'chair', 'office desk', 'executive desk', 'table', 
+            'cabinet', 'shelf', 'furniture', 'sofa', 'filing'
+        ])) {
+            return 'Furniture and Fixtures';
+        }
+
+        return 'ICT Equipment - Computing Hardware';
+    }
+
+    private function generatePpeNumber(Category $category, string $year): string
+    {
+        $subMajor = $category->sub_major_account_code ?? '05';
+        $glCode = $category->gl_account_code ?? '03';
+
+        $prefixPattern = sprintf('%s-%s-%s-', $year, $subMajor, $glCode);
+
+        $last = SerializedAsset::where('ppe_number', 'LIKE', $prefixPattern . '%')->orderBy('id', 'desc')->first();
+        $seq = 1;
+
+        if ($last && $last->ppe_number) {
+            $parts = explode('-', $last->ppe_number);
+            if (isset($parts[3]) && is_numeric($parts[3])) {
+                $seq = intval($parts[3]) + 1;
+            }
+        }
+
+        do {
+            $candidate = sprintf('%s%04d-NIR CHD', $prefixPattern, $seq);
+            $seq++;
+        } while (
+            in_array($candidate, $this->generatedPpeNumbers) ||
+            SerializedAsset::where('ppe_number', $candidate)->exists()
+        );
+
+        $this->generatedPpeNumbers[] = $candidate;
+        return $candidate;
+    }
+
     private function printWarnings(): void
     {
         if (empty($this->stats['warnings'])) return;
@@ -260,9 +337,6 @@ class ImportLegacyAllocation extends Command
         $this->warn('Notes from the import (' . count($this->stats['warnings']) . '):');
         foreach (array_slice(array_unique($this->stats['warnings']), 0, 15) as $w) {
             $this->line('  - ' . $w);
-        }
-        if (count($this->stats['warnings']) > 15) {
-            $this->line('  ... and ' . (count($this->stats['warnings']) - 15) . ' more.');
         }
     }
 
@@ -302,7 +376,8 @@ class ImportLegacyAllocation extends Command
         $prefix = strtoupper(substr($cleaned, 0, 3));
         if (strlen($prefix) < 3) $prefix = str_pad($prefix, 3, 'X', STR_PAD_RIGHT);
 
-        $pattern = sprintf('DOH-NIR-%s-%s-%s-', $prefix, date('Y'), date('m'));
+        $pattern = sprintf('NIR CHD-%s-%s-', $prefix, date('Y'));
+        
         $last = Item::where('item_code', 'LIKE', $pattern . '%')->orderBy('id', 'desc')->first();
         $seq = 1;
         if ($last) {
@@ -310,7 +385,7 @@ class ImportLegacyAllocation extends Command
             $seq = intval(end($parts)) + 1;
         }
         do {
-            $candidateCode = sprintf('%s%03d', $pattern, $seq);
+            $candidateCode = sprintf('%s%05d', $pattern, $seq);
             $seq++;
         } while (
             in_array($candidateCode, $this->generatedItemCodes) ||

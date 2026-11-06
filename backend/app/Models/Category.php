@@ -10,7 +10,7 @@ class Category extends Model
 {
     use Auditable;
     
-    protected $fillable = ['name', 'description'];
+    protected $fillable = ['name', 'description', 'sub_major_account_code', 'gl_account_code', 'semi_expendable_gl_code'];
 
     public function items(): HasMany
     {

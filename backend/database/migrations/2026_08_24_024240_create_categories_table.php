@@ -15,6 +15,11 @@ return new class extends Migration
             $table->id();
             $table->string('name')->unique();
             $table->text('description')->nullable();
+
+            //Commission On Audit codes
+            $table->string('sub_major_account_code')->nullable();
+            $table->string('gl_account_code')->nullable();
+            $table->string('semi_expendable_gl_code')->nullable();
             $table->timestamps();
         });
     }

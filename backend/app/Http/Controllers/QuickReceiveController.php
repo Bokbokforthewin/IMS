@@ -17,6 +17,35 @@ use Illuminate\Support\Facades\Storage;
  */
 class QuickReceiveController extends Controller
 {
+    /**
+     * Helper method to generate the PPE number following the system pattern:
+     * Format: YEAR-SUB_MAJOR-GL-SEQUENCE(4 digits)-NIR CHD
+     */
+    private function generatePpeNumber(Category $category, string $year): string
+    {
+        $subMajor = $category->sub_major_account_code ?? '05';
+        $glCode = $category->gl_account_code ?? '03';
+
+        $prefixPattern = sprintf('%s-%s-%s-', $year, $subMajor, $glCode);
+
+        $last = SerializedAsset::where('ppe_number', 'LIKE', $prefixPattern . '%')->orderBy('id', 'desc')->first();
+        $seq = 1;
+
+        if ($last && $last->ppe_number) {
+            $parts = explode('-', $last->ppe_number);
+            if (isset($parts[3]) && is_numeric($parts[3])) {
+                $seq = intval($parts[3]) + 1;
+            }
+        }
+
+        do {
+            $candidate = sprintf('%s%04d-NIR CHD', $prefixPattern, $seq);
+            $seq++;
+        } while (SerializedAsset::where('ppe_number', $candidate)->exists());
+
+        return $candidate;
+    }
+
     public function store(Request $request)
     {
         $envelope = $request->validate([
@@ -39,7 +68,7 @@ class QuickReceiveController extends Controller
         ]);
 
         $item = $envelope['item_mode'] === 'existing'
-            ? Item::findOrFail($envelope['item_id'])
+            ? Item::with('category')->findOrFail($envelope['item_id'])
             : null;
 
         $trackingType = $item?->tracking_type ?? $envelope['tracking_type'] ?? null;
@@ -101,6 +130,7 @@ class QuickReceiveController extends Controller
                         'estimated_useful_life' => $estimatedUsefulLife,
                         'image_path' => $uploadedImagePath,
                     ]);
+                    $item->setRelation('category', $category);
                 }
 
                 // --- Step 2: receive stock against that item ---
@@ -157,11 +187,13 @@ class QuickReceiveController extends Controller
                     }
 
                     $serial = $hasSerials ? ($serialList[$i] ?? null) : null;
+                    $ppeNumber = $this->generatePpeNumber($item->category, $year);
 
                     $createdAssets[] = SerializedAsset::create([
                         'item_id' => $item->id,
                         'serial_number' => $serial,
                         'property_number' => $propertyNumber,
+                        'ppe_number' => $ppeNumber,
                         'model' => $assetFields['model'] ?? null,
                         'manufacturer_name' => $assetFields['manufacturer_name'] ?? null,
                         'country_of_origin' => $assetFields['country_of_origin'] ?? null,
@@ -194,8 +226,6 @@ class QuickReceiveController extends Controller
     private function generateItemCode(Category $category): string
     {
         $year = date('Y');
-        $month = date('m');
-        $day = date('d');
 
         $cleanedName = preg_replace('/[^a-zA-Z]/', '', $category->name);
         $catPrefix = strtoupper(substr($cleanedName, 0, 3));
@@ -203,7 +233,7 @@ class QuickReceiveController extends Controller
             $catPrefix = str_pad($catPrefix, 3, 'X', STR_PAD_RIGHT);
         }
 
-        $fullPrefix = sprintf("DOH NIR-%s-%s-%s-%s-", $catPrefix, $year, $month, $day);
+        $fullPrefix = sprintf("NIR CHD-%s-%s-", $catPrefix, $year);
 
         $lastItem = Item::where('item_code', 'LIKE', $fullPrefix . '%')
             ->orderBy('id', 'desc')
@@ -216,7 +246,7 @@ class QuickReceiveController extends Controller
             $nextSeq = intval(end($parts)) + 1;
         }
 
-        return sprintf('%s%03d', $fullPrefix, $nextSeq);
+        return sprintf('%s%05d', $fullPrefix, $nextSeq);
     }
 
     public function storeBundle(Request $request)
@@ -301,11 +331,13 @@ class QuickReceiveController extends Controller
                     }
 
                     $serial = $mainHasSerial ? ($serialRules['main']['serial_numbers'][$i] ?? null) : null;
+                    $ppeNumber = $this->generatePpeNumber($mainItem->category, $year);
 
                     $createdMain[] = SerializedAsset::create([
                         'item_id' => $mainItem->id,
                         'serial_number' => $serial,
                         'property_number' => $propertyNumber,
+                        'ppe_number' => $ppeNumber,
                         'model' => $mainInput['model'] ?? null,
                         'manufacturer_name' => $mainInput['manufacturer_name'] ?? null,
                         'country_of_origin' => $mainInput['country_of_origin'] ?? null,
@@ -336,11 +368,13 @@ class QuickReceiveController extends Controller
                         }
 
                         $pSerial = $pHasSerial ? ($peripheralSerials[$i] ?? null) : null;
+                        $ppeNumber = $this->generatePpeNumber($peripheralItem->category, $year);
 
                         $createdPeripherals[] = SerializedAsset::create([
                             'item_id' => $peripheralItem->id,
                             'serial_number' => $pSerial,
                             'property_number' => $propertyNumber,
+                            'ppe_number' => $ppeNumber,
                             'model' => $peripheralInput['model'] ?? null,
                             'manufacturer_name' => $peripheralInput['manufacturer_name'] ?? null,
                             'country_of_origin' => $peripheralInput['country_of_origin'] ?? null,
@@ -376,7 +410,7 @@ class QuickReceiveController extends Controller
     private function resolveItem(array $componentInput, $file = null, array &$newlyUploadedPaths = []): Item
     {
         if ($componentInput['item_mode'] === 'existing') {
-            return Item::findOrFail($componentInput['item_id']);
+            return Item::with('category')->findOrFail($componentInput['item_id']);
         }
 
         $category = Category::findOrFail($componentInput['category_id']);
@@ -387,7 +421,7 @@ class QuickReceiveController extends Controller
             $newlyUploadedPaths[] = $imagePath;
         }
 
-        return Item::create([
+        $item = Item::create([
             'category_id' => $componentInput['category_id'],
             'item_code' => $this->generateItemCode($category),
             'name' => $componentInput['name'],
@@ -400,6 +434,9 @@ class QuickReceiveController extends Controller
             'estimated_useful_life' => $componentInput['estimated_useful_life'] ?? null,
             'image_path' => $imagePath,
         ]);
+        $item->setRelation('category', $category);
+
+        return $item;
     }
 
     private function nextPropertySequence(bool $hasPropertyNumber, string $year): int

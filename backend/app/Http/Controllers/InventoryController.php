@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\StockBatch;
 use App\Models\SerializedAsset;
+use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -12,6 +14,35 @@ use Illuminate\Http\JsonResponse;
 
 class InventoryController extends Controller
 {
+    /**
+     * Helper method to generate the PPE number following the system pattern:
+     * Format: YEAR-SUB_MAJOR-GL-SEQUENCE(4 digits)-NIR CHD
+     */
+    private function generatePpeNumber(Category $category, string $year): string
+    {
+        $subMajor = $category->sub_major_account_code ?? '05';
+        $glCode = $category->gl_account_code ?? '03';
+
+        $prefixPattern = sprintf('%s-%s-%s-', $year, $subMajor, $glCode);
+
+        $last = SerializedAsset::where('ppe_number', 'LIKE', $prefixPattern . '%')->orderBy('id', 'desc')->first();
+        $seq = 1;
+
+        if ($last && $last->ppe_number) {
+            $parts = explode('-', $last->ppe_number);
+            if (isset($parts[3]) && is_numeric($parts[3])) {
+                $seq = intval($parts[3]) + 1;
+            }
+        }
+
+        do {
+            $candidate = sprintf('%s%04d-NIR CHD', $prefixPattern, $seq);
+            $seq++;
+        } while (SerializedAsset::where('ppe_number', $candidate)->exists());
+
+        return $candidate;
+    }
+
     /**
      * Store inbound stock deliveries (Handles both Serialized Assets and Bulk/Consumables).
      */
@@ -24,7 +55,7 @@ class InventoryController extends Controller
             'quantity' => 'required|integer|min:1',
         ]);
 
-        $item = Item::findOrFail($validated['item_id']);
+        $item = Item::with('category')->findOrFail($validated['item_id']);
         $arrivalDate = $validated['arrival_date'] ?? date('Y-m-d');
         $year = date('Y', strtotime($arrivalDate));
         $month = date('m', strtotime($arrivalDate));
@@ -100,11 +131,13 @@ class InventoryController extends Controller
                     }
 
                     $serial = $hasSerial ? ($serialList[$i] ?? null) : null;
+                    $ppeNumber = $this->generatePpeNumber($item->category, $year);
 
                     $createdAssets[] = SerializedAsset::create([
                         'item_id' => $validated['item_id'],
                         'serial_number' => $serial,
                         'property_number' => $propertyNumber,
+                        'ppe_number' => $ppeNumber,
                         'model' => $assetData['model'] ?? null,
                         'manufacturer_name' => $assetData['manufacturer_name'] ?? null,
                         'country_of_origin' => $assetData['country_of_origin'] ?? null,
@@ -178,7 +211,7 @@ class InventoryController extends Controller
         try {
             return DB::transaction(function () use ($validated, $serialRules, $sets, $year, $mainHasSerial) {
                 $mainInput = $validated['main'];
-                $mainItem = Item::findOrFail($mainInput['item_id']);
+                $mainItem = Item::with('category')->findOrFail($mainInput['item_id']);
 
                 $nextSeq = 1;
                 if ($mainInput['has_property_number']) {
@@ -200,11 +233,13 @@ class InventoryController extends Controller
                     }
 
                     $serial = $mainHasSerial ? ($serialRules['main']['serial_numbers'][$i] ?? null) : null;
+                    $ppeNumber = $this->generatePpeNumber($mainItem->category, $year);
 
                     $createdMain[] = SerializedAsset::create([
                         'item_id' => $mainInput['item_id'],
                         'serial_number' => $serial,
                         'property_number' => $propertyNumber,
+                        'ppe_number' => $ppeNumber,
                         'model' => $mainInput['model'] ?? null,
                         'manufacturer_name' => $mainInput['manufacturer_name'] ?? null,
                         'country_of_origin' => $mainInput['country_of_origin'] ?? null,
@@ -219,7 +254,7 @@ class InventoryController extends Controller
 
                 $createdPeripherals = [];
                 foreach ($validated['peripherals'] ?? [] as $pIndex => $peripheralInput) {
-                    $peripheralItem = Item::findOrFail($peripheralInput['item_id']);
+                    $peripheralItem = Item::with('category')->findOrFail($peripheralInput['item_id']);
                     $pHasSerial = $peripheralInput['has_serial_number'] ?? true;
                     $peripheralSerials = $serialRules['peripherals'][$pIndex]['serial_numbers'] ?? [];
 
@@ -242,11 +277,13 @@ class InventoryController extends Controller
                         }
 
                         $pSerial = $pHasSerial ? ($peripheralSerials[$i] ?? null) : null;
+                        $ppeNumber = $this->generatePpeNumber($peripheralItem->category, $year);
 
                         $createdPeripherals[] = SerializedAsset::create([
                             'item_id' => $peripheralInput['item_id'],
                             'serial_number' => $pSerial,
                             'property_number' => $propertyNumber,
+                            'ppe_number' => $ppeNumber,
                             'model' => $peripheralInput['model'] ?? null,
                             'manufacturer_name' => $peripheralInput['manufacturer_name'] ?? null,
                             'country_of_origin' => $peripheralInput['country_of_origin'] ?? null,
@@ -363,6 +400,7 @@ class InventoryController extends Controller
                         'item_image_url' => $a->item?->image_url,
                         'unit_of_measure' => $a->item->unit_of_measure ?? null,
                         'reference_no' => $a->property_number,
+                        'ppe_number' => $a->ppe_number,
                         'attached_to' => $a->attached_to,
                         'serial_number' => $a->serial_number,
                         'model' => $a->model,
@@ -492,7 +530,7 @@ class InventoryController extends Controller
         }
     }
 
-     public function updateAssetStatus(Request $request, SerializedAsset $serializedAsset): JsonResponse
+    public function updateAssetStatus(Request $request, SerializedAsset $serializedAsset): JsonResponse
     {
         $validated = $request->validate([
             'status' => 'required|in:Available,Assigned,Distributed,Under Repair,Condemned',
@@ -519,7 +557,6 @@ class InventoryController extends Controller
             }
  
             if ($newStatus === 'Under Repair') {
-                // Remember where it came from so it can return to the same status
                 $changes = [
                     'status' => 'Under Repair',
                     'pre_repair_status' => $currentStatus,

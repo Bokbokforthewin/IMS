@@ -15,7 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('item_id')->constrained('items')->onDelete('cascade');
             $table->string('serial_number')->unique()->nullable();
-            $table->string('property_number')->unique()->nullable(); 
+            $table->string('property_number')->unique()->nullable();
+            $table->string('ppe_number')->unique(); 
             $table->foreignId('current_holder_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('model')->nullable();
             $table->string('manufacturer_name')->nullable();

@@ -15,6 +15,7 @@ class SerializedAsset extends Model
         'item_id',
         'serial_number',
         'property_number',
+        'ppe_number',
         'model',
         'manufacturer_name',
         'country_of_origin',

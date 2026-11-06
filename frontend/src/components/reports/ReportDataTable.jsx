@@ -73,7 +73,7 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
           </div>
         ) : (
           <>
-            {/* Wide table is reserved for extra-large screens; tablets use cards. */}
+            {/* Desktop Table View */}
             <div className="hidden overflow-x-auto xl:block">
               <Table className="min-w-[1200px]">
                 <TableHeader className="bg-muted/50">
@@ -82,6 +82,7 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
                     <TableHead>Item Details</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Code / Serial</TableHead>
+                    <TableHead>PPE Number</TableHead>
                     <TableHead className="text-center">Qty</TableHead>
                     <TableHead className="text-right">Unit Cost</TableHead>
                     <TableHead className="text-right">Total Value</TableHead>
@@ -116,6 +117,7 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{row.category}</TableCell>
                       <TableCell className="font-mono text-xs text-foreground/80">{row.code_or_serial}</TableCell>
+                      <TableCell className="font-mono text-xs font-medium text-foreground">{row.ppe_number || "—"}</TableCell>
                       <TableCell className="text-center font-semibold text-sm">{row.quantity}</TableCell>
                       <TableCell className="text-right font-mono text-xs text-muted-foreground">
                         {formatCurrency(row.unit_cost)}
@@ -138,7 +140,7 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
               </Table>
             </div>
 
-            {/* Stacked records fit phones and portrait tablet widths without scrolling. */}
+            {/* Mobile / Stacked Card View */}
             <div className="divide-y xl:hidden">
               {paginatedData.map((row, idx) => (
                 <div key={`mob-${row.type}-${row.id}-${idx}`} className="min-w-0 space-y-2.5 p-4">
@@ -146,11 +148,11 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
                     <div className="min-w-0 space-y-1">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
                         {row.type === "asset" ? (
-                          <Badge className="flex items-center gap-1.5 mb-2">
+                          <Badge className="flex items-center gap-1.5 mb-1">
                             ASSET
                           </Badge>
                         ) : (
-                          <Badge className="flex items-center gap-1.5 mb-2">
+                          <Badge className="flex items-center gap-1.5 mb-1">
                             CONSUMABLE
                           </Badge>
                         )}
@@ -165,12 +167,16 @@ export default function ReportDataTable({ reportData, loading, exportToCSV }) {
 
                   <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-1">
                     <div>
-                      <span className="block text-[10px] uppercase font-semibold">Holder / Recipient</span>
-                      <span className="break-words text-foreground font-medium">{row.recipient_or_holder}</span>
+                      <span className="block text-[10px] uppercase font-semibold">PPE Number</span>
+                      <span className="break-all font-mono text-foreground font-medium">{row.ppe_number || "—"}</span>
                     </div>
                     <div>
                       <span className="block text-[10px] uppercase font-semibold">Date</span>
                       <span>{row.date || "—"}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-[10px] uppercase font-semibold">Holder / Recipient</span>
+                      <span className="break-words text-foreground font-medium">{row.recipient_or_holder || "—"}</span>
                     </div>
                   </div>
                 </div>

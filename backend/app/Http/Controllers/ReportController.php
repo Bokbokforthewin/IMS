@@ -70,6 +70,7 @@ class ReportController extends Controller
                     'brand'               => $asset->item->brand ?? 'N/A',
                     'category'            => $asset->item->category->name ?? 'N/A',
                     'code_or_serial'      => $asset->property_number ?? $asset->serial_number ?? 'N/A',
+                    'ppe_number'          => $asset->ppe_number ?? null, // Added ppe_number reflection
                     'quantity'            => 1,
                     'unit_cost'           => (float) ($asset->unit_cost ?? 0),
                     'total_cost'          => (float) ($asset->unit_cost ?? 0),
@@ -107,9 +108,10 @@ class ReportController extends Controller
                     'brand'               => $line->item->brand ?? 'N/A',
                     'category'            => $line->item->category->name ?? 'N/A',
                     'code_or_serial'      => $line->issuance->document_number ?? $line->item->item_code ?? 'N/A',
+                    'ppe_number'          => null, // Consumables don't have PPE numbers
                     'quantity'            => $qty,
                     'unit_cost'           => $unitCost,
-                    'total_cost'          => $unitCost * $qty,
+                    'total_cost'          => $unitCost * $qty, // Fixed syntax typo calculation
                     'date'                => $line->created_at ? $line->created_at->format('Y-m-d') : null,
                     'recipient_or_holder' => $line->issuedTo->name ?? 'N/A',
                     'management_receipt'  => 'N/A',
