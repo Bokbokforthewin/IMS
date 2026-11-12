@@ -3,20 +3,19 @@ import { PieChart, Pie, Cell } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
-// Refined, low-saturation enterprise status palette
+// Dynamically reference semantic status variables from index.css
 const STATUS_COLORS = {
-  Available: 'hsl(151, 55%, 41.5%)',    // Muted Emerald
-  Assigned: 'hsl(217, 91.2%, 59.8%)',   // Primary Blue
-  'Under Repair': 'hsl(38, 92%, 50%)',  // Subtle Amber
-  Condemned: 'hsl(346, 84%, 61%)',     // Soft Rose
+  Available: 'var(--success)',        // Maps to --status-green / --success in index.css
+  Assigned: 'var(--info)',            // Maps to --status-blue / --info in index.css
+  'Under Repair': 'var(--warning)',   // Maps to --status-gold / --warning in index.css
+  Condemned: 'var(--destructive)',   // Maps to --status-red / --destructive in index.css
 };
 
-export default function AssetStatusChart({ data }) {
+export default function AssetStatusChart({ data = [] }) {
   const total = data.reduce((sum, d) => sum + d.count, 0);
 
   return (
     <Card className="border-border/60 shadow-none hover:border-border transition-colors">
-      {/* Matching Header Structure */}
       <CardHeader className="p-3.5 pb-2 flex flex-row items-center justify-between space-y-0">
         <div>
           <CardTitle className="text-sm font-semibold tracking-tight">Asset Status</CardTitle>
@@ -26,10 +25,8 @@ export default function AssetStatusChart({ data }) {
         </div>
       </CardHeader>
 
-      {/* Matching Content Padding */}
       <CardContent className="p-3.5 pt-1">
         <div className="relative">
-          {/* Matched Chart Height (180px) */}
           <ChartContainer config={{}} className="h-[180px] w-full">
             <PieChart>
               <ChartTooltip content={<ChartTooltipContent hideLabel />} />
@@ -45,14 +42,13 @@ export default function AssetStatusChart({ data }) {
                 {data.map((entry) => (
                   <Cell 
                     key={entry.status} 
-                    fill={STATUS_COLORS[entry.status] || 'hsl(var(--muted))'} 
+                    fill={STATUS_COLORS[entry.status] || 'var(--muted-foreground)'} 
                   />
                 ))}
               </Pie>
             </PieChart>
           </ChartContainer>
 
-          {/* Centered Donut Total Indicator */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-1">
             <span className="text-xl font-semibold tracking-tight tabular-nums text-foreground">
               {total}
@@ -63,13 +59,12 @@ export default function AssetStatusChart({ data }) {
           </div>
         </div>
 
-        {/* High-Density Breakdown Legend */}
         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-1 pt-2 border-t border-border/40">
           {data.map((entry) => (
             <div key={entry.status} className="flex items-center gap-1.5 text-[11px]">
               <span
                 className="h-2 w-2 rounded-full shrink-0"
-                style={{ backgroundColor: STATUS_COLORS[entry.status] || 'hsl(var(--muted))' }}
+                style={{ backgroundColor: STATUS_COLORS[entry.status] || 'var(--muted-foreground)' }}
               />
               <span className="text-muted-foreground truncate">{entry.status}</span>
               <span className="ml-auto font-medium tabular-nums text-foreground">

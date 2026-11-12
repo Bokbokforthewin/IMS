@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import api from '@/api/client';
+import EditReceivedItemModal from '@/components/receive/EditReceivedItemModal.jsx';
+import DeleteReceivedItemModal from '@/components/receive/DeleteReceivedItemModal.jsx';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +13,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Search, RotateCcw, Calendar as CalendarIcon, Package, Eye, History } from 'lucide-react';
+import { Search, RotateCcw, Calendar as CalendarIcon, Package, Eye, History, Pencil, Trash2 } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -71,6 +73,13 @@ export default function QuickReceiveHistory({ refreshKey }) {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [dateRange, setDateRange] = useState(undefined);
 
+  // Modal States
+  const [editingRow, setEditingRow] = useState(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const [deletingRow, setDeletingRow] = useState(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
   const [detailsGroup, setDetailsGroup] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
@@ -98,6 +107,16 @@ export default function QuickReceiveHistory({ refreshKey }) {
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory, refreshKey]);
+
+  const openEdit = (row) => {
+    setEditingRow(row);
+    setIsEditOpen(true);
+  };
+
+  const openDelete = (row) => {
+    setDeletingRow(row);
+    setIsDeleteOpen(true);
+  };
 
   const openDetails = (group) => {
     setDetailsGroup(group);
@@ -171,7 +190,7 @@ export default function QuickReceiveHistory({ refreshKey }) {
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
-      {/* Prominent Task Title Header */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-border pb-3">
         <div className="flex items-center gap-2">
           <History className="h-4 w-4 text-primary" />
@@ -284,7 +303,6 @@ export default function QuickReceiveHistory({ refreshKey }) {
                 key={`${primary.type}-${primary.id}`}
                 className="group flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-2xs transition-all hover:shadow-sm"
               >
-                {/* Hero Image Header Section */}
                 <div className="relative aspect-4/3 w-full bg-muted/40 overflow-hidden border-b border-border flex items-center justify-center">
                   {imageUrl ? (
                     <img
@@ -299,7 +317,6 @@ export default function QuickReceiveHistory({ refreshKey }) {
                     </div>
                   )}
 
-                  {/* Overlaid Badges */}
                   <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider border ${
@@ -470,6 +487,28 @@ export default function QuickReceiveHistory({ refreshKey }) {
                       {row.received_at ? new Date(row.received_at).toLocaleDateString() : 'N/A'}
                     </dd>
                   </dl>
+
+                  {/* Edit & Delete Actions */}
+                  <div className="flex gap-2 pt-2 border-t border-border/50">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 text-xs h-8 gap-1.5"
+                      onClick={() => { setIsDetailsOpen(false); openEdit(row); }}
+                    >
+                      <Pencil className="size-3.5" />
+                      Edit Record
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="flex-1 text-xs h-8 gap-1.5"
+                      onClick={() => { setIsDetailsOpen(false); openDelete(row); }}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Delete Record
+                    </Button>
+                  </div>
                 </div>
               );
             })}
@@ -480,6 +519,21 @@ export default function QuickReceiveHistory({ refreshKey }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit & Delete Modal Mounts */}
+      <EditReceivedItemModal
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        row={editingRow}
+        onSaved={fetchHistory}
+      />
+
+      <DeleteReceivedItemModal
+        isOpen={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        row={deletingRow}
+        onDeleted={fetchHistory}
+      />
     </div>
   );
 }

@@ -88,6 +88,21 @@ class CategorySeeder extends Seeder
                 'updated_at'               => now(),
             ],
 
+              // ==========================================
+            // OFFICE EQUIPMENT
+            // Sub-Major: 05 (Machinery & Equipment)
+            // GL: 02 (Office Equipment)
+            // ==========================================
+            [
+                'name'                     => 'Office Equipment',
+                'sub_major_account_code'   => '05', // 10605020 (PPE)
+                'gl_account_code'          => '02',
+                'semi_expendable_gl_code'  => '02', // 10405020 (Semi-Expendable)
+                'description'              => 'Official category for Air Conditioning Units, Shredders, Photocopiers, and CCTV Systems.',
+                'created_at'               => now(),
+                'updated_at'               => now(),
+            ],
+
             // ==========================================
             // CONSUMABLE SUPPLIES (RIS)
             // Major/Sub-Group: 04 (Office Supplies Inventory)

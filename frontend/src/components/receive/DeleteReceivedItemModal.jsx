@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,11 +10,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from "@/components/ui/button";
-import api from '../../api/client.js';
+import api from '@/api/client';
 
 export default function DeleteReceivedItemModal({ isOpen, onClose, row, onDeleted }) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setError(null);
+    }
+  }, [isOpen]);
 
   if (!row) return null;
 
@@ -33,7 +39,6 @@ export default function DeleteReceivedItemModal({ isOpen, onClose, row, onDelete
       onDeleted();
       onClose();
     } catch (err) {
-      // Surface whatever the server actually said, instead of a generic fallback.
       const data = err.response?.data;
       setError(data?.error || data?.message || `Request failed${err.response?.status ? ` (${err.response.status})` : ''}.`);
     } finally {

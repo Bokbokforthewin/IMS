@@ -4,14 +4,13 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
 
 const chartConfig = {
-  receipts: { label: 'Asset', color: '#2563eb' },
-  issuances: { label: 'Consumable', color: '#eab308' },
+  receipts: { label: 'Asset', color: 'var(--chart-1)' },    // Replaced #2563eb with var(--chart-1)
+  issuances: { label: 'Consumable', color: 'var(--chart-3)' }, // Replaced #eab308 with var(--chart-3)
 };
 
-export default function IssuanceActivityChart({ data }) {
+export default function IssuanceActivityChart({ data = [] }) {
   return (
     <Card className="border-border/60 shadow-none hover:border-border transition-colors">
-      {/* Uniform Header Structure */}
       <CardHeader className="p-3.5 pb-2 flex flex-row items-center justify-between space-y-0">
         <div>
           <CardTitle className="text-sm font-semibold tracking-tight">Issuance Activity</CardTitle>
@@ -21,23 +20,21 @@ export default function IssuanceActivityChart({ data }) {
         </div>
       </CardHeader>
 
-      {/* Uniform Content Padding & Footprint */}
       <CardContent className="p-3.5 pt-1">
         <ChartContainer config={chartConfig} className="h-[180px] w-full">
           <BarChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }} barGap={2}>
             <defs>
               <linearGradient id="fillIssuances" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-issuances)" stopOpacity={0.95} />
-                <stop offset="95%" stopColor="var(--color-issuances)" stopOpacity={0.01} />
+                <stop offset="5%" stopColor="var(--chart-3)" stopOpacity={0.95} />
+                <stop offset="95%" stopColor="var(--chart-3)" stopOpacity={0.01} />
               </linearGradient>
               <linearGradient id="fillReceipts" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-receipts)" stopOpacity={0.95} />
-                <stop offset="95%" stopColor="var(--color-receipts)" stopOpacity={0.01} />
+                <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.95} />
+                <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.01} />
               </linearGradient>
             </defs>
 
-            {/* Micro Gridlines */}
-            <CartesianGrid vertical={false} strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.6} />
+            <CartesianGrid vertical={false} strokeDasharray="2 4" stroke="var(--border)" opacity={0.6} />
 
             <XAxis 
               dataKey="month" 
@@ -45,6 +42,7 @@ export default function IssuanceActivityChart({ data }) {
               axisLine={false} 
               tickMargin={6}
               fontSize={11} 
+              stroke="var(--muted-foreground)"
             />
             <YAxis 
               tickLine={false} 
@@ -52,12 +50,12 @@ export default function IssuanceActivityChart({ data }) {
               tickMargin={6}
               fontSize={11} 
               allowDecimals={false}
+              stroke="var(--muted-foreground)"
             />
 
             <ChartTooltip content={<ChartTooltipContent />} />
             <ChartLegend content={<ChartLegendContent className="text-[11px] gap-3 pt-2" />} />
 
-            {/* Clean, high-density bar proportions with matched linear gradients */}
             <Bar 
               dataKey="issuances" 
               fill="url(#fillIssuances)" 

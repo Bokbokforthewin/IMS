@@ -13,11 +13,13 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Loader2,
+  Filter,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDistribution, AssetStatusCell, ReceiptDistributeButtons, DistributionDialogs } from './DistributionControls';
 
@@ -25,9 +27,6 @@ function money(n) {
   return `₱${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 }
 
-/**
- * Helper to resolve the secondary receiver (current holder) for an asset line.
- */
 function getSecondaryReceiver(line, defaultPrimaryUser) {
   const holder =
     line.serialized_asset?.current_holder ||
@@ -38,9 +37,6 @@ function getSecondaryReceiver(line, defaultPrimaryUser) {
   return defaultPrimaryUser?.name || 'Primary Receiver';
 }
 
-/**
- * Groups lines into primary assets and their attached child peripherals.
- */
 function groupLines(lines) {
   const byPropertyNumber = {};
   lines.forEach((line) => {
@@ -66,10 +62,6 @@ function groupLines(lines) {
   }));
 }
 
-/**
- * Groups individual database receipts (PAR & ICS) created in the same
- * issuance transaction into a single bundled card object.
- */
 function groupReceiptsIntoBundles(receipts) {
   const bundleMap = new Map();
 
@@ -106,11 +98,57 @@ function groupReceiptsIntoBundles(receipts) {
   return Array.from(bundleMap.values());
 }
 
+/**
+ * Checks if an individual asset line matches the active search query.
+ */
+function isLineMatched(line, query) {
+  if (!query) return false;
+
+  const tokens = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return false;
+
+  const asset = line.serialized_asset;
+  const catalogItem = line.item || asset?.item;
+  const holder = asset?.current_holder || asset?.currentHolder || line.user;
+
+  // Aggregate all possible fields for this line into a single text blob
+  const textBlob = [
+    catalogItem?.name,
+    catalogItem?.brand,
+    catalogItem?.category?.name,
+    catalogItem?.type,
+    catalogItem?.item_code,
+    asset?.model,
+    asset?.property_number,
+    asset?.serial_number,
+    asset?.ppe_number,
+    asset?.status,
+    asset?.unit_cost,
+    line?.unit_cost,
+    holder?.name,
+    holder?.unit?.name || holder?.unit,
+    holder?.designation?.name || holder?.designation,
+    holder?.division?.name || holder?.division,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  // Every word in the user's query must be present in the text blob
+  return tokens.every((token) => textBlob.includes(token));
+}
+
 export default function AccountabilityReceiptsTable({ refreshKey }) {
   const [receipts, setReceipts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showOnlyMatchingItems, setShowOnlyMatchingItems] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+
+  const [loadingMap, setLoadingMap] = useState({});
+
+  const startLoading = (key) => setLoadingMap((prev) => ({ ...prev, [key]: true }));
+  const stopLoading = (key) => setLoadingMap((prev) => ({ ...prev, [key]: false }));
 
   const fetchReceipts = useCallback(async () => {
     try {
@@ -134,6 +172,9 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
   }, [searchQuery]);
 
   const handleDownload = async (receiptId, documentNumber) => {
+    const key = `excel_${receiptId}`;
+    startLoading(key);
+
     try {
       const response = await api.get(
         `/v1/accountability/receipts/${receiptId}/download-excel`,
@@ -150,10 +191,15 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Failed to download receipt:', err);
+    } finally {
+      stopLoading(key);
     }
   };
 
   const handleDownloadTagPdf = async (assetId) => {
+    const key = `tag_${assetId}`;
+    startLoading(key);
+
     try {
       const response = await api.get(
         `/v1/accountability/serialized-assets/${assetId}/download-tag-pdf`,
@@ -165,10 +211,15 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
       window.open(url, '_blank');
     } catch (err) {
       console.error('Failed to download asset tag PDF:', err);
+    } finally {
+      stopLoading(key);
     }
   };
 
-  const handleDownloadBulkTags = async (bundleLines) => {
+  const handleDownloadBulkTags = async (bundleKey, bundleLines) => {
+    const key = `bulk_tags_${bundleKey}`;
+    startLoading(key);
+
     try {
       const assetIds = bundleLines
         .map((line) => line.serialized_asset?.id)
@@ -187,66 +238,46 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
       window.open(url, '_blank');
     } catch (err) {
       console.error('Failed to download bulk asset tags PDF:', err);
+    } finally {
+      stopLoading(key);
     }
   };
 
   const bundles = useMemo(() => groupReceiptsIntoBundles(receipts), [receipts]);
 
-  const filteredBundles = useMemo(() => {
-    if (!searchQuery.trim()) return bundles;
+  const cleanQuery = searchQuery.toLowerCase().trim();
 
-    const query = searchQuery.toLowerCase();
+  const filteredBundles = useMemo(() => {
+    if (!cleanQuery) return bundles;
+
     return bundles.filter((bundle) => {
       const primaryUser = bundle.user;
-      const primaryUserName = primaryUser?.name?.toLowerCase() || '';
+      const primaryUserName = (primaryUser?.name || '').toLowerCase();
       const primaryUserUnit = (primaryUser?.unit?.name || primaryUser?.unit || '').toLowerCase();
       const primaryUserDesignation = (primaryUser?.designation?.name || primaryUser?.designation || '').toLowerCase();
-      const primaryUserDivision = (primaryUser?.division?.name || primaryUser?.division || '').toLowerCase();
 
-      const remarksMatches = bundle.remarks?.toLowerCase().includes(query);
-      const dateMatches = bundle.date_issued?.toLowerCase().includes(query);
+      const remarksMatches = (bundle.remarks || '').toLowerCase().includes(cleanQuery);
+      const dateMatches = (bundle.date_issued || '').toLowerCase().includes(cleanQuery);
 
-      const receiptMatches = bundle.receipts.some(
-        (rcpt) =>
-          rcpt.document_number?.toLowerCase().includes(query) ||
-          rcpt.receipt_type?.toLowerCase().includes(query)
-      );
-
-      const lineMatches = bundle.allLines.some((line) => {
-        const asset = line.serialized_asset;
-        const itemName = asset?.item?.name?.toLowerCase() || '';
-        const serialNo = asset?.serial_number?.toLowerCase() || '';
-        const propertyNo = asset?.property_number?.toLowerCase() || '';
-
-        const holder = asset?.current_holder || asset?.currentHolder || line.user;
-        const secondaryReceiverName = (holder?.name || '').toLowerCase();
-        const secondaryUnit = (holder?.unit?.name || holder?.unit || '').toLowerCase();
-        const secondaryDesignation = (holder?.designation?.name || holder?.designation || '').toLowerCase();
-        const secondaryDivision = (holder?.division?.name || holder?.division || '').toLowerCase();
-
-        return (
-          itemName.includes(query) ||
-          serialNo.includes(query) ||
-          propertyNo.includes(query) ||
-          secondaryReceiverName.includes(query) ||
-          secondaryUnit.includes(query) ||
-          secondaryDesignation.includes(query) ||
-          secondaryDivision.includes(query)
-        );
+      const receiptMatches = bundle.receipts.some((rcpt) => {
+        const docNum = (rcpt.document_number || '').toLowerCase();
+        const rcptType = (rcpt.receipt_type || '').toLowerCase();
+        return docNum.includes(cleanQuery) || rcptType.includes(cleanQuery);
       });
 
+      const lineMatches = bundle.allLines.some((line) => isLineMatched(line, cleanQuery));
+
       return (
-        primaryUserName.includes(query) ||
-        primaryUserUnit.includes(query) ||
-        primaryUserDesignation.includes(query) ||
-        primaryUserDivision.includes(query) ||
+        primaryUserName.includes(cleanQuery) ||
+        primaryUserUnit.includes(cleanQuery) ||
+        primaryUserDesignation.includes(cleanQuery) ||
         remarksMatches ||
         dateMatches ||
         receiptMatches ||
         lineMatches
       );
     });
-  }, [bundles, searchQuery]);
+  }, [bundles, cleanQuery]);
 
   const totalPages = Math.ceil(filteredBundles.length / pageSize) || 1;
   const paginatedBundles = useMemo(() => {
@@ -262,7 +293,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
 
   return (
     <Card className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
-      {/* Header with Title and Search Input */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-3">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-primary shrink-0" />
@@ -271,16 +302,30 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
           </h3>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
-            type="search"
-            placeholder="Search receiver, unit, doc #, SN..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 h-9 text-xs"
-          />
+        {/* Toolbar Controls */}
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {cleanQuery && (
+            <Button
+              size="sm"
+              variant={showOnlyMatchingItems ? 'default' : 'outline'}
+              className="h-9 text-xs gap-1.5"
+              onClick={() => setShowOnlyMatchingItems((prev) => !prev)}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span>{showOnlyMatchingItems ? 'Show All Items' : 'Filter Matched Rows'}</span>
+            </Button>
+          )}
+
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="search"
+              placeholder="Search item, PPE #, receiver, doc #, SN..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-9 text-xs"
+            />
+          </div>
         </div>
       </div>
 
@@ -297,6 +342,8 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
         ) : (
           <div className="space-y-4 sm:space-y-5">
             {paginatedBundles.map((bundle) => {
+              const isBulkTagLoading = loadingMap[`bulk_tags_${bundle.key}`];
+
               return (
                 <div
                   key={bundle.key}
@@ -321,17 +368,21 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                       )}
                     </div>
 
-                    {/* Top Right: ONLY Bulk Tag Download Button */}
                     <div className="shrink-0">
                       <Button
                         size="sm"
                         variant="outline"
+                        disabled={isBulkTagLoading}
                         className="h-8 text-xs gap-1.5 border-border bg-card shadow-2xs w-full sm:w-auto"
-                        onClick={() => handleDownloadBulkTags(bundle.allLines)}
+                        onClick={() => handleDownloadBulkTags(bundle.key, bundle.allLines)}
                         title="Print all asset tags for this bundle"
                       >
-                        <PackageOpen className="w-3.5 h-3.5 text-info-text" />
-                        <span>Print Sticker Bundle</span>
+                        {isBulkTagLoading ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-info-text" />
+                        ) : (
+                          <PackageOpen className="w-3.5 h-3.5 text-info-text" />
+                        )}
+                        <span>{isBulkTagLoading ? 'Generating Stickers...' : 'Print Sticker Bundle'}</span>
                       </Button>
                     </div>
                   </div>
@@ -340,14 +391,26 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                   <div className="p-2 sm:p-4 space-y-3 bg-muted/10">
                     {bundle.receipts.map((rcpt) => {
                       const receiptLines = rcpt.lines || [];
-                      const groupedLines = groupLines(receiptLines);
+                      let groupedLines = groupLines(receiptLines);
+
+                      // Optional row filter
+                      if (cleanQuery && showOnlyMatchingItems) {
+                        groupedLines = groupedLines.filter(
+                          ({ primary, children }) =>
+                            isLineMatched(primary, cleanQuery) ||
+                            children.some((child) => isLineMatched(child, cleanQuery))
+                        );
+                      }
+
+                      if (groupedLines.length === 0) return null;
+
+                      const isExcelLoading = loadingMap[`excel_${rcpt.id}`];
 
                       return (
                         <div
                           key={rcpt.id}
                           className="rounded-lg border border-border bg-card shadow-2xs overflow-hidden"
                         >
-                          {/* Sub-Card Header */}
                           <div className="bg-card px-3 py-2.5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                               <FileSpreadsheet className="w-4 h-4 text-success-text shrink-0" />
@@ -357,27 +420,27 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                               <Badge variant="secondary" className="px-1.5 py-0 text-[10px] border border-border">
                                 {rcpt.receipt_type}
                               </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                ({receiptLines.length} item{receiptLines.length === 1 ? '' : 's'})
-                              </span>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-2">
                               <ReceiptDistributeButtons rcpt={rcpt} dist={dist} />
-                              {/* Excel Download Button */}
                               <Button
                                 size="sm"
-                                className="h-7 text-xs gap-1.5 bg-success text-success-foreground hover:bg-success/90 shadow-2xs w-full sm:w-auto shrink-0 justify-center"
+                                disabled={isExcelLoading}
+                                className="h-7 text-xs gap-1.5 bg-success text-success-foreground hover:bg-success/90 shadow-2xs shrink-0 justify-center"
                                 onClick={() => handleDownload(rcpt.id, rcpt.document_number)}
-                                title={`Download ${rcpt.receipt_type} Excel Form`}
                               >
-                                <Download className="w-3.5 h-3.5" />
-                                <span>Download Sheet</span>
+                                {isExcelLoading ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Download className="w-3.5 h-3.5" />
+                                )}
+                                <span>{isExcelLoading ? 'Generating...' : 'Download Sheet'}</span>
                               </Button>
                             </div>
                           </div>
 
-                          {/* Desktop Layout: Table View */}
+                          {/* Desktop Layout */}
                           <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-xs text-left">
                               <thead className="bg-muted/40 text-muted-foreground border-b border-border">
@@ -387,7 +450,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                   <th className="py-2 px-3 font-medium">End User</th>
                                   <th className="py-2 px-3 font-medium text-right">Unit Cost</th>
                                   <th className="py-2 px-3 font-medium">Status</th>
-                                  <th className="py-2 px-3 font-medium text-center w-[70px]">Tag</th>
+                                  <th className="py-2 px-3 font-medium text-center w-[100px]">Tag</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-border/60">
@@ -397,11 +460,25 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                     bundle.user
                                   );
 
+                                  const isPrimaryMatched = isLineMatched(primary, cleanQuery);
+                                  const primaryItemName = primary.item?.name || primary.serialized_asset?.item?.name || 'N/A';
+
                                   return (
                                     <React.Fragment key={primary.id}>
-                                      <tr className="hover:bg-muted/20 transition-colors">
-                                        <td className="py-2 px-3 font-medium text-foreground">
-                                          {primary.serialized_asset?.item?.name || 'N/A'}
+                                      <tr
+                                        className={`transition-colors ${
+                                          isPrimaryMatched
+                                            ? 'bg-primary/10 hover:bg-primary/15 font-medium'
+                                            : 'hover:bg-muted/20'
+                                        }`}
+                                      >
+                                        <td className="py-2 px-3 text-foreground">
+                                          {primaryItemName}
+                                          {isPrimaryMatched && (
+                                            <Badge variant="outline" className="ml-2 text-[9px] px-1 py-0 bg-primary/20 border-primary/30">
+                                              Match
+                                            </Badge>
+                                          )}
                                         </td>
                                         <td className="py-2 px-3 font-mono text-muted-foreground">
                                           {primary.serialized_asset?.property_number || 'N/A'}
@@ -418,7 +495,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                           </span>
                                         </td>
                                         <td className="py-2 px-3 text-right font-mono text-foreground font-medium">
-                                          {money(primary.serialized_asset?.unit_cost)}
+                                          {money(primary.serialized_asset?.unit_cost || primary.unit_cost)}
                                         </td>
                                         <td className="py-2 px-3">
                                           <AssetStatusCell line={primary} rcpt={rcpt} dist={dist} />
@@ -428,10 +505,11 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                             <Button
                                               size="sm"
                                               variant="outline"
-                                              className="h-6 text-[10px] px-2 border-border"
+                                              disabled={loadingMap[`tag_${primary.serialized_asset.id}`]}
+                                              className="h-6 text-[10px] px-2 border-border gap-1"
                                               onClick={() => handleDownloadTagPdf(primary.serialized_asset.id)}
                                             >
-                                              Print Sticker
+                                              <span>Print Sticker</span>
                                             </Button>
                                           )}
                                         </td>
@@ -442,22 +520,31 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                           child,
                                           bundle.user
                                         );
+                                        const isChildMatched = isLineMatched(child, cleanQuery);
+                                        const childItemName = child.item?.name || child.serialized_asset?.item?.name || 'N/A';
 
                                         return (
-                                          <tr key={child.id} className="bg-muted/10 hover:bg-muted/20 transition-colors">
+                                          <tr
+                                            key={child.id}
+                                            className={`transition-colors ${
+                                              isChildMatched
+                                                ? 'bg-primary/10 hover:bg-primary/15 font-medium'
+                                                : 'bg-muted/10 hover:bg-muted/20'
+                                            }`}
+                                          >
                                             <td className="py-1.5 px-3 pl-6 text-muted-foreground">
                                               <span className="inline-flex items-center gap-1">
                                                 <Paperclip className="h-3 w-3 text-primary/70 shrink-0" />
-                                                {child.serialized_asset?.item?.name || 'N/A'} (Attached)
+                                                {childItemName} (Attached)
+                                                {isChildMatched && (
+                                                  <Badge variant="outline" className="ml-2 text-[9px] px-1 py-0 bg-primary/20 border-primary/30">
+                                                    Match
+                                                  </Badge>
+                                                )}
                                               </span>
                                             </td>
                                             <td className="py-1.5 px-3 font-mono text-muted-foreground text-[11px]">
                                               {child.serialized_asset?.property_number || 'N/A'}
-                                              {child.serialized_asset?.serial_number && (
-                                                <span className="block text-[10px]">
-                                                  SN: {child.serialized_asset.serial_number}
-                                                </span>
-                                              )}
                                             </td>
                                             <td className="py-1.5 px-3 text-[11px]">
                                               <span className="text-muted-foreground">
@@ -465,7 +552,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                               </span>
                                             </td>
                                             <td className="py-1.5 px-3 text-right font-mono text-[11px] text-foreground font-medium">
-                                              {money(child.serialized_asset?.unit_cost)}
+                                              {money(child.serialized_asset?.unit_cost || child.unit_cost)}
                                             </td>
                                             <td className="py-1.5 px-3">
                                               <AssetStatusCell line={child} rcpt={rcpt} dist={dist} />
@@ -475,10 +562,11 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                                 <Button
                                                   size="sm"
                                                   variant="outline"
-                                                  className="h-6 text-[10px] px-2 border-border"
+                                                  disabled={loadingMap[`tag_${child.serialized_asset.id}`]}
+                                                  className="h-6 text-[10px] px-2 border-border gap-1"
                                                   onClick={() => handleDownloadTagPdf(child.serialized_asset.id)}
                                                 >
-                                                  Print Sticker
+                                                  <span>Print Sticker</span>
                                                 </Button>
                                               )}
                                             </td>
@@ -490,79 +578,6 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                 })}
                               </tbody>
                             </table>
-                          </div>
-
-                          {/* Mobile Layout: Compact Card View */}
-                          <div className="block md:hidden divide-y divide-border">
-                            {groupedLines.map(({ primary, children }) => {
-                              const primarySecondaryHolder = getSecondaryReceiver(
-                                primary,
-                                bundle.user
-                              );
-
-                              return (
-                                <div key={primary.id} className="p-3 space-y-2">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="space-y-0.5">
-                                      <p className="font-semibold text-xs text-foreground">
-                                        {primary.serialized_asset?.item?.name || 'N/A'}
-                                      </p>
-                                      <p className="text-[11px] font-mono text-muted-foreground">
-                                        Prop #{primary.serialized_asset?.property_number || 'N/A'}
-                                      </p>
-                                    </div>
-                                    {primary.serialized_asset?.id && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-6 text-[10px] px-2 shrink-0 border-border"
-                                        onClick={() => handleDownloadTagPdf(primary.serialized_asset.id)}
-                                      >
-                                        Print Sticker
-                                      </Button>
-                                    )}
-                                  </div>
-
-                                  <div className="flex items-center justify-between text-[11px] pt-1">
-                                    <span className="inline-flex items-center gap-1 text-primary font-medium">
-                                      <UserCheck className="h-3 w-3 shrink-0" />
-                                      {primarySecondaryHolder}
-                                    </span>
-                                    <span className="font-mono font-medium text-foreground">
-                                      {money(primary.serialized_asset?.unit_cost)}
-                                    </span>
-                                  </div>
-
-                                  <AssetStatusCell line={primary} rcpt={rcpt} dist={dist} />
-
-                                  {/* Mobile Attached Peripherals */}
-                                  {children.map((child) => {
-                                    const childSecondaryHolder = getSecondaryReceiver(
-                                      child,
-                                      bundle.user
-                                    );
-
-                                    return (
-                                      <div key={child.id} className="ml-2 pl-2 border-l-2 border-primary/30 pt-1 space-y-1">
-                                        <div className="flex items-center justify-between text-[11px]">
-                                          <span className="text-muted-foreground flex items-center gap-1">
-                                            <Paperclip className="h-2.5 w-2.5 text-primary shrink-0" />
-                                            {child.serialized_asset?.item?.name}
-                                          </span>
-                                          <span className="font-mono text-muted-foreground">
-                                            {money(child.serialized_asset?.unit_cost)}
-                                          </span>
-                                        </div>
-                                        <p className="text-[10px] text-muted-foreground">
-                                          User: {childSecondaryHolder}
-                                        </p>
-                                        <AssetStatusCell line={child} rcpt={rcpt} dist={dist} />
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })}
                           </div>
                         </div>
                       );
@@ -596,10 +611,6 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                   <SelectItem value="50">50</SelectItem>
                 </SelectContent>
               </Select>
-              <span className="ml-1">
-                Showing {(currentPage - 1) * pageSize + 1} to{' '}
-                {Math.min(currentPage * pageSize, filteredBundles.length)} of {filteredBundles.length}
-              </span>
             </div>
 
             <div className="flex items-center gap-4 sm:gap-6">

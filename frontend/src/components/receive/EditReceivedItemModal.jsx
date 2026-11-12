@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '@/api/client';
 import {
   Dialog,
   DialogContent,
@@ -16,15 +17,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
-
 export default function EditReceivedItemModal({ isOpen, onClose, row, onSaved }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!row) return;
+    if (!row || !isOpen) return;
+    
     if (row.type === 'Consumable') {
       setForm({
         iar_number: row.reference_no || '',
@@ -40,34 +40,27 @@ export default function EditReceivedItemModal({ isOpen, onClose, row, onSaved })
       });
     }
     setError(null);
-  }, [row]);
+  }, [row, isOpen]);
 
   if (!row) return null;
 
   const isConsumable = row.type === 'Consumable';
   const endpoint = isConsumable
-    ? `/inventory/stock-batches/${row.id}`
-    : `/inventory/serialized-assets/${row.id}`;
+    ? `/v1/inventory/stock-batches/${row.id}`
+    : `/v1/inventory/serialized-assets/${row.id}`;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
+
     try {
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to save changes.');
-        return;
-      }
+      await api.put(endpoint, form);
       onSaved();
       onClose();
     } catch (err) {
-      setError('Network error while saving.');
+      const data = err.response?.data;
+      setError(data?.error || data?.message || 'Failed to save changes.');
     } finally {
       setSaving(false);
     }

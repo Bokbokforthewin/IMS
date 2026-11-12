@@ -10,23 +10,21 @@ import {
 } from '@/components/ui/chart';
 
 const chartConfig = {
-  asset_value: { label: 'Assets', color: '#2563eb' }, // Blue
-  consumable_value: { label: 'Consumables', color: '#eab308' }, // Yellow
+  asset_value: { label: 'Assets', color: 'var(--chart-1)' },       // Replaced #2563eb
+  consumable_value: { label: 'Consumables', color: 'var(--chart-3)' }, // Replaced #eab308
 };
 
 function formatCurrency(v) {
   return `₱${Number(v).toLocaleString()}`;
 }
 
-export default function MonthlyTrendChart({ data }) {
+export default function MonthlyTrendChart({ data = [] }) {
   const summary = data.reduce(
     (totals, month) => ({
       assetValue: totals.assetValue + Number(month.asset_value || 0),
       consumableValue: totals.consumableValue + Number(month.consumable_value || 0),
-      issuances: totals.issuances + Number(month.issuances || 0),
-      receipts: totals.receipts + Number(month.receipts || 0),
     }),
-    { assetValue: 0, consumableValue: 0, issuances: 0, receipts: 0 }
+    { assetValue: 0, consumableValue: 0 }
   );
 
   return (
@@ -47,19 +45,19 @@ export default function MonthlyTrendChart({ data }) {
           <AreaChart data={data} margin={{ top: 8, right: 8, left: -14, bottom: 0 }}>
             <defs>
               <linearGradient id="fillAsset" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-asset_value)" stopOpacity={0.95} />
-                <stop offset="95%" stopColor="var(--color-asset_value)" stopOpacity={0.01} />
+                <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.95} />
+                <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.01} />
               </linearGradient>
               <linearGradient id="fillConsumable" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-consumable_value)" stopOpacity={0.95} />
-                <stop offset="95%" stopColor="var(--color-consumable_value)" stopOpacity={0.01} />
+                <stop offset="5%" stopColor="var(--chart-3)" stopOpacity={0.95} />
+                <stop offset="95%" stopColor="var(--chart-3)" stopOpacity={0.01} />
               </linearGradient>
             </defs>
 
             <CartesianGrid
               vertical={false}
               strokeDasharray="2 4"
-              stroke="hsl(var(--border))"
+              stroke="var(--border)"
               opacity={0.6}
             />
 
@@ -69,12 +67,14 @@ export default function MonthlyTrendChart({ data }) {
               axisLine={false}
               tickMargin={6}
               fontSize={11}
+              stroke="var(--muted-foreground)"
             />
             <YAxis
               tickLine={false}
               axisLine={false}
               tickMargin={6}
               fontSize={11}
+              stroke="var(--muted-foreground)"
               tickFormatter={(v) => `₱${(v / 1000).toFixed(0)}k`}
             />
 
