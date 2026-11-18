@@ -30,6 +30,7 @@ import ItemPickerDialog from '@/components/ItemPickerDialog.jsx';
 import QuickReceiveBundleForm from './QuickReceiveBundleForm.jsx';
 import ImageCaptureInput from '@/components/ImageCaptureInput.jsx';
 import api from "@/api/client";
+import { Textarea } from '../ui/textarea.jsx';
 
 // --- Date Helpers ---
 function formatDateDisplay(date) {
@@ -426,7 +427,7 @@ export default function QuickEncodeForm({ categories, items, handleApiCall }) {
                         <AlignLeft className="w-3.5 h-3.5 text-muted-foreground" />
                         Specifications
                       </FieldLabel>
-                      <Input
+                      <Textarea
                         placeholder="e.g., Bluetooth 5.0, Rechargeable"
                         value={form.specifications}
                         onChange={(e) => update({ specifications: e.target.value })}

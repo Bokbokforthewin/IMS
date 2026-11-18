@@ -440,6 +440,134 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                             </div>
                           </div>
 
+                          {/* Mobile Layout (Card Based Details) */}
+                          <div className="block md:hidden divide-y divide-border/60">
+                            {groupedLines.map(({ primary, children }) => {
+                              const primarySecondaryHolder = getSecondaryReceiver(primary, bundle.user);
+                              const isPrimaryMatched = isLineMatched(primary, cleanQuery);
+                              const primaryItemName = primary.item?.name || primary.serialized_asset?.item?.name || 'N/A';
+
+                              return (
+                                <div
+                                  key={primary.id}
+                                  className={`p-3 space-y-2.5 ${
+                                    isPrimaryMatched ? 'bg-primary/10' : 'bg-card'
+                                  }`}
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="space-y-1 min-w-0">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="font-semibold text-xs text-foreground">
+                                          {primaryItemName}
+                                        </span>
+                                        {isPrimaryMatched && (
+                                          <Badge variant="outline" className="text-[9px] px-1 py-0 bg-primary/20 border-primary/30">
+                                            Match
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="font-mono text-[11px] text-muted-foreground">
+                                        {primary.serialized_asset?.property_number || 'N/A'}
+                                        {primary.serialized_asset?.serial_number && (
+                                          <span className="block text-[10px] text-muted-foreground/80">
+                                            SN: {primary.serialized_asset.serial_number}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="shrink-0 font-mono text-xs font-medium text-foreground">
+                                      {money(primary.serialized_asset?.unit_cost || primary.unit_cost)}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1 border-t border-border/40">
+                                    <span className="inline-flex items-center gap-1 text-primary font-medium truncate">
+                                      <UserCheck className="h-3 w-3 shrink-0" />
+                                      {primarySecondaryHolder}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <AssetStatusCell line={primary} rcpt={rcpt} dist={dist} />
+                                      {primary.serialized_asset?.id && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          disabled={loadingMap[`tag_${primary.serialized_asset.id}`]}
+                                          className="h-6 text-[10px] px-2 border-border gap-1"
+                                          onClick={() => handleDownloadTagPdf(primary.serialized_asset.id)}
+                                        >
+                                          <span>Sticker</span>
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Attached Child Items on Mobile */}
+                                  {children.length > 0 && (
+                                    <div className="pl-3 mt-2 space-y-2 border-l-2 border-primary/20">
+                                      {children.map((child) => {
+                                        const childSecondaryHolder = getSecondaryReceiver(child, bundle.user);
+                                        const isChildMatched = isLineMatched(child, cleanQuery);
+                                        const childItemName = child.item?.name || child.serialized_asset?.item?.name || 'N/A';
+
+                                        return (
+                                          <div
+                                            key={child.id}
+                                            className={`p-2.5 rounded-md space-y-2 ${
+                                              isChildMatched ? 'bg-primary/10' : 'bg-muted/30'
+                                            }`}
+                                          >
+                                            <div className="flex items-start justify-between gap-2">
+                                              <div className="space-y-1 min-w-0">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                  <Paperclip className="h-3 w-3 text-primary/70 shrink-0" />
+                                                  <span className="font-semibold text-xs text-foreground">
+                                                    {childItemName}{' '}
+                                                    <span className="text-[10px] font-normal text-muted-foreground">(Attached)</span>
+                                                  </span>
+                                                  {isChildMatched && (
+                                                    <Badge variant="outline" className="text-[9px] px-1 py-0 bg-primary/20 border-primary/30">
+                                                      Match
+                                                    </Badge>
+                                                  )}
+                                                </div>
+                                                <div className="font-mono text-[11px] text-muted-foreground">
+                                                  {child.serialized_asset?.property_number || 'N/A'}
+                                                </div>
+                                              </div>
+                                              <div className="shrink-0 font-mono text-xs font-medium text-foreground">
+                                                {money(child.serialized_asset?.unit_cost || child.unit_cost)}
+                                              </div>
+                                            </div>
+
+                                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1 border-t border-border/40">
+                                              <span className="text-muted-foreground truncate">
+                                                {childSecondaryHolder}
+                                              </span>
+                                              <div className="flex items-center gap-2">
+                                                <AssetStatusCell line={child} rcpt={rcpt} dist={dist} />
+                                                {child.serialized_asset?.id && (
+                                                  <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    disabled={loadingMap[`tag_${child.serialized_asset.id}`]}
+                                                    className="h-6 text-[10px] px-2 border-border gap-1"
+                                                    onClick={() => handleDownloadTagPdf(child.serialized_asset.id)}
+                                                  >
+                                                    <span>Sticker</span>
+                                                  </Button>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+
                           {/* Desktop Layout */}
                           <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-xs text-left">

@@ -6,7 +6,7 @@ import path from "path";
 export default defineConfig(({ mode }) => {
   // Load APP_URL directly from your root .env file
   const env = loadEnv(mode, process.cwd(), '');
-  const backendTarget = env.APP_URL || 'http://192.168.10.17:8000';
+  const backendTarget = env.APP_URL || 'http://192.168.0.152:8000';
 
   return {
     plugins: [react(), tailwindcss()],

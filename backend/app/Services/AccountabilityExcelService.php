@@ -70,7 +70,6 @@ class AccountabilityExcelService
     protected function calculateRowHeight(string $text, int $columnCharWidth): float
     {
         $lineCount = $this->calculateWrappedLines($text, $columnCharWidth);
-        // Generous line height and padding to ensure zero text clipping
         return (float) max(35, ($lineCount * 18) + 12);
     }
 
@@ -190,9 +189,7 @@ class AccountabilityExcelService
         if (!empty($asset->serial_number)) {
             $lines[] = "SN: {$asset->serial_number}";
         }
-        if (!empty($item->estimated_useful_life)) {
-            $lines[] = "Estimated Useful Life: {$item->estimated_useful_life}";
-        }
+        // Estimated Useful Life removed per request
         if (!empty($item->specifications)) {
             $lines[] = $item->specifications;
         }
@@ -235,20 +232,28 @@ class AccountabilityExcelService
 
         $sheet->setCellValue('A4', 'Entity Name:');
         $sheet->mergeCells('B4:F4');
-        $sheet->setCellValue('B4', 'DOH NIR CHD');
+        $sheet->setCellValue('B4', 'Management Support Division ICTU');
 
+        // Fund Cluster with red font
         $sheet->setCellValue('A5', 'Fund Cluster:');
         $sheet->mergeCells('B5:D5');
-        $sheet->setCellValue('B5', '');
-        $sheet->setCellValue('E5', 'PAR No:');
-        $sheet->setCellValue('F5', $receipt->document_number);
+        $sheet->setCellValue('B5', 'Fund');
+        $sheet->getStyle('B5')->getFont()->getColor()->setARGB('FFFF0000');
+
+        // P.O. No. added above PAR No.
+        $sheet->setCellValue('E5', 'P.O. No:');
+        $sheet->setCellValue('F5', $receipt->po_number ?? '');
         $sheet->getStyle('E5')->getFont()->setBold(true);
 
-        $sheet->setCellValue('A7', 'Description:');
-        $sheet->mergeCells('B7:F7');
-        $sheet->setCellValue('B7', '');
+        $sheet->setCellValue('E6', 'PAR No:');
+        $sheet->setCellValue('F6', $receipt->document_number);
+        $sheet->getStyle('E6')->getFont()->setBold(true);
 
-        $headerRow = 9;
+        $sheet->setCellValue('A8', 'Description:');
+        $sheet->mergeCells('B8:F8');
+        $sheet->setCellValue('B8', '');
+
+        $headerRow = 10;
         $headers = ['Quantity', 'Unit', 'Description', 'Property Number', 'Date Acquired', 'Amount'];
         foreach ($columns as $i => $col) {
             $sheet->setCellValue("{$col}{$headerRow}", $headers[$i]);
@@ -268,13 +273,11 @@ class AccountabilityExcelService
         foreach ($lines as $index => $line) {
             $descriptions[$index] = $this->buildLineDescription($line, $index, $totalLines);
             $descHeight = $this->calculateRowHeight($descriptions[$index], $widths['C']);
-            
+
             $asset = $line->serializedAsset;
             $item = $asset->item;
             $itemName = $item->name ?? 'N/A';
-            $category = $item->category->name ?? '';
-            $unitLabel = $category !== '' ? "{$category}\n{$itemName}" : $itemName;
-            $unitLabelHeight = $this->calculateRowHeight($unitLabel, $widths['B']);
+            $unitLabelHeight = $this->calculateRowHeight($itemName, $widths['B']);
 
             $rowHeights[$index] = max($descHeight, $unitLabelHeight);
         }
@@ -305,11 +308,9 @@ class AccountabilityExcelService
             $lineRows[$index] = $row;
 
             $itemName = $item->name ?? 'N/A';
-            $category = $item->category->name ?? '';
-            $unitLabel = $category !== '' ? "{$category}\n{$itemName}" : $itemName;
 
             $sheet->setCellValue("A{$row}", $line->quantity);
-            $sheet->setCellValue("B{$row}", $unitLabel);
+            $sheet->setCellValue("B{$row}", $itemName);
             $sheet->setCellValue("C{$row}", $descriptions[$index]);
             $sheet->setCellValue("D{$row}", $asset->property_number ?? 'N/A');
             $sheet->setCellValue("E{$row}", $asset->created_at?->format('n/j/Y'));
@@ -324,14 +325,12 @@ class AccountabilityExcelService
                     ->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
 
-            // Apply vertical-only borders (no horizontal interior lines between rows)
             $this->applyVerticalOnlyBorders($sheet, $row, $columns);
 
             $sheet->getRowDimension($row)->setRowHeight($rowHeights[$index]);
             $row++;
         }
 
-        // Insert blank filler rows on the last page with vertical-only borders
         for ($f = 0; $f < $fillerCount; $f++) {
             foreach ($columns as $col) {
                 $sheet->setCellValue("{$col}{$row}", '');
@@ -351,7 +350,6 @@ class AccountabilityExcelService
         $sheet->getStyle("F{$row}")->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle("F{$row}")->getFont()->setBold(true);
 
-        // Total row gets explicit top and bottom borders
         $sheet->getStyle("A{$row}:F{$row}")->applyFromArray([
             'borders' => [
                 'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'FF000000']],
@@ -445,17 +443,25 @@ class AccountabilityExcelService
 
         $sheet->setCellValue('A4', 'Entity Name:');
         $sheet->mergeCells('B4:E4');
-        $sheet->setCellValue('B4', $receipt->remarks ?? '');
-        $sheet->setCellValue('F5', 'NIR ICS No:');
-        $sheet->setCellValue('G5', $receipt->document_number);
-        $sheet->getStyle('F5')->getFont()->setBold(true);
+        $sheet->setCellValue('B4', 'Management Support Division ICTU');
 
+        // Fund Cluster with red font
         $sheet->setCellValue('A5', 'Fund Cluster:');
         $sheet->mergeCells('B5:E5');
-        $sheet->setCellValue('B5', '');
+        $sheet->setCellValue('B5', 'Fund');
+        $sheet->getStyle('B5')->getFont()->getColor()->setARGB('FFFF0000');
 
-        $headerTop = 7;
-        $headerSub = 8;
+        // P.O. No. added above ICS No.
+        $sheet->setCellValue('F6', 'P.O. No:');
+        $sheet->setCellValue('G6', $receipt->po_number ?? '');
+        $sheet->getStyle('F6')->getFont()->setBold(true);
+
+        $sheet->setCellValue('F7', 'NIR ICS No:');
+        $sheet->setCellValue('G7', $receipt->document_number);
+        $sheet->getStyle('F7')->getFont()->setBold(true);
+
+        $headerTop = 9;
+        $headerSub = 10;
         $sheet->getRowDimension($headerTop)->setRowHeight(self::ICS_HEADER_HEIGHT / 2);
         $sheet->getRowDimension($headerSub)->setRowHeight(self::ICS_HEADER_HEIGHT / 2);
 
@@ -498,9 +504,7 @@ class AccountabilityExcelService
             $asset = $line->serializedAsset;
             $item = $asset->item;
             $itemName = $item->name ?? 'N/A';
-            $category = $item->category->name ?? '';
-            $unitLabel = $category !== '' ? "{$category}\n{$itemName}" : $itemName;
-            $unitLabelHeight = $this->calculateRowHeight($unitLabel, $widths['B']);
+            $unitLabelHeight = $this->calculateRowHeight($itemName, $widths['B']);
 
             $rowHeights[$index] = max($descHeight, $unitLabelHeight);
         }
@@ -532,11 +536,9 @@ class AccountabilityExcelService
             $lineRows[$index] = $row;
 
             $itemName = $item->name ?? 'N/A';
-            $category = $item->category->name ?? '';
-            $unitLabel = $category !== '' ? "{$category}\n{$itemName}" : $itemName;
 
             $sheet->setCellValue("A{$row}", $line->quantity);
-            $sheet->setCellValue("B{$row}", $unitLabel);
+            $sheet->setCellValue("B{$row}", $itemName);
             $sheet->setCellValue("C{$row}", $unitCost);
             $sheet->setCellValue("D{$row}", $totalCost);
             $sheet->setCellValue("E{$row}", $descriptions[$index]);
@@ -555,14 +557,12 @@ class AccountabilityExcelService
                     ->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
 
-            // Apply vertical-only borders (no horizontal interior lines between rows)
             $this->applyVerticalOnlyBorders($sheet, $row, $columns);
 
             $sheet->getRowDimension($row)->setRowHeight($rowHeights[$index]);
             $row++;
         }
 
-        // Insert blank filler rows on the last page with vertical-only borders
         for ($f = 0; $f < $fillerCount; $f++) {
             foreach ($columns as $col) {
                 $sheet->setCellValue("{$col}{$row}", '');
@@ -582,7 +582,6 @@ class AccountabilityExcelService
         $sheet->getStyle("D{$row}")->getNumberFormat()->setFormatCode('#,##0.00');
         $sheet->getStyle("D{$row}")->getFont()->setBold(true);
 
-        // Total row gets explicit top and bottom borders
         $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
             'borders' => [
                 'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'FF000000']],
