@@ -189,7 +189,6 @@ class AccountabilityExcelService
         if (!empty($asset->serial_number)) {
             $lines[] = "SN: {$asset->serial_number}";
         }
-        // Estimated Useful Life removed per request
         if (!empty($item->specifications)) {
             $lines[] = $item->specifications;
         }
@@ -230,21 +229,18 @@ class AccountabilityExcelService
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(13);
         $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->setCellValue('A4', 'Entity Name:');
-        $sheet->mergeCells('B4:F4');
-        $sheet->setCellValue('B4', 'Management Support Division ICTU');
+        // Entity Name moved down to Row 5
+        $sheet->setCellValue('A5', 'Entity Name:');
+        $sheet->mergeCells('B5:F5');
+        $sheet->setCellValue('B5', 'Management Support Division ICTU');
 
-        // Fund Cluster with red font
-        $sheet->setCellValue('A5', 'Fund Cluster:');
-        $sheet->mergeCells('B5:D5');
-        $sheet->setCellValue('B5', 'Fund');
-        $sheet->getStyle('B5')->getFont()->getColor()->setARGB('FFFF0000');
+        // Fund Cluster moved down to Row 6 (leveled with PAR No), bold + red font
+        $sheet->setCellValue('A6', 'Fund Cluster:');
+        $sheet->mergeCells('B6:D6');
+        $sheet->setCellValue('B6', 'Fund');
+        $sheet->getStyle('B6')->getFont()->setBold(true)->getColor()->setARGB('FFFF0000');
 
-        // P.O. No. added above PAR No.
-        $sheet->setCellValue('E5', 'P.O. No:');
-        $sheet->setCellValue('F5', $receipt->po_number ?? '');
-        $sheet->getStyle('E5')->getFont()->setBold(true);
-
+        // P.O. No removed; PAR No remains on Row 6
         $sheet->setCellValue('E6', 'PAR No:');
         $sheet->setCellValue('F6', $receipt->document_number);
         $sheet->getStyle('E6')->getFont()->setBold(true);
@@ -441,21 +437,18 @@ class AccountabilityExcelService
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(13);
         $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->setCellValue('A4', 'Entity Name:');
-        $sheet->mergeCells('B4:E4');
-        $sheet->setCellValue('B4', 'Management Support Division ICTU');
+        // Entity Name moved down to Row 6
+        $sheet->setCellValue('A6', 'Entity Name:');
+        $sheet->mergeCells('B6:G6');
+        $sheet->setCellValue('B6', 'Management Support Division ICTU');
 
-        // Fund Cluster with red font
-        $sheet->setCellValue('A5', 'Fund Cluster:');
-        $sheet->mergeCells('B5:E5');
-        $sheet->setCellValue('B5', 'Fund');
-        $sheet->getStyle('B5')->getFont()->getColor()->setARGB('FFFF0000');
+        // Fund Cluster moved down to Row 7 (leveled with NIR ICS No), bold + red font
+        $sheet->setCellValue('A7', 'Fund Cluster:');
+        $sheet->mergeCells('B7:E7');
+        $sheet->setCellValue('B7', 'Fund');
+        $sheet->getStyle('B7')->getFont()->setBold(true)->getColor()->setARGB('FFFF0000');
 
-        // P.O. No. added above ICS No.
-        $sheet->setCellValue('F6', 'P.O. No:');
-        $sheet->setCellValue('G6', $receipt->po_number ?? '');
-        $sheet->getStyle('F6')->getFont()->setBold(true);
-
+        // P.O. No removed; NIR ICS No remains on Row 7
         $sheet->setCellValue('F7', 'NIR ICS No:');
         $sheet->setCellValue('G7', $receipt->document_number);
         $sheet->getStyle('F7')->getFont()->setBold(true);

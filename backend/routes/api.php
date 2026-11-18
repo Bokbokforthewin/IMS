@@ -200,11 +200,11 @@ Route::prefix('v1')
         | Serialized Assets, Accountability & Transfers
         |------------------------------------------------------------------
         */
-        Route::get('/serialized-assets', [AccountabilityController::class, 'index']);
-        Route::get('/accountability/available-for-cart', [AccountabilityController::class, 'availableForCart']);
-        Route::get('/accountability/serialized-assets/{serializedAsset}/attached', [AccountabilityController::class, 'attachedItems']);
-
         Route::middleware('permission:view:assets_page')->group(function () {
+            Route::get('/serialized-assets', [AccountabilityController::class, 'index']);
+            Route::get('/accountability/available-for-cart', [AccountabilityController::class, 'availableForCart']);
+            Route::get('/accountability/serialized-assets/{serializedAsset}/attached', [AccountabilityController::class, 'attachedItems']);
+
             Route::post('/accountability/issue-asset', [AccountabilityController::class, 'issueAsset']);
             Route::get('/accountability/receipts', [AccountabilityController::class, 'getReceipts']);
             Route::get('/accountability/receipts/{receipt}/download-excel', [AccountabilityController::class, 'downloadExcel']);
