@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssetTransfer;
+use App\Models\AccountabilityReceipt;
 use App\Models\SerializedAsset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +48,7 @@ class AssetTransferController extends Controller
             'transfer_type'       => 'required|in:RETURN,TRANSFER',
             'user_id'             => 'required|exists:users,id', // transferring FROM
             'transfered_to'       => 'required|exists:users,id', // transferring TO
+            'new_mr_id'           => 'required_if:transfer_type,TRANSFER|nullable|exists:users,id',
             'description'         => 'required|string|max:255',
             'reason'              => 'required|string|max:255',
             'transfer_date'       => 'required|date',
@@ -59,7 +61,7 @@ class AssetTransferController extends Controller
         $prefix = $validatedData['transfer_type'] === 'RETURN' ? 'RET' : 'PTR';
 
         try {
-            return DB::transaction(function () use ($validatedData, $year, $month, $prefix) {
+            return DB::transaction(function () use ($validatedData, $year, $month, $prefix, $request) {
                 $asset = SerializedAsset::where('id', $validatedData['serialized_asset_id'])
                     ->lockForUpdate()
                     ->firstOrFail();
@@ -108,10 +110,37 @@ class AssetTransferController extends Controller
                         'revert_reason'     => null, // clear any pending revert request
                     ]);
                 } else {
-                    // A transfer only changes the holder. Assigned stays Assigned and
-                    // Distributed stays Distributed, so it can never undo a distribution.
+                    // Transfer the physical holder and create a new accountability receipt
+                    // for the person responsible as MR. Keep the asset's current status.
                     $asset->update([
                         'current_holder_id' => $validatedData['transfered_to'],
+                    ]);
+
+                    $mr = \App\Models\User::findOrFail($validatedData['new_mr_id']);
+                    $unitName = strtoupper(preg_replace('/[^A-Za-z0-9-_]/', '', trim($mr->unit ?? 'OFFICE')));
+                    $unitName = $unitName ?: 'OFFICE';
+                    $receiptYear = date('Y', strtotime($validatedData['transfer_date']));
+                    $receiptNumbers = AccountabilityReceipt::where('document_number', 'like', "{$unitName}-{$receiptYear}-%")
+                        ->lockForUpdate()->pluck('document_number');
+                    $receiptSeq = 1;
+                    foreach ($receiptNumbers as $number) {
+                        $parts = explode('-', $number);
+                        $receiptSeq = max($receiptSeq, intval(end($parts)) + 1);
+                    }
+                    $cost = (float) preg_replace('/[^0-9.]/', '', (string) ($asset->unit_cost ?? $asset->item?->unit_cost ?? 0));
+                    $receipt = AccountabilityReceipt::create([
+                        'receipt_type' => $cost >= 50000 ? 'PAR' : 'ICS',
+                        'document_number' => sprintf('%s-%s-%04d', $unitName, $receiptYear, $receiptSeq),
+                        'user_id' => $validatedData['transfered_to'],
+                        'issued_by_id' => $request->user()->id,
+                        'received_mr_by_id' => $mr->id,
+                        'date_issued' => $validatedData['transfer_date'],
+                        'remarks' => $validatedData['remarks'] ?? null,
+                    ]);
+                    $receipt->lines()->create([
+                        'serialized_asset_id' => $asset->id,
+                        'item_id' => $asset->item_id,
+                        'quantity' => 1,
                     ]);
                 }
 

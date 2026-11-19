@@ -506,6 +506,8 @@ export default function TransferOrReturnForm({
     transfer_type: 'RETURN',
     user_id: '',       // Return From / Transferring From (Current Holder)
     transfered_to: '', // Receiving Officer / Transferring To (Recipient)
+    current_mr_id: '',
+    new_mr_id: '',
     description: '',
     reason: '',
     transfer_date: new Date().toISOString().split('T')[0],
@@ -513,6 +515,7 @@ export default function TransferOrReturnForm({
   });
 
   const [users, setUsers] = useState([]);
+  const [receipts, setReceipts] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -542,6 +545,12 @@ export default function TransferOrReturnForm({
     fetchUsers();
   }, [fetchUsers]);
 
+  useEffect(() => {
+    api.get('/v1/accountability/receipts')
+      .then(({ data }) => setReceipts(Array.isArray(data) ? data : []))
+      .catch((err) => console.warn('TransferOrReturnForm: Failed to load receipt MR data:', err));
+  }, []);
+
   const combinedUsers = useMemo(() => {
     if (!currentUser?.id) return users;
     const exists = users.some((u) => String(u.id) === String(currentUser.id));
@@ -565,11 +574,16 @@ export default function TransferOrReturnForm({
     const derivedHolderId = selectedAsset?.current_holder_id
       ? String(selectedAsset.current_holder_id)
       : '';
+    const latestReceipt = receipts
+      .filter((receipt) => receipt.lines?.some((line) => String(line.serialized_asset_id || line.serialized_asset?.id) === String(assetId)))
+      .sort((a, b) => (b.id || 0) - (a.id || 0))[0];
 
     setForm((prev) => ({
       ...prev,
       serialized_asset_id: assetId,
       user_id: derivedHolderId,
+      current_mr_id: latestReceipt?.received_mr_by_id ? String(latestReceipt.received_mr_by_id) : '',
+      new_mr_id: '',
     }));
   };
 
@@ -583,6 +597,8 @@ export default function TransferOrReturnForm({
           transfer_type: 'RETURN',
           user_id: '',
           transfered_to: '',
+          current_mr_id: '',
+          new_mr_id: '',
           description: '',
           reason: '',
           transfer_date: new Date().toISOString().split('T')[0],
@@ -631,6 +647,8 @@ export default function TransferOrReturnForm({
                     transfer_type: e.target.value,
                     serialized_asset_id: '',
                     user_id: '',
+                    current_mr_id: '',
+                    new_mr_id: '',
                   })
                 }
                 className="mt-0.5 accent-primary"
@@ -661,6 +679,8 @@ export default function TransferOrReturnForm({
                     transfer_type: e.target.value,
                     serialized_asset_id: '',
                     user_id: '',
+                    current_mr_id: '',
+                    new_mr_id: '',
                   })
                 }
                 className="mt-0.5 accent-primary"
@@ -668,7 +688,7 @@ export default function TransferOrReturnForm({
               <div>
                 <span className="font-semibold text-xs text-foreground cursor-pointer">Transfer Equipment</span>
                 <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
-                  Reassign item from employee to employee (PTR Document)
+                  Reassign the holder and MR, then create a new ICS or PAR receipt
                 </p>
               </div>
             </label>
@@ -735,6 +755,32 @@ export default function TransferOrReturnForm({
               }
             />
           </div>
+
+          {form.transfer_type === 'TRANSFER' && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="current_mr_id" className="text-xs font-semibold text-muted-foreground">Current MR</Label>
+                <Input
+                  id="current_mr_id"
+                  readOnly
+                  value={combinedUsers.find((u) => String(u.id) === String(form.current_mr_id))?.name || ''}
+                  placeholder={form.serialized_asset_id ? 'No MR found on the current receipt' : 'Select an asset first'}
+                  className="h-8 text-xs bg-muted/40 border-border"
+                />
+                <p className="text-[10px] text-muted-foreground">Auto-filled from the asset’s latest ICS/PAR.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="new_mr_id" className="text-xs font-semibold text-muted-foreground">New MR <span className="text-destructive">*</span></Label>
+                <UserSearch
+                  id="new_mr_id"
+                  users={combinedUsers}
+                  userId={form.new_mr_id}
+                  onSelectUser={(id) => setForm((prev) => ({ ...prev, new_mr_id: id }))}
+                  placeholder="Search new MR..."
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Context Inputs Grid */}
@@ -815,6 +861,7 @@ export default function TransferOrReturnForm({
               !form.serialized_asset_id ||
               !form.user_id ||
               !form.transfered_to ||
+              (form.transfer_type === 'TRANSFER' && !form.new_mr_id) ||
               !form.description ||
               !form.reason ||
               !form.transfer_date
@@ -826,7 +873,7 @@ export default function TransferOrReturnForm({
               ? 'Processing...'
               : form.transfer_type === 'RETURN'
               ? 'Process Equipment Return'
-              : 'Generate Property Transfer Report (PTR)'}
+              : 'Transfer Asset & Create ICS/PAR'}
           </Button>
         </div>
       </form>
