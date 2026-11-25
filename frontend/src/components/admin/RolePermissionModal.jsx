@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Loader2, ShieldCheck, Search, LayoutGrid, Layers, Wrench, CheckSquare, Square } from "lucide-react";
 
 import api from "../../api/client";
+import { useAuth } from "../../context/AuthContext";
 
 import {
   Dialog,
@@ -54,6 +55,7 @@ const PERMISSION_LABEL_MAP = {
   // --- ACTIONS & ADMIN ---
   "action:manage users": { title: "Manage Users", desc: "Create, edit, or deactivate user accounts" },
   "action:manage roles": { title: "Manage Roles & Matrix", desc: "Configure role permissions and settings" },
+  "action:manage asset status": { title: "Manage PAR/ICS Status", desc: "Update asset status and revert distributions" },
   "action:create_custom_permission": { title: "Create Permissions", desc: "Add custom permissions to system" },
   "action:create_custom_role": { title: "Create Roles", desc: "Create new user roles" },
 };
@@ -84,6 +86,8 @@ const PERMISSION_DEPENDENCIES = {
 };
 
 export default function RolePermissionModal({ isOpen, onClose }) {
+  const { refetchMe } = useAuth();
+
   const [roles, setRoles] = useState([]);
   const [allPermissions, setAllPermissions] = useState([]);
   const [matrix, setMatrix] = useState({});
@@ -182,6 +186,7 @@ export default function RolePermissionModal({ isOpen, onClose }) {
         permissions: checkedPermissions,
       });
       await fetchMatrix();
+      await refetchMe?.();
       onClose();
     } catch (err) {
       alert(err.response?.data?.error || "Failed to save role permissions.");

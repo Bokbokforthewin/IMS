@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import {
   Loader2,
-  ShieldCheck,
   UserCog,
   Search,
   CheckSquare,
@@ -13,6 +12,7 @@ import {
 } from "lucide-react";
 
 import api from "../../api/client";
+import { useAuth } from "../../context/AuthContext";
 
 import {
   Dialog,
@@ -28,9 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
-// Human-readable labels and descriptions for system permissions
 const PERMISSION_LABEL_MAP = {
-  // Page Views
   "view:dashboard_page": { title: "Dashboard Page", desc: "Overview cards and stock summaries" },
   "view:catalog_page": { title: "Catalog Page", desc: "Item masterlist and categories" },
   "view:receiving_page": { title: "Stock Receiving Page", desc: "Inbound inventory encoding" },
@@ -40,7 +38,6 @@ const PERMISSION_LABEL_MAP = {
   "view:audit_trail_page": { title: "Audit Trail Page", desc: "View system audit logs" },
   "view:quick_receive_page": { title: "Quick Receive Page", desc: "Streamlined encoding page" },
 
-  // Component Widgets
   "component:quick_category_widget": { title: "Quick Category Widget", desc: "Manage categories in Quick Receive" },
   "component:quick_receive_form_widget": { title: "Quick Receive Form", desc: "Fast encoding form for receiving stock" },
   "component:quick_receive_history_widget": { title: "Quick Receive History", desc: "View history logs in Quick Receive" },
@@ -56,10 +53,9 @@ const PERMISSION_LABEL_MAP = {
   "component:transfer_return_form_widget": { title: "Transfer / Return Form", desc: "Process asset movements" },
   "component:movement_logs_widget": { title: "Movement Logs Table", desc: "Audit log of asset transfers" },
 
-  // Actions & Admin
   "action:manage users": { title: "Manage Users", desc: "Create, edit, or deactivate user accounts" },
   "action:manage roles": { title: "Manage Roles & Matrix", desc: "Configure role permissions and settings" },
-  "action:manage_asset_status": { title: "Manage PAR/ICS Status", desc: "This action is only available to ICTU users." },
+  "action:manage asset status": { title: "Manage PAR/ICS Status", desc: "Update asset status and revert distributions." },
   "action:create_custom_permission": { title: "Create Permissions", desc: "Add custom permissions to system" },
   "action:create_custom_role": { title: "Create Roles", desc: "Create new user roles" },
 };
@@ -70,12 +66,14 @@ export default function UserAccessModal({
   onClose,
   onSaveSuccess,
 }) {
+  const { refetchMe } = useAuth();
+
   const [availableRoles, setAvailableRoles] = useState([]);
   const [availablePermissions, setAvailablePermissions] = useState([]);
   const [rolePermissionsMap, setRolePermissionsMap] = useState({});
 
   const [selectedRoles, setSelectedRoles] = useState([]);
-  const [selectedPermissions, setSelectedPermissions] = useState([]);
+  const [checkedPermissions, setCheckedPermissions] = useState([]);
 
   const [permissionSearch, setPermissionSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -100,17 +98,21 @@ export default function UserAccessModal({
         setRolePermissionsMap(matrixRes.data.matrix || {});
 
         const currentUserRoles = data.user?.roles || user.roles || [];
-        const currentUserPermissions = data.user?.permissions || user.permissions || [];
-
         const activeRoles = currentUserRoles.map((role) =>
           typeof role === "string" ? role : role.name
         );
-        const activePerms = currentUserPermissions.map((permission) =>
-          typeof permission === "string" ? permission : permission.name
+
+        const rawAllPerms =
+          data.all_permissions ||
+          user.all_permissions ||
+          [...(data.user?.permissions || user.permissions || [])];
+
+        const normalizedAllPerms = Array.from(
+          new Set(rawAllPerms.map((p) => (typeof p === "string" ? p : p?.name)).filter(Boolean))
         );
 
         setSelectedRoles(activeRoles);
-        setSelectedPermissions(activePerms);
+        setCheckedPermissions(normalizedAllPerms);
       } catch (error) {
         console.error("Failed to load user access:", error);
         setErrorMessage("Failed to fetch user access configuration.");
@@ -122,20 +124,28 @@ export default function UserAccessModal({
     loadAccess();
   }, [isOpen, user]);
 
+  // Role-granted permissions for currently selected role(s)
+  const roleGrantedSet = useMemo(() => {
+    const set = new Set();
+    selectedRoles.forEach((roleName) => {
+      (rolePermissionsMap[roleName] || []).forEach((perm) => set.add(perm));
+    });
+    return set;
+  }, [selectedRoles, rolePermissionsMap]);
+
+  // Direct permissions = checked permissions NOT already granted by selected role(s)
+  const directPermissions = useMemo(
+    () => checkedPermissions.filter((perm) => !roleGrantedSet.has(perm)),
+    [checkedPermissions, roleGrantedSet]
+  );
+
+  // Selecting a role does NOT copy role permissions into direct permissions
   const selectRole = (roleName) => {
-    if (selectedRoles.includes(roleName)) {
-      setSelectedRoles([]);
-    } else {
-      setSelectedRoles([roleName]);
-      const defaultRolePerms = rolePermissionsMap[roleName] || [];
-      if (defaultRolePerms.length > 0) {
-        setSelectedPermissions(defaultRolePerms);
-      }
-    }
+    setSelectedRoles((prev) => (prev.includes(roleName) ? [] : [roleName]));
   };
 
   const togglePermission = (permissionName) => {
-    setSelectedPermissions((current) =>
+    setCheckedPermissions((current) =>
       current.includes(permissionName)
         ? current.filter((permission) => permission !== permissionName)
         : [...current, permissionName]
@@ -172,12 +182,12 @@ export default function UserAccessModal({
 
   const toggleCategory = (categoryKey) => {
     const categoryPerms = categorizedPermissions[categoryKey] || [];
-    const allChecked = categoryPerms.every((p) => selectedPermissions.includes(p));
+    const allChecked = categoryPerms.every((p) => checkedPermissions.includes(p));
 
     if (allChecked) {
-      setSelectedPermissions((prev) => prev.filter((p) => !categoryPerms.includes(p)));
+      setCheckedPermissions((prev) => prev.filter((p) => !categoryPerms.includes(p)));
     } else {
-      setSelectedPermissions((prev) => Array.from(new Set([...prev, ...categoryPerms])));
+      setCheckedPermissions((prev) => Array.from(new Set([...prev, ...categoryPerms])));
     }
   };
 
@@ -188,13 +198,15 @@ export default function UserAccessModal({
 
     try {
       await api.patch(`/v1/users/${user.id}/roles`, { roles: selectedRoles });
-      await api.patch(`/v1/users/${user.id}/permissions`, { permissions: selectedPermissions });
+      await api.patch(`/v1/users/${user.id}/permissions`, { permissions: directPermissions });
 
+      await refetchMe?.();
       onSaveSuccess?.();
       onClose();
     } catch (error) {
       console.error("Failed to update user access:", error);
-      const backendMessage = error.response?.data?.message || error.message;
+      const backendMessage =
+        error.response?.data?.error || error.response?.data?.message || error.message;
       setErrorMessage(
         error.response?.status === 405
           ? "Route error (405): Server expected a different HTTP method (e.g. PATCH)."
@@ -207,11 +219,10 @@ export default function UserAccessModal({
 
   const renderSection = (title, icon, perms, categoryKey) => {
     const IconComponent = icon;
-    const allSelected = perms.length > 0 && perms.every((p) => selectedPermissions.includes(p));
+    const allSelected = perms.length > 0 && perms.every((p) => checkedPermissions.includes(p));
 
     return (
       <div className="rounded-xl border bg-card p-4 shadow-sm space-y-3">
-        {/* Section Header */}
         <div className="flex items-center justify-between border-b pb-2.5">
           <div className="flex items-center gap-2">
             <IconComponent className="size-4 text-primary" />
@@ -239,7 +250,6 @@ export default function UserAccessModal({
           )}
         </div>
 
-        {/* Section Permission List - SINGLE COLUMN VERTICAL LIST */}
         {perms.length === 0 ? (
           <div className="py-6 text-center text-xs text-muted-foreground bg-muted/10 rounded-md border border-dashed">
             No matching permissions found.
@@ -247,7 +257,8 @@ export default function UserAccessModal({
         ) : (
           <div className="flex flex-col gap-2">
             {perms.map((permName) => {
-              const isChecked = selectedPermissions.includes(permName);
+              const isChecked = checkedPermissions.includes(permName);
+              const fromRole = roleGrantedSet.has(permName);
               const meta = PERMISSION_LABEL_MAP[permName] || {
                 title: permName.replace(/^(view:|component:|action:)/, "").replace(/_/g, " "),
                 desc: permName,
@@ -256,7 +267,9 @@ export default function UserAccessModal({
               return (
                 <label
                   key={permName}
-                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border p-3 text-xs transition-all ${
+                  className={`flex items-center justify-between gap-3 rounded-lg border p-3 text-xs transition-all ${
+                    fromRole ? "cursor-default opacity-90" : "cursor-pointer"
+                  } ${
                     isChecked
                       ? "border-primary/50 bg-primary/5 shadow-sm font-medium"
                       : "bg-background hover:bg-muted/40"
@@ -265,13 +278,23 @@ export default function UserAccessModal({
                   <div className="flex items-center gap-3 overflow-hidden">
                     <Checkbox
                       checked={isChecked}
-                      onCheckedChange={() => togglePermission(permName)}
+                      disabled={fromRole}
+                      onCheckedChange={() => {
+                        if (!fromRole) togglePermission(permName);
+                      }}
                       className="shrink-0"
                     />
                     <div className="flex flex-col gap-0.5 overflow-hidden">
-                      <span className="capitalize text-foreground font-semibold truncate">
-                        {meta.title}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="capitalize text-foreground font-semibold truncate">
+                          {meta.title}
+                        </span>
+                        {fromRole && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            Via Role
+                          </Badge>
+                        )}
+                      </div>
                       <span className="text-[11px] text-muted-foreground truncate">
                         {meta.desc}
                       </span>
@@ -327,12 +350,11 @@ export default function UserAccessModal({
               <TabsTrigger value="permissions" className="flex items-center gap-2">
                 Permission Overrides
                 <Badge variant="secondary" className="ml-1 text-[10px]">
-                  {selectedPermissions.length}
+                  {directPermissions.length} direct / {checkedPermissions.length} total
                 </Badge>
               </TabsTrigger>
             </TabsList>
 
-            {/* TAB 1: SINGLE ROLE SELECTION */}
             <TabsContent value="roles" className="mt-4 space-y-3">
               <div className="space-y-2 rounded-xl border p-3 bg-card">
                 {availableRoles.length === 0 ? (
@@ -381,7 +403,6 @@ export default function UserAccessModal({
               </div>
             </TabsContent>
 
-            {/* TAB 2: DIRECT PERMISSION OVERRIDES */}
             <TabsContent value="permissions" className="mt-4 space-y-4">
               <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-xl border">
                 <div className="relative flex-1">
@@ -394,7 +415,7 @@ export default function UserAccessModal({
                   />
                 </div>
                 <Badge variant="secondary" className="px-3 py-1.5 text-xs font-semibold">
-                  {selectedPermissions.length} Active Permissions
+                  {directPermissions.length} Direct Overrides ({checkedPermissions.length} Active)
                 </Badge>
               </div>
 

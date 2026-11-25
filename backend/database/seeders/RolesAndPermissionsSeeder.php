@@ -79,7 +79,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'view:receiving_page',
             'view:assets_page',
             'view:consumables_page',
-            'view:audit_trail_page',
             'view:quick_receive_page',
             'component:quick_category_widget',
             'component:quick_receive_form_widget',

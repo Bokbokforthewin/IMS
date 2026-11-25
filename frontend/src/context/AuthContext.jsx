@@ -107,6 +107,7 @@ export function AuthProvider({ children }) {
         token,
         loading,
         settings,
+        refetchMe: fetchMe,
         refetchSettings: fetchSettings,
         login,
         register,

@@ -92,7 +92,7 @@ function isValidDate(date) {
 }
 
 // --- Custom DatePicker Component ---
-function IssuanceDatePicker({ value, onChange, id = "date_issued" }) {
+function IssuanceDatePicker({ value, onChange, id = 'date_issued' }) {
   const [open, setOpen] = useState(false);
   const currentDate = parseISO(value);
   const [month, setMonth] = useState(currentDate || new Date());
@@ -178,15 +178,23 @@ function IssuanceDatePicker({ value, onChange, id = "date_issued" }) {
 }
 
 // --- Searchable Employee Select Dropdown ---
-function UserSearch({ users = [], userId, onSelectUser, id = "user_search", placeholder = "Search employee..." }) {
+function UserSearch({
+  users = [],
+  userId,
+  onSelectUser,
+  currentUserId = null,
+  id = 'user_search',
+  placeholder = 'Search employee...',
+}) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const wrapperRef = useRef(null);
 
   // Sync search input when userId changes externally or on user list load
   useEffect(() => {
     if (!userId) {
-      setSearchTerm('');
+      if (!isSearching) setSearchTerm('');
     } else {
       const match = users.find((u) => String(u.id) === String(userId));
       if (match) {
@@ -196,13 +204,14 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
         }
       }
     }
-  }, [userId, users, isOpen]);
+  }, [userId, users, isOpen, isSearching, searchTerm]);
 
   // Click outside listener
   useEffect(() => {
     function handleClickOutside(event) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
         setIsOpen(false);
+        setIsSearching(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -211,7 +220,7 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
 
   // Filter users based on name, unit, designation, and division
   const filteredUsers = useMemo(() => {
-    if (!searchTerm.trim()) return users;
+    if (!isSearching || !searchTerm.trim()) return users;
     const q = searchTerm.toLowerCase().trim();
 
     return users.filter((user) => {
@@ -227,11 +236,21 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
         division.includes(q)
       );
     });
-  }, [users, searchTerm]);
+  }, [users, searchTerm, isSearching]);
+
+  const handleFocus = () => {
+    setIsOpen(true);
+    // If user clicks to change from the pre-filled name, show full dropdown immediately
+    const currentMatch = users.find((u) => String(u.id) === String(userId));
+    if (currentMatch && searchTerm === getUserLabel(currentMatch)) {
+      setIsSearching(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const val = e.target.value;
     setSearchTerm(val);
+    setIsSearching(true);
     setIsOpen(true);
 
     const exactMatch = users.find((u) => {
@@ -250,13 +269,15 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
   const handleSelectOption = (user) => {
     setSearchTerm(getUserLabel(user));
     onSelectUser(String(user.id));
+    setIsSearching(false);
     setIsOpen(false);
   };
 
   const handleClear = () => {
     setSearchTerm('');
     onSelectUser('');
-    setIsOpen(false);
+    setIsSearching(true);
+    setIsOpen(true);
   };
 
   return (
@@ -268,7 +289,7 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
           type="text"
           placeholder={placeholder}
           value={searchTerm}
-          onFocus={() => setIsOpen(true)}
+          onFocus={handleFocus}
           onChange={handleInputChange}
           className="pl-8 pr-7 h-8 text-xs bg-card"
           autoComplete="off"
@@ -289,8 +310,10 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
         <div className="absolute z-50 w-full mt-1 bg-popover text-popover-foreground rounded-md border border-border shadow-md max-h-56 overflow-y-auto">
           {filteredUsers.length > 0 ? (
             <ul className="py-1 divide-y divide-border/40 text-xs">
-              {filteredUsers.map((u) => {
+              {filteredUsers.map((u, idx) => {
                 const isSelected = String(u.id) === String(userId);
+                const isLoggedInUser =
+                  currentUserId != null && String(u.id) === String(currentUserId);
                 const unitStr = u.unit?.name || u.unit;
                 const desigStr = u.designation?.name || u.designation;
                 const divStr = u.division?.name || u.division;
@@ -305,8 +328,18 @@ function UserSearch({ users = [], userId, onSelectUser, id = "user_search", plac
                         : 'hover:bg-muted/80'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">{u.name}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-semibold truncate">{u.name}</span>
+                        {(isLoggedInUser || idx === 0) && isLoggedInUser && (
+                          <Badge
+                            variant="secondary"
+                            className="h-4 px-1.5 text-[10px] font-medium shrink-0"
+                          >
+                            You
+                          </Badge>
+                        )}
+                      </div>
                       {isSelected && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
                     </div>
 
@@ -352,7 +385,9 @@ export default function DeliveryForm({
 
   // Default "Issued By" to current logged-in user
   const [issuedById, setIssuedById] = useState(
-    initialDetails?.issuedById || initialDetails?.issued_by_id || currentUser?.id || ''
+    initialDetails?.issuedById ||
+      initialDetails?.issued_by_id ||
+      (currentUser?.id ? String(currentUser.id) : '')
   );
 
   const [dateIssued, setDateIssued] = useState(
@@ -360,7 +395,7 @@ export default function DeliveryForm({
   );
   const [remarks, setRemarks] = useState(initialDetails?.remarks || '');
 
-  // Keep issuedById aligned with currentUser once loaded
+  // Keep issuedById defaulted to currentUser once auth resolves
   useEffect(() => {
     if (currentUser?.id && !issuedById) {
       setIssuedById(String(currentUser.id));
@@ -403,23 +438,22 @@ export default function DeliveryForm({
     fetchUsers();
   }, [fetchUsers]);
 
-  // Ensure current user exists in users list
-  const combinedUsers = useMemo(() => {
+  // Put logged-in user first in the dropdown list
+  const orderedUsers = useMemo(() => {
     if (!currentUser?.id) return users;
-    const exists = users.some((u) => String(u.id) === String(currentUser.id));
-    if (!exists) {
-      return [
-        {
-          id: currentUser.id,
-          name: currentUser.name || 'Current User',
-          unit: currentUser.unit,
-          designation: currentUser.designation,
-          division: currentUser.division,
-        },
-        ...users,
-      ];
-    }
-    return users;
+    const currentIdStr = String(currentUser.id);
+    const matched = users.find((u) => String(u.id) === currentIdStr);
+    const others = users.filter((u) => String(u.id) !== currentIdStr);
+
+    const firstUser = matched || {
+      id: currentUser.id,
+      name: currentUser.name || 'Current User',
+      unit: currentUser.unit,
+      designation: currentUser.designation,
+      division: currentUser.division,
+    };
+
+    return [firstUser, ...others];
   }, [users, currentUser]);
 
   // Sync secondary receiver mapping when cart items update
@@ -457,16 +491,16 @@ export default function DeliveryForm({
     e.preventDefault();
     if (!receivedMrById || !issuedById || !dateIssued) return;
 
-    const primaryReceiverUser = combinedUsers.find(
+    const primaryReceiverUser = orderedUsers.find(
       (u) => String(u.id) === String(receivedMrById) || u.name === receivedMrById
     );
-    const issuerUser = combinedUsers.find(
+    const issuerUser = orderedUsers.find(
       (u) => String(u.id) === String(issuedById) || u.name === issuedById
     );
 
     const cartWithSecondaryReceivers = cart.map((item) => {
       const targetUserId = itemUsers[item.key] || receivedMrById;
-      const secondaryUser = combinedUsers.find(
+      const secondaryUser = orderedUsers.find(
         (u) => String(u.id) === String(targetUserId) || u.name === targetUserId
       );
 
@@ -520,14 +554,13 @@ export default function DeliveryForm({
             const selectedSecondaryUser = itemUsers[item.key] || '';
 
             return (
-              <Card 
-                key={item.key} 
+              <Card
+                key={item.key}
                 className="rounded-lg border border-border bg-card shadow-2xs overflow-visible relative transition-all focus-within:z-30 hover:z-20"
               >
                 <CardContent className="p-4 overflow-visible">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 overflow-visible">
                     <div className="flex-1 space-y-3 overflow-visible">
-                      
                       {/* Asset Header Info */}
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-semibold text-sm text-foreground">{item.name}</span>
@@ -551,7 +584,6 @@ export default function DeliveryForm({
 
                       {/* Item Controls Row */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2.5 border-t border-border/60 overflow-visible">
-                        
                         {/* Per-Item End User Selector */}
                         <div className="space-y-1 relative z-30 overflow-visible">
                           <label className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
@@ -560,9 +592,10 @@ export default function DeliveryForm({
                           </label>
                           <UserSearch
                             id={`user_search_${item.key}`}
-                            users={combinedUsers}
+                            users={orderedUsers}
                             userId={selectedSecondaryUser}
                             onSelectUser={(userId) => handleItemUserChange(item.key, userId)}
+                            currentUserId={currentUser?.id}
                             placeholder="Search end user..."
                           />
                         </div>
@@ -595,7 +628,6 @@ export default function DeliveryForm({
                             </Select>
                           </div>
                         )}
-
                       </div>
                     </div>
 
@@ -629,37 +661,48 @@ export default function DeliveryForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Issued To Field */}
               <div className="space-y-1.5">
-                <Label htmlFor="received_mr_by_id" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Label
+                  htmlFor="received_mr_by_id"
+                  className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"
+                >
                   <User className="h-3.5 w-3.5 text-primary" />
                   Issued To (Accountable Receiver) <span className="text-destructive">*</span>
                 </Label>
                 <UserSearch
                   id="received_mr_by_id"
-                  users={combinedUsers}
+                  users={orderedUsers}
                   userId={receivedMrById}
                   onSelectUser={setReceivedMrById}
+                  currentUserId={currentUser?.id}
                   placeholder="Search accountable receiver..."
                 />
               </div>
 
               {/* Issued By Field */}
               <div className="space-y-1.5">
-                <Label htmlFor="issued_by_id" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Label
+                  htmlFor="issued_by_id"
+                  className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"
+                >
                   <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                   Issued By <span className="text-destructive">*</span>
                 </Label>
                 <UserSearch
                   id="issued_by_id"
-                  users={combinedUsers}
+                  users={orderedUsers}
                   userId={issuedById}
                   onSelectUser={setIssuedById}
+                  currentUserId={currentUser?.id}
                   placeholder="Search issuer..."
                 />
               </div>
 
               {/* Date Issued Field */}
               <div className="space-y-1.5">
-                <Label htmlFor="date_issued" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Label
+                  htmlFor="date_issued"
+                  className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"
+                >
                   <CalendarIcon className="h-3.5 w-3.5 text-primary" />
                   Issuance Date <span className="text-destructive">*</span>
                 </Label>
@@ -672,7 +715,10 @@ export default function DeliveryForm({
 
               {/* Remarks Field */}
               <div className="space-y-1.5">
-                <Label htmlFor="remarks" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Label
+                  htmlFor="remarks"
+                  className="text-xs font-medium text-muted-foreground flex items-center gap-1.5"
+                >
                   <MessageSquare className="h-3.5 w-3.5 text-primary" />
                   Purpose / Remarks
                 </Label>

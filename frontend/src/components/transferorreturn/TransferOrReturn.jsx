@@ -17,12 +17,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import {
   InputGroup,
@@ -56,6 +50,13 @@ function getAssetLabel(asset) {
   const details = [sn, pn].filter(Boolean).join(' | ');
 
   return `${categoryName} ${itemName} ${brandModel} — ${details}`.trim();
+}
+
+function resolveMrId(formState) {
+  if (formState.transfer_type === 'TRANSFER') {
+    return formState.new_mr_id || '';
+  }
+  return formState.current_mr_id || formState.transfered_to || '';
 }
 
 // --- Date Helpers ---
@@ -123,7 +124,6 @@ function TransferDatePicker({ value, onChange, id = 'transfer_date' }) {
   };
 
   return (
-    // Added overflow-hidden, rounded-lg, border, and focus-within states to the wrapper group
     <InputGroup className="w-full overflow-hidden rounded-lg border border-input bg-card shadow-2xs focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
       <InputGroupInput
         id={id}
@@ -136,7 +136,6 @@ function TransferDatePicker({ value, onChange, id = 'transfer_date' }) {
           }
         }}
         placeholder="Select transaction date..."
-        // Removed default border-border from the input so it doesn't paint over the parent container's frame
         className="h-8 text-xs bg-transparent border-0 focus-visible:ring-0 shadow-none"
         required
       />
@@ -501,26 +500,30 @@ export default function TransferOrReturnForm({
 }) {
   const { user: currentUser } = useAuth();
 
-  const [form, setForm] = useState({
-    serialized_asset_id: '',
-    transfer_type: 'RETURN',
-    user_id: '',       // Return From / Transferring From (Current Holder)
-    transfered_to: '', // Receiving Officer / Transferring To (Recipient)
-    current_mr_id: '',
-    new_mr_id: '',
-    description: '',
-    reason: '',
-    transfer_date: new Date().toISOString().split('T')[0],
-    remarks: '',
-  });
+  const createInitialForm = useCallback(
+    () => ({
+      serialized_asset_id: '',
+      transfer_type: 'RETURN',
+      user_id: '',            // Return From / Transferring From (Current Holder)
+      transfered_to: '',      // Receiving Officer / Transferring To (Recipient)
+      current_mr_id: '',
+      new_mr_id: '',
+      received_by_mr_id: '',
+      issued_by_id: '',       // Always mirrors MR (never currentUser.id)
+      description: '',
+      reason: '',
+      transfer_date: new Date().toISOString().split('T')[0],
+      remarks: '',
+    }),
+    []
+  );
 
+  const [form, setForm] = useState(createInitialForm);
   const [users, setUsers] = useState([]);
   const [receipts, setReceipts] = useState([]);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchUsers = useCallback(async () => {
-    setIsLoadingUsers(true);
     try {
       const response = await api.get('/v1/users/options');
       const data = response.data;
@@ -536,8 +539,6 @@ export default function TransferOrReturnForm({
       setUsers(userList);
     } catch (err) {
       console.warn('TransferOrReturnForm: Failed to load user options:', err);
-    } finally {
-      setIsLoadingUsers(false);
     }
   }, []);
 
@@ -547,7 +548,10 @@ export default function TransferOrReturnForm({
 
   useEffect(() => {
     api.get('/v1/accountability/receipts')
-      .then(({ data }) => setReceipts(Array.isArray(data) ? data : []))
+      .then(({ data }) => {
+        const list = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+        setReceipts(list);
+      })
       .catch((err) => console.warn('TransferOrReturnForm: Failed to load receipt MR data:', err));
   }, []);
 
@@ -575,35 +579,60 @@ export default function TransferOrReturnForm({
       ? String(selectedAsset.current_holder_id)
       : '';
     const latestReceipt = receipts
-      .filter((receipt) => receipt.lines?.some((line) => String(line.serialized_asset_id || line.serialized_asset?.id) === String(assetId)))
+      .filter((receipt) =>
+        receipt.lines?.some(
+          (line) => String(line.serialized_asset_id || line.serialized_asset?.id) === String(assetId)
+        )
+      )
       .sort((a, b) => (b.id || 0) - (a.id || 0))[0];
 
-    setForm((prev) => ({
-      ...prev,
-      serialized_asset_id: assetId,
-      user_id: derivedHolderId,
-      current_mr_id: latestReceipt?.received_mr_by_id ? String(latestReceipt.received_mr_by_id) : '',
-      new_mr_id: '',
-    }));
+    const derivedCurrentMrId = latestReceipt?.received_mr_by_id
+      ? String(latestReceipt.received_mr_by_id)
+      : '';
+
+    setForm((prev) => {
+      const next = {
+        ...prev,
+        serialized_asset_id: assetId,
+        user_id: derivedHolderId,
+        current_mr_id: derivedCurrentMrId,
+        new_mr_id: '',
+      };
+      const mrId = resolveMrId(next);
+      return {
+        ...next,
+        received_by_mr_id: mrId,
+        issued_by_id: mrId,
+      };
+    });
+  };
+
+  const handleFieldChange = (updates) => {
+    setForm((prev) => {
+      const next = { ...prev, ...updates };
+      const mrId = resolveMrId(next);
+      return {
+        ...next,
+        received_by_mr_id: mrId,
+        issued_by_id: mrId,
+      };
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
+
+    const mrId = resolveMrId(form);
+    const payload = {
+      ...form,
+      received_by_mr_id: mrId,
+      issued_by_id: mrId,
+    };
+
     try {
-      await handleApiCall('/asset-transfers', form, () => {
-        setForm({
-          serialized_asset_id: '',
-          transfer_type: 'RETURN',
-          user_id: '',
-          transfered_to: '',
-          current_mr_id: '',
-          new_mr_id: '',
-          description: '',
-          reason: '',
-          transfer_date: new Date().toISOString().split('T')[0],
-          remarks: '',
-        });
+      await handleApiCall('/asset-transfers', payload, () => {
+        setForm(createInitialForm());
         if (typeof onSuccess === 'function') onSuccess();
       });
     } finally {
@@ -642,8 +671,7 @@ export default function TransferOrReturnForm({
                 value="RETURN"
                 checked={form.transfer_type === 'RETURN'}
                 onChange={(e) =>
-                  setForm({
-                    ...form,
+                  handleFieldChange({
                     transfer_type: e.target.value,
                     serialized_asset_id: '',
                     user_id: '',
@@ -674,8 +702,7 @@ export default function TransferOrReturnForm({
                 value="TRANSFER"
                 checked={form.transfer_type === 'TRANSFER'}
                 onChange={(e) =>
-                  setForm({
-                    ...form,
+                  handleFieldChange({
                     transfer_type: e.target.value,
                     serialized_asset_id: '',
                     user_id: '',
@@ -729,7 +756,7 @@ export default function TransferOrReturnForm({
               id="user_id"
               users={combinedUsers}
               userId={form.user_id}
-              onSelectUser={(id) => setForm((prev) => ({ ...prev, user_id: id }))}
+              onSelectUser={(id) => handleFieldChange({ user_id: id })}
               placeholder="Search current holder..."
             />
             <p className="text-[10px] text-muted-foreground">
@@ -747,7 +774,7 @@ export default function TransferOrReturnForm({
               id="transfered_to"
               users={combinedUsers}
               userId={form.transfered_to}
-              onSelectUser={(id) => setForm((prev) => ({ ...prev, transfered_to: id }))}
+              onSelectUser={(id) => handleFieldChange({ transfered_to: id })}
               placeholder={
                 form.transfer_type === 'RETURN'
                   ? 'Search warehouse receiving officer...'
@@ -775,9 +802,12 @@ export default function TransferOrReturnForm({
                   id="new_mr_id"
                   users={combinedUsers}
                   userId={form.new_mr_id}
-                  onSelectUser={(id) => setForm((prev) => ({ ...prev, new_mr_id: id }))}
+                  onSelectUser={(id) => handleFieldChange({ new_mr_id: id })}
                   placeholder="Search new MR..."
                 />
+                <p className="text-[10px] text-muted-foreground">
+                  Also used as the receipt’s Issued By & Received MR.
+                </p>
               </div>
             </>
           )}
@@ -796,7 +826,7 @@ export default function TransferOrReturnForm({
               required
               placeholder="e.g., Laptop reassignment, unit relocation"
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onChange={(e) => handleFieldChange({ description: e.target.value })}
               className="h-8 text-xs bg-card border-border"
             />
           </div>
@@ -816,7 +846,7 @@ export default function TransferOrReturnForm({
                   : 'e.g., Departmental Reassignment'
               }
               value={form.reason}
-              onChange={(e) => setForm({ ...form, reason: e.target.value })}
+              onChange={(e) => handleFieldChange({ reason: e.target.value })}
               className="h-8 text-xs bg-card border-border"
             />
           </div>
@@ -830,7 +860,7 @@ export default function TransferOrReturnForm({
             <TransferDatePicker
               id="transfer_date"
               value={form.transfer_date}
-              onChange={(date) => setForm({ ...form, transfer_date: date })}
+              onChange={(date) => handleFieldChange({ transfer_date: date })}
             />
           </div>
 
@@ -845,7 +875,7 @@ export default function TransferOrReturnForm({
               type="text"
               placeholder="Optional additional context..."
               value={form.remarks}
-              onChange={(e) => setForm({ ...form, remarks: e.target.value })}
+              onChange={(e) => handleFieldChange({ remarks: e.target.value })}
               className="h-8 text-xs bg-card border-border"
             />
           </div>

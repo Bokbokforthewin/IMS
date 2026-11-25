@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { createPortal } from "react-dom";
+import { ArrowUp } from "lucide-react";
 
 import { useAuth } from "./context/AuthContext";
 import api from "./api/client";
@@ -26,14 +28,64 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 
 export default function App() {
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, settings } = useAuth();
 
   const [activeTab, setActiveTab] = useState("dashboard-overview");
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
   const [stockBatches, setStockBatches] = useState([]);
   const [serializedAssets, setSerializedAssets] = useState([]);
+
+  const simplified = Boolean(settings?.simplified_encoding_workflow);
+
+  const getDefaultAllowedTab = useCallback(() => {
+    if (!user) return "dashboard-overview";
+    if (hasPermission("view:dashboard_page")) return "dashboard-overview";
+
+    const candidates = [
+      { perm: "view:quick_receive_page", tab: "quick-receive-form", allowed: simplified },
+      { perm: "view:catalog_page", tab: "catalog-items", allowed: !simplified },
+      { perm: "view:receiving_page", tab: "receive-single", allowed: !simplified },
+      { perm: "view:consumables_page", tab: "consumables-issue", allowed: true },
+      { perm: "view:assets_page", tab: "accountability-list", allowed: true },
+      { perm: "view:reports_page", tab: "reports-overview", allowed: true },
+      { perm: "view:audit_trail_page", tab: "audit-logs", allowed: true },
+      { perm: "action:manage users", tab: "admin-users", allowed: true },
+    ];
+
+    const match = candidates.find((c) => c.allowed && hasPermission(c.perm));
+    return match ? match.tab : "dashboard-overview";
+  }, [user, hasPermission, simplified]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const tabPermissionMap = {
+      dashboard: "view:dashboard_page",
+      "quick-receive": "view:quick_receive_page",
+      catalog: "view:catalog_page",
+      receive: "view:receiving_page",
+      consumables: "view:consumables_page",
+      accountability: "view:assets_page",
+      "transfer-return": "view:assets_page",
+      admin: "action:manage users",
+      audit: "view:audit_trail_page",
+      reports: "view:reports_page",
+    };
+
+    const currentRequiredPerm = Object.entries(tabPermissionMap).find(([prefix]) =>
+      activeTab.startsWith(prefix)
+    )?.[1];
+
+    if (currentRequiredPerm && !hasPermission(currentRequiredPerm)) {
+      const nextTab = getDefaultAllowedTab();
+      if (nextTab !== activeTab) {
+        setActiveTab(nextTab);
+      }
+    }
+  }, [user, activeTab, hasPermission, getDefaultAllowedTab]);
 
   const [categoryForm, setCategoryForm] = useState({
     name: "",
@@ -68,6 +120,40 @@ export default function App() {
     date_issued: "",
     remarks: "",
   });
+
+  useEffect(() => {
+    const checkScroll = () => {
+      const hasWindowScroll = window.scrollY > 120;
+      const hasElementScroll = [...document.querySelectorAll("*")].some(
+        (el) => el.scrollTop > 120
+      );
+      setShowScrollTop(hasWindowScroll || hasElementScroll);
+    };
+
+    window.addEventListener("scroll", checkScroll, { passive: true });
+    document.addEventListener("scroll", checkScroll, {
+      capture: true,
+      passive: true,
+    });
+    checkScroll();
+
+    return () => {
+      window.removeEventListener("scroll", checkScroll);
+      document.removeEventListener("scroll", checkScroll, { capture: true });
+    };
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+    document.body.scrollTo({ top: 0, behavior: "smooth" });
+
+    document.querySelectorAll("*").forEach((el) => {
+      if (el.scrollTop > 0) {
+        el.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    });
+  };
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -171,7 +257,7 @@ export default function App() {
       );
     }
 
-   if (activeTab.startsWith("quick-receive")) {
+    if (activeTab.startsWith("quick-receive")) {
       if (!hasPermission("view:quick_receive_page")) return <AccessDenied />;
       return (
         <QuickReceivePage
@@ -324,6 +410,30 @@ export default function App() {
           element={<Navigate to="/login" replace />}
         />
       </Routes>
+
+      {showScrollTop &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <button
+            type="button"
+            onClick={scrollToTop}
+            aria-label="Scroll back to top"
+            title="Back to top"
+            style={{
+              position: "fixed",
+              right: "24px",
+              bottom: "24px",
+              width: "38px",
+              height: "38px",
+              borderRadius: "9999px",
+              zIndex: 2147483647,
+            }}
+            className="flex items-center justify-center border border-border bg-card text-foreground shadow-lg hover:bg-muted cursor-pointer"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </button>,
+          document.body
+        )}
     </>
   );
 }

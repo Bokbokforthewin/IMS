@@ -11,9 +11,8 @@ use Spatie\Permission\PermissionRegistrar;
 
 class UserController extends Controller
 {
-    /**
-     * Get all users with their assigned roles and direct permissions.
-     */
+    protected string $guard = 'sanctum';
+
     public function index()
     {
         $users = User::with([
@@ -32,7 +31,6 @@ class UserController extends Controller
             ->orderBy('name')
             ->get()
             ->map(function ($user) {
-                // Include aggregated permissions (Role permissions + Direct user permissions)
                 $user->all_permissions = $user->getAllPermissions()->pluck('name');
                 return $user;
             });
@@ -43,9 +41,6 @@ class UserController extends Controller
         ]);
     }
 
-    /**
-     * Get a single user together with all available roles and permissions.
-     */
     public function show(User $user)
     {
         $user->load([
@@ -57,19 +52,29 @@ class UserController extends Controller
             'user' => $user,
             'all_permissions' => $user->getAllPermissions()->pluck('name'),
             'roles' => Role::query()
-                ->where('guard_name', 'sanctum')
+                ->where('guard_name', $this->guard)
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'permissions' => Permission::query()
-                ->where('guard_name', 'sanctum')
+                ->where('guard_name', $this->guard)
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]);
     }
 
-    /**
-     * Get lightweight user list for dropdown select options.
-     */
+    public function getRoles()
+    {
+        $roles = Role::query()
+            ->where('guard_name', $this->guard)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $roles,
+        ]);
+    }
+
     public function options(): \Illuminate\Http\JsonResponse
     {
         try {
@@ -91,9 +96,16 @@ class UserController extends Controller
         }
     }
 
-    /**
-     * Update user roles.
-     */
+    protected function isLastSuperAdmin(User $targetUser): bool
+    {
+        if (!$targetUser->hasRole('super_admin')) {
+            return false;
+        }
+
+        $superAdminCount = User::role('super_admin', $this->guard)->count();
+        return $superAdminCount <= 1;
+    }
+
     public function updateRoles(Request $request, User $user)
     {
         $validated = $request->validate([
@@ -101,9 +113,36 @@ class UserController extends Controller
             'roles.*' => 'string|exists:roles,name',
         ]);
 
-        $user->syncRoles($validated['roles'] ?? []);
+        $actor = $request->user();
+        $newRoles = array_values(array_unique($validated['roles'] ?? []));
 
-        // Reset Spatie Cache
+        if ($actor && !$actor->hasRole('super_admin')) {
+            $actorRoleNames = $actor->getRoleNames()->toArray();
+            $disallowedRoles = array_diff($newRoles, $actorRoleNames);
+            if (!empty($disallowedRoles)) {
+                return response()->json([
+                    'error' => 'You cannot assign roles that you do not hold yourself.',
+                ], 403);
+            }
+        }
+
+        if ($actor && (int) $actor->id === (int) $user->id) {
+            $currentRoles = $user->getRoleNames()->toArray();
+            if (sort($currentRoles) !== sort($newRoles) || $currentRoles !== $newRoles) {
+                return response()->json([
+                    'error' => 'You cannot modify or demote your own roles.',
+                ], 403);
+            }
+        }
+
+        if ($user->hasRole('super_admin') && !in_array('super_admin', $newRoles, true) && $this->isLastSuperAdmin($user)) {
+            return response()->json([
+                'error' => 'Cannot remove the super_admin role from the last super_admin user.',
+            ], 422);
+        }
+
+        $user->syncRoles($newRoles);
+
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         return response()->json([
@@ -112,9 +151,6 @@ class UserController extends Controller
         ]);
     }
 
-    /**
-     * Update direct user permissions.
-     */
     public function updatePermissions(Request $request, User $user)
     {
         $validated = $request->validate([
@@ -122,9 +158,25 @@ class UserController extends Controller
             'permissions.*' => 'string|exists:permissions,name',
         ]);
 
-        $user->syncPermissions($validated['permissions'] ?? []);
+        $actor = $request->user();
+        $newPermissions = array_values(array_unique($validated['permissions'] ?? []));
 
-        // Reset Spatie Cache
+        if ($actor && !$actor->hasRole('super_admin')) {
+            $actorPermissions = $actor->getAllPermissions()->pluck('name')->toArray();
+            $disallowedPermissions = array_diff($newPermissions, $actorPermissions);
+            if (!empty($disallowedPermissions)) {
+                return response()->json([
+                    'error' => 'You cannot grant permissions that you do not possess yourself.',
+                ], 403);
+            }
+        }
+
+        // Strip any permissions already granted by the user's assigned roles so only true direct overrides remain
+        $roleGrantedPermissions = $user->getPermissionsViaRoles()->pluck('name')->toArray();
+        $directOnlyPermissions = array_values(array_diff($newPermissions, $roleGrantedPermissions));
+
+        $user->syncPermissions($directOnlyPermissions);
+
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         return response()->json([
@@ -133,9 +185,6 @@ class UserController extends Controller
         ]);
     }
 
-    /**
-     * Create a new user.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -146,11 +195,37 @@ class UserController extends Controller
             'division' => 'nullable|string|max:255',
             'designation' => 'nullable|string|max:255',
             'is_head' => 'sometimes|boolean',
+            'role' => 'nullable|string|exists:roles,name',
         ]);
 
-        $validated['password'] = bcrypt($validated['password']);
+        $actor = $request->user();
+        $requestedRole = $validated['role'] ?? 'end_user';
 
-        $user = User::create($validated);
+        if ($actor && !$actor->hasRole('super_admin')) {
+            $actorRoles = $actor->getRoleNames()->toArray();
+            if (!in_array($requestedRole, $actorRoles, true)) {
+                return response()->json([
+                    'error' => 'You cannot assign a role that you do not hold yourself.',
+                ], 403);
+            }
+        }
+
+        $userData = collect($validated)->except('role')->toArray();
+        $userData['password'] = bcrypt($userData['password']);
+        $userData['unit'] = $userData['unit'] ?? '';
+        $userData['division'] = $userData['division'] ?? '';
+        $userData['designation'] = $userData['designation'] ?? '';
+
+        $user = User::create($userData);
+
+        $defaultRole = Role::where('name', $requestedRole)->where('guard_name', $this->guard)->first()
+            ?? Role::where('name', 'end_user')->where('guard_name', $this->guard)->first();
+
+        if ($defaultRole) {
+            $user->assignRole($defaultRole);
+        }
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         return response()->json([
             'message' => 'User created successfully.',
@@ -158,9 +233,6 @@ class UserController extends Controller
         ], 201);
     }
 
-    /**
-     * Update basic user information.
-     */
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
@@ -173,7 +245,6 @@ class UserController extends Controller
             'password' => 'nullable|string|min:8',
         ]);
 
-        // Ensure non-nullable columns get empty strings instead of null
         $validated['unit'] = $validated['unit'] ?? '';
         $validated['division'] = $validated['division'] ?? '';
         $validated['designation'] = $validated['designation'] ?? '';
@@ -191,11 +262,23 @@ class UserController extends Controller
             'user' => $user->fresh(['roles', 'permissions']),
         ]);
     }
-    /**
-     * Delete a user.
-     */
-    public function destroy(User $user)
+
+    public function destroy(Request $request, User $user)
     {
+        $actor = $request->user();
+
+        if ($actor && (int) $actor->id === (int) $user->id) {
+            return response()->json([
+                'error' => 'You cannot delete your own account.',
+            ], 403);
+        }
+
+        if ($this->isLastSuperAdmin($user)) {
+            return response()->json([
+                'error' => 'Cannot delete the last super_admin account.',
+            ], 422);
+        }
+
         $user->delete();
 
         return response()->json([

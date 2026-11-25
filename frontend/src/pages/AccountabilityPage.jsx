@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Check, ChevronRight, RefreshCw, AlertCircle, ArrowUp } from 'lucide-react';
 import api from '@/api/client';
+import { createPortal } from 'react-dom';
 
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import AssetCatalogBrowse from '../components/assets/AssetCatalogBrowse.jsx';
 import DeliveryForm from '../components/assets/DeliveryForm.jsx';
 import CartReview from '../components/assets/CartReview.jsx';
 import AccountabilityReceiptsTable from '../components/assets/AccountabilityReceiptsTable.jsx';
-import { Badge } from '@/components/ui/badge';
-import { Check, ChevronRight } from 'lucide-react';
 
 // Helper to extract clean numeric unit cost
 function parseCost(asset) {
@@ -18,12 +21,29 @@ export default function AccountabilityPage({ activeTab, handleApiCall }) {
   // Wizard steps: 'browse' -> 'delivery' -> 'review'
   const [step, setStep] = useState('browse');
   const [catalog, setCatalog] = useState({ assets: [], serialized: [], non_serialized: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [cart, setCart] = useState([]);
   const [deliveryDetails, setDeliveryDetails] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
+    document.body.scrollTo({ top: 0, behavior: 'smooth' });
+
+    const allElements = document.querySelectorAll('*');
+    allElements.forEach((el) => {
+      if (el.scrollTop > 0) {
+        el.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+  };
+
   // Fetch available asset catalog directly using Axios client
   const fetchCatalog = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const response = await api.get('/v1/accountability/available-for-cart');
       const data = response.data?.data || response.data;
@@ -32,6 +52,11 @@ export default function AccountabilityPage({ activeTab, handleApiCall }) {
       }
     } catch (err) {
       console.error('Failed to load accountability catalog:', err);
+      setError(
+        err.response?.data?.message || err.message || 'Failed to load accountability catalog.'
+      );
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -143,6 +168,51 @@ export default function AccountabilityPage({ activeTab, handleApiCall }) {
     { id: 'review', label: 'Review & Issue' },
   ];
 
+  const getPageTitle = () => {
+    if (activeTab === 'accountability-assign') return 'Asset Accountability Assignment';
+    if (activeTab === 'accountability-list') return 'Accountability Receipts Registry';
+    return 'Asset Accountability & Custodianship';
+  };
+
+  const getPageDescription = () => {
+    if (activeTab === 'accountability-assign')
+      return 'Issue assets to designated personnel, pair equipment sets, and generate PAR/ICS receipts.';
+    if (activeTab === 'accountability-list')
+      return 'View, filter, and manage active asset accountability receipts and issued equipment.';
+    return 'Manage equipment allocation, custodian assignments, and accountability receipt records.';
+  };
+
+  const renderSkeleton = () => (
+    <div className="flex flex-col gap-6">
+      {/* Stepper Skeleton */}
+      <Skeleton className="h-14 w-full rounded-lg" />
+
+      {/* Filter & Search Bar Skeleton */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Skeleton className="h-10 w-full sm:w-72 rounded-lg" />
+        <div className="flex gap-2">
+          <Skeleton className="h-10 w-28 rounded-lg" />
+          <Skeleton className="h-10 w-28 rounded-lg" />
+        </div>
+      </div>
+
+      {/* Catalog Grid Skeleton */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-44 w-full rounded-xl" />
+        ))}
+      </div>
+
+      {/* Receipts Table Skeleton when showing registry */}
+      {activeTab !== 'accountability-assign' && (
+        <div className="space-y-3 pt-4 border-t border-border">
+          <Skeleton className="h-6 w-56 rounded-md" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      )}
+    </div>
+  );
+
   const renderWizardContent = () => (
     <div className="space-y-6">
       {/* Wizard Progress Stepper */}
@@ -210,22 +280,8 @@ export default function AccountabilityPage({ activeTab, handleApiCall }) {
     </div>
   );
 
-  const getPageTitle = () => {
-    if (activeTab === 'accountability-assign') return 'Asset Accountability Assignment';
-    if (activeTab === 'accountability-list') return 'Accountability Receipts Registry';
-    return 'Asset Accountability & Custodianship';
-  };
-
-  const getPageDescription = () => {
-    if (activeTab === 'accountability-assign')
-      return 'Issue assets to designated personnel, pair equipment sets, and generate PAR/ICS receipts.';
-    if (activeTab === 'accountability-list')
-      return 'View, filter, and manage active asset accountability receipts and issued equipment.';
-    return 'Manage equipment allocation, custodian assignments, and accountability receipt records.';
-  };
-
   return (
-    <div className="space-y-6 p-4">
+    <div className="space-y-6 p-4 min-w-0 w-full">
       {/* Prominent Page Header */}
       <div>
         <h2 className="text-xl font-bold tracking-tight text-foreground">
@@ -236,21 +292,50 @@ export default function AccountabilityPage({ activeTab, handleApiCall }) {
         </p>
       </div>
 
-      {/* View Routing */}
-      {activeTab ? (
+      {/* Loading Skeleton */}
+      {loading && renderSkeleton()}
+
+      {/* Error Alert with Retry button */}
+      {!loading && error && (
+        <Alert
+          variant="destructive"
+          className="max-w-xl mx-auto border-destructive-border bg-destructive-soft text-destructive-text"
+        >
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error Loading Accountability Data</AlertTitle>
+          <AlertDescription className="mt-2 flex flex-col gap-4">
+            <p className="text-xs">{error}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchCatalog}
+              className="w-fit gap-2 text-xs border-border bg-card"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Try Again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Loaded Content */}
+      {!loading && !error && (
         <>
-          {activeTab === 'accountability-assign' && renderWizardContent()}
-          {activeTab === 'accountability-list' && (
-            <AccountabilityReceiptsTable refreshKey={refreshKey} />
+          {activeTab ? (
+            <>
+              {activeTab === 'accountability-assign' && renderWizardContent()}
+              {activeTab === 'accountability-list' && (
+                <AccountabilityReceiptsTable refreshKey={refreshKey} />
+              )}
+            </>
+          ) : (
+            /* Standalone mode: Render wizard and receipts table together */
+            <>
+              {renderWizardContent()}
+              <div className="pt-6 border-t border-border">
+                <AccountabilityReceiptsTable refreshKey={refreshKey} />
+              </div>
+            </>
           )}
-        </>
-      ) : (
-        /* Standalone mode: Render wizard and receipts table together */
-        <>
-          {renderWizardContent()}
-          <div className="pt-6 border-t border-border">
-            <AccountabilityReceiptsTable refreshKey={refreshKey} />
-          </div>
         </>
       )}
     </div>

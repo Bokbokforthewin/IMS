@@ -10,6 +10,7 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\JsonResponse;
 
 class InventoryController extends Controller
@@ -346,7 +347,7 @@ class InventoryController extends Controller
             $perPage = (int) $request->input('per_page', 20);
 
             // --- Consumables (stock batches) ---
-            $batchesQuery = StockBatch::with('item:id,name,item_code,unit_of_measure,image_path');
+            $batchesQuery = StockBatch::with('item.category');
 
             if ($itemId) {
                 $batchesQuery->where('item_id', $itemId);
@@ -360,25 +361,31 @@ class InventoryController extends Controller
 
             $batches = (!$type || $type === 'Consumable')
                 ? $batchesQuery->get()->map(function ($b) {
+                    $item = $b->item;
                     return [
                         'type' => 'Consumable',
                         'id' => $b->id,
                         'item_id' => $b->item_id,
-                        'item_name' => $b->item->name ?? 'N/A',
-                        'item_code' => $b->item->item_code ?? 'N/A',
-                        'item_image_url' => $b->item?->image_url,
-                        'unit_of_measure' => $b->item->unit_of_measure ?? null,
+                        'category_id' => $item?->category_id,
+                        'category_name' => $item?->category?->name,
+                        'item_name' => $item?->name ?? 'N/A',
+                        'item_code' => $item?->item_code ?? 'N/A',
+                        'brand' => $item?->brand,
+                        'specifications' => $item?->specifications,
+                        'reorder_level' => $item?->reorder_level,
+                        'item_image_url' => $item?->image_url,
+                        'unit_of_measure' => $item?->unit_of_measure ?? null,
                         'reference_no' => $b->iar_number,
                         'quantity' => $b->quantity_on_hand,
                         'unit_cost' => (float) $b->unit_cost,
                         'total_cost' => round((float) $b->quantity_on_hand * (float) $b->unit_cost, 2),
-                        'received_at' => $b->created_at,
+                        'received_at' => $b->received_date ?? $b->created_at,
                     ];
                 })
                 : collect();
 
             // --- Serialized Assets ---
-            $assetsQuery = SerializedAsset::with('item:id,name,item_code,unit_of_measure,estimated_useful_life,image_path');
+            $assetsQuery = SerializedAsset::with('item.category');
             if ($itemId) {
                 $assetsQuery->where('item_id', $itemId);
             }
@@ -391,22 +398,30 @@ class InventoryController extends Controller
 
             $assets = (!$type || $type === 'Asset')
                 ? $assetsQuery->get()->map(function ($a) {
+                    $item = $a->item;
                     return [
                         'type' => 'Asset',
                         'id' => $a->id,
                         'item_id' => $a->item_id,
-                        'item_name' => $a->item->name ?? 'N/A',
-                        'item_code' => $a->item->item_code ?? 'N/A',
-                        'item_image_url' => $a->item?->image_url,
-                        'unit_of_measure' => $a->item->unit_of_measure ?? null,
+                        'category_id' => $item?->category_id,
+                        'category_name' => $item?->category?->name,
+                        'item_name' => $item?->name ?? 'N/A',
+                        'item_code' => $item?->item_code ?? 'N/A',
+                        'brand' => $item?->brand,
+                        'specifications' => $item?->specifications,
+                        'item_image_url' => $item?->image_url,
+                        'unit_of_measure' => $item?->unit_of_measure ?? null,
                         'reference_no' => $a->property_number,
+                        'property_number' => $a->property_number,
                         'ppe_number' => $a->ppe_number,
                         'attached_to' => $a->attached_to,
                         'serial_number' => $a->serial_number,
                         'model' => $a->model,
                         'manufacturer_name' => $a->manufacturer_name,
                         'country_of_origin' => $a->country_of_origin,
-                        'estimated_useful_life' => $a->item->estimated_useful_life ?? null,
+                        'estimated_useful_life' => $item?->estimated_useful_life ?? null,
+                        'assign_property_number' => (bool) $a->property_number,
+                        'track_serial_numbers' => (bool) $a->serial_number,
                         'quantity' => 1,
                         'unit_cost' => (float) $a->unit_cost,
                         'total_cost' => (float) $a->unit_cost,
@@ -440,24 +455,81 @@ class InventoryController extends Controller
     }
 
     /**
-     * Update an existing consumable stock batch (correction, not a new receipt).
+     * Update an existing consumable stock batch and its catalog item details.
      */
     public function updateStockBatch(Request $request, StockBatch $stockBatch)
     {
         $validated = $request->validate([
-            'iar_number' => 'required|string|max:255',
-            'received_date' => 'required|date',
-            'quantity_on_hand' => 'required|integer|min:0',
+            'iar_number' => 'nullable|string|max:255',
+            'received_date' => 'nullable|date',
+            'arrival_date' => 'nullable|date',
+            'quantity_on_hand' => 'nullable|integer|min:0',
+            'quantity' => 'nullable|integer|min:0',
             'unit_cost' => 'required|numeric|min:0',
+            'category_id' => 'nullable|exists:categories,id',
+            'brand' => 'nullable|string|max:255',
+            'specifications' => 'nullable|string|max:255',
+            'unit_of_measure' => 'nullable|string|max:50',
+            'reorder_level' => 'nullable|integer|min:0',
+            'remove_photo' => 'nullable|boolean',
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
         try {
-            $stockBatch->update($validated);
+            return DB::transaction(function () use ($request, $validated, $stockBatch) {
+                $receivedDate = $validated['received_date']
+                    ?? $validated['arrival_date']
+                    ?? ($stockBatch->received_date ? $stockBatch->received_date->format('Y-m-d') : date('Y-m-d'));
 
-            return response()->json([
-                'message' => 'Stock batch updated successfully.',
-                'batch' => $stockBatch->fresh('item'),
-            ], 200);
+                $quantityOnHand = $validated['quantity_on_hand']
+                    ?? $validated['quantity']
+                    ?? $stockBatch->quantity_on_hand;
+
+                $batchUpdates = [
+                    'received_date' => $receivedDate,
+                    'quantity_on_hand' => $quantityOnHand,
+                    'unit_cost' => $validated['unit_cost'],
+                ];
+                if (!empty($validated['iar_number'])) {
+                    $batchUpdates['iar_number'] = $validated['iar_number'];
+                }
+
+                $stockBatch->update($batchUpdates);
+
+                $item = $stockBatch->item;
+                if ($item) {
+                    $itemUpdates = array_filter([
+                        'category_id' => $validated['category_id'] ?? null,
+                        'brand' => array_key_exists('brand', $validated) ? $validated['brand'] : null,
+                        'specifications' => array_key_exists('specifications', $validated) ? $validated['specifications'] : null,
+                        'unit_of_measure' => $validated['unit_of_measure'] ?? null,
+                        'reorder_level' => $validated['reorder_level'] ?? null,
+                    ], fn ($v) => !is_null($v));
+
+                    if ($request->boolean('remove_photo')) {
+                        if ($item->image_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($item->image_path)) {
+                            \Illuminate\Support\Facades\Storage::disk('public')->delete($item->image_path);
+                        }
+                        $itemUpdates['image_path'] = null;
+                    }
+
+                    if ($request->hasFile('photo')) {
+                        if ($item->image_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($item->image_path)) {
+                            \Illuminate\Support\Facades\Storage::disk('public')->delete($item->image_path);
+                        }
+                        $itemUpdates['image_path'] = $request->file('photo')->store('items', 'public');
+                    }
+
+                    if (!empty($itemUpdates)) {
+                        $item->update($itemUpdates);
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Stock batch updated successfully.',
+                    'batch' => $stockBatch->fresh('item.category'),
+                ], 200);
+            });
         } catch (\Exception $e) {
             Log::error('Failed to update stock batch: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to update stock batch.'], 500);
@@ -486,23 +558,171 @@ class InventoryController extends Controller
     }
 
     /**
-     * Update an existing serialized asset (correction, not a new receipt).
+     * Update an existing serialized asset and its catalog item details.
+     * - When edit_mode === 'shared', shared catalog fields (and unit_cost) are applied across target_ids.
+     * - Property number is auto-generated if assign_property_number is enabled and none exists yet.
      */
     public function updateSerializedAsset(Request $request, SerializedAsset $serializedAsset)
     {
         $validated = $request->validate([
             'serial_number' => 'nullable|string|max:255|unique:serialized_assets,serial_number,' . $serializedAsset->id,
             'model' => 'nullable|string|max:255',
+            'manufacturer_name' => 'nullable|string|max:255',
+            'country_of_origin' => 'nullable|string|max:255',
             'unit_cost' => 'required|numeric|min:0',
+            'received_date' => 'nullable|date',
+            'arrival_date' => 'nullable|date',
+            'category_id' => 'nullable|exists:categories,id',
+            'brand' => 'nullable|string|max:255',
+            'specifications' => 'nullable|string|max:255',
+            'unit_of_measure' => 'nullable|string|max:50',
+            'assign_property_number' => 'nullable',
+            'track_serial_numbers' => 'nullable',
+            'remove_photo' => 'nullable|boolean',
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'edit_mode' => 'nullable|in:single,shared',
+            'target_ids' => 'nullable|array',
+            'target_ids.*' => 'integer|exists:serialized_assets,id',
         ]);
 
         try {
-            $serializedAsset->update($validated);
+            return DB::transaction(function () use ($request, $validated, $serializedAsset) {
+                $isShared = ($validated['edit_mode'] ?? 'single') === 'shared';
+                $targetIds = collect($validated['target_ids'] ?? [$serializedAsset->id])
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values()
+                    ->all();
 
-            return response()->json([
-                'message' => 'Serialized asset updated successfully.',
-                'asset' => $serializedAsset->fresh('item'),
-            ], 200);
+                if (!in_array((int) $serializedAsset->id, $targetIds, true)) {
+                    array_unshift($targetIds, (int) $serializedAsset->id);
+                }
+
+                $assets = SerializedAsset::with('item.category')
+                    ->whereIn('id', $targetIds)
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($assets->isEmpty()) {
+                    $assets = collect([
+                        SerializedAsset::with('item.category')
+                            ->whereKey($serializedAsset->id)
+                            ->lockForUpdate()
+                            ->firstOrFail(),
+                    ]);
+                }
+
+                $primaryAsset = $assets->firstWhere('id', $serializedAsset->id) ?? $assets->first();
+                $dateRef = $validated['received_date'] ?? $validated['arrival_date'] ?? now()->toDateString();
+                $year = date('Y', strtotime($dateRef));
+
+                if ($isShared) {
+                    $sharedAssetUpdates = [
+                        'unit_cost' => $validated['unit_cost'],
+                    ];
+
+                    if (array_key_exists('model', $validated)) {
+                        $sharedAssetUpdates['model'] = $validated['model'];
+                    }
+                    if (array_key_exists('manufacturer_name', $validated)) {
+                        $sharedAssetUpdates['manufacturer_name'] = $validated['manufacturer_name'];
+                    }
+                    if (array_key_exists('country_of_origin', $validated)) {
+                        $sharedAssetUpdates['country_of_origin'] = $validated['country_of_origin'];
+                    }
+
+                    $assignProp = array_key_exists('assign_property_number', $validated)
+                        ? filter_var($validated['assign_property_number'], FILTER_VALIDATE_BOOLEAN)
+                        : null;
+
+                    $trackSerial = array_key_exists('track_serial_numbers', $validated)
+                        ? filter_var($validated['track_serial_numbers'], FILTER_VALIDATE_BOOLEAN)
+                        : null;
+
+                    foreach ($assets as $asset) {
+                        $rowUpdates = $sharedAssetUpdates;
+
+                        if ($assignProp === true && !$asset->property_number) {
+                            $nextSeq = $this->nextPropertySequence(true, $year);
+                            $rowUpdates['property_number'] = sprintf('DOH NIR-%s-%04d', $year, $nextSeq);
+                        } elseif ($assignProp === false) {
+                            $rowUpdates['property_number'] = null;
+                        }
+
+                        if ($trackSerial === false) {
+                            $rowUpdates['serial_number'] = null;
+                        }
+
+                        $asset->update($rowUpdates);
+                    }
+                } else {
+                    $assignProp = filter_var(
+                        $validated['assign_property_number'] ?? (bool) $primaryAsset->property_number,
+                        FILTER_VALIDATE_BOOLEAN
+                    );
+                    $trackSerial = filter_var(
+                        $validated['track_serial_numbers'] ?? (bool) $primaryAsset->serial_number,
+                        FILTER_VALIDATE_BOOLEAN
+                    );
+
+                    $propertyNumber = $primaryAsset->property_number;
+                    if ($assignProp && !$propertyNumber) {
+                        $nextSeq = $this->nextPropertySequence(true, $year);
+                        $propertyNumber = sprintf('DOH NIR-%s-%04d', $year, $nextSeq);
+                    } elseif (!$assignProp) {
+                        $propertyNumber = null;
+                    }
+
+                    $primaryAsset->update([
+                        'property_number' => $propertyNumber,
+                        'serial_number' => $trackSerial
+                            ? (array_key_exists('serial_number', $validated) ? $validated['serial_number'] : $primaryAsset->serial_number)
+                            : null,
+                        'model' => array_key_exists('model', $validated) ? $validated['model'] : $primaryAsset->model,
+                        'manufacturer_name' => array_key_exists('manufacturer_name', $validated) ? $validated['manufacturer_name'] : $primaryAsset->manufacturer_name,
+                        'country_of_origin' => array_key_exists('country_of_origin', $validated) ? $validated['country_of_origin'] : $primaryAsset->country_of_origin,
+                        'unit_cost' => $validated['unit_cost'],
+                    ]);
+                }
+
+                // Update shared catalog item(s) when in shared mode or on the primary asset's item
+                $itemsToUpdate = $isShared
+                    ? $assets->pluck('item')->filter()->unique('id')
+                    : collect([$primaryAsset->item])->filter();
+
+                $shouldRemovePhoto = $request->boolean('remove_photo');
+                $hasNewPhoto = $request->hasFile('photo');
+                $storedPhotoPath = null;
+
+                if ($hasNewPhoto) {
+                    $storedPhotoPath = $request->file('photo')->store('items', 'public');
+                }
+
+                foreach ($itemsToUpdate as $item) {
+                    $itemUpdates = array_filter([
+                        'category_id' => $validated['category_id'] ?? null,
+                        'brand' => array_key_exists('brand', $validated) ? $validated['brand'] : null,
+                        'specifications' => array_key_exists('specifications', $validated) ? $validated['specifications'] : null,
+                        'unit_of_measure' => $validated['unit_of_measure'] ?? null,
+                    ], fn ($v) => !is_null($v));
+
+                    if ($shouldRemovePhoto || $hasNewPhoto) {
+                        if ($item->image_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($item->image_path)) {
+                            \Illuminate\Support\Facades\Storage::disk('public')->delete($item->image_path);
+                        }
+                        $itemUpdates['image_path'] = $hasNewPhoto ? $storedPhotoPath : null;
+                    }
+
+                    if (!empty($itemUpdates)) {
+                        $item->update($itemUpdates);
+                    }
+                }
+
+                return response()->json([
+                    'message' => 'Serialized asset updated successfully.',
+                    'asset' => $primaryAsset->fresh('item.category'),
+                ], 200);
+            });
         } catch (\Exception $e) {
             Log::error('Failed to update serialized asset: ' . $e->getMessage());
             return response()->json(['error' => 'Failed to update serialized asset.'], 500);
@@ -611,5 +831,25 @@ class InventoryController extends Controller
                 'asset'   => $asset->fresh(['item', 'currentHolder']),
             ], 200);
         });
+    }
+
+    private function nextPropertySequence(bool $hasPropertyNumber, string $year): int
+    {
+        if (!$hasPropertyNumber) {
+            return 1;
+        }
+
+        $lastProperty = SerializedAsset::whereNotNull('property_number')
+            ->whereYear('created_at', $year)
+            ->orderBy('id', 'desc')
+            ->lockForUpdate()
+            ->first();
+
+        if ($lastProperty && $lastProperty->property_number) {
+            $parts = explode('-', $lastProperty->property_number);
+            return intval(end($parts)) + 1;
+        }
+
+        return 1;
     }
 }

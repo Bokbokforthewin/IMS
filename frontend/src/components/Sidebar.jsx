@@ -205,18 +205,18 @@ export default function Sidebar({
     })
     .map((item) => {
       const hasParentPerm = hasPermission(item.permission);
+      if (!hasParentPerm) {
+        return null;
+      }
+
       const allowedSubItems = (item.subItems || []).filter(
         (subItem) => !subItem.permission || hasPermission(subItem.permission)
       );
 
-      if (hasParentPerm || allowedSubItems.length > 0) {
-        return {
-          ...item,
-          subItems: allowedSubItems,
-        };
-      }
-
-      return null;
+      return {
+        ...item,
+        subItems: allowedSubItems,
+      };
     })
     .filter(Boolean);
 

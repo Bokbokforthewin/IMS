@@ -13,14 +13,19 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Search, RotateCcw, Calendar as CalendarIcon, Package, Eye, History, Pencil, Trash2 } from 'lucide-react';
 import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+  Search,
+  RotateCcw,
+  Calendar as CalendarIcon,
+  Package,
+  Eye,
+  History,
+  Pencil,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  Layers,
+} from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -34,6 +39,10 @@ function money(n) {
   return `₱${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 }
 
+function getRowKey(row) {
+  return `${row.type}-${row.id}`;
+}
+
 function groupHistory(history) {
   if (!Array.isArray(history)) return [];
 
@@ -44,29 +53,63 @@ function groupHistory(history) {
     }
   });
 
-  const childIds = new Set();
+  const attachedChildKeys = new Set();
+  const attachedByParentKey = {};
+
   history.forEach((row) => {
     if (row.type === 'Asset' && row.attached_to && byReference[row.attached_to]) {
-      childIds.add(`${row.type}-${row.id}`);
+      const parent = byReference[row.attached_to];
+      const pKey = getRowKey(parent);
+      attachedChildKeys.add(getRowKey(row));
+      if (!attachedByParentKey[pKey]) attachedByParentKey[pKey] = [];
+      attachedByParentKey[pKey].push(row);
     }
   });
 
-  const primaries = history.filter((row) => !childIds.has(`${row.type}-${row.id}`));
+  const standaloneRows = history.filter((row) => !attachedChildKeys.has(getRowKey(row)));
 
-  return primaries.map((primary) => ({
-    primary,
-    children:
-      primary.type === 'Asset' && primary.reference_no
-        ? history.filter(
-            (r) => r.type === 'Asset' && r.attached_to === primary.reference_no
-          )
-        : [],
-  }));
+  const bucketMap = new Map();
+  standaloneRows.forEach((row) => {
+    const groupKey = `${row.type}-${row.item_id || row.item_code || row.item_name}`;
+    if (!bucketMap.has(groupKey)) {
+      bucketMap.set(groupKey, []);
+    }
+    bucketMap.get(groupKey).push(row);
+  });
+
+  const groups = [];
+  bucketMap.forEach((rows) => {
+    const primary = rows[0];
+    const primaryKey = getRowKey(primary);
+    const siblings = rows.slice(1);
+    const attached = attachedByParentKey[primaryKey] || [];
+
+    const totalQuantity = rows.reduce((sum, r) => sum + Number(r.quantity || 0), 0);
+    const totalCost = rows.reduce(
+      (sum, r) =>
+        sum + Number(r.total_cost ?? Number(r.quantity || 0) * Number(r.unit_cost || 0)),
+      0
+    );
+
+    groups.push({
+      key: primaryKey,
+      primary,
+      children: [...siblings, ...attached],
+      siblings,
+      attached,
+      allRows: [primary, ...siblings, ...attached],
+      totalQuantity,
+      totalCost,
+    });
+  });
+
+  return groups;
 }
 
 export default function QuickReceiveHistory({ refreshKey }) {
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [expandedKeys, setExpandedKeys] = useState(() => new Set());
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,26 +118,27 @@ export default function QuickReceiveHistory({ refreshKey }) {
 
   // Modal States
   const [editingRow, setEditingRow] = useState(null);
+  const [editMode, setEditMode] = useState('single');
+  const [editTargetIds, setEditTargetIds] = useState([]);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   const [deletingRow, setDeletingRow] = useState(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
-  const [detailsGroup, setDetailsGroup] = useState(null);
+  const [detailsRows, setDetailsRows] = useState([]);
+  const [detailsTitle, setDetailsTitle] = useState('');
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
       const res = await api.get('/v1/inventory/received-history?per_page=50');
-      
       const payload = res.data;
       const dataList = Array.isArray(payload)
         ? payload
         : Array.isArray(payload?.data)
         ? payload.data
         : [];
-
       setHistory(dataList);
     } catch (err) {
       console.error('Failed to fetch received history:', err);
@@ -108,18 +152,50 @@ export default function QuickReceiveHistory({ refreshKey }) {
     fetchHistory();
   }, [fetchHistory, refreshKey]);
 
-  const openEdit = (row) => {
-    setEditingRow(row);
+  const toggleExpand = (key) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const openSharedEdit = (e, group) => {
+    e.stopPropagation();
+    const matchingIds = group.allRows
+      .filter((r) => r.type === group.primary.type)
+      .map((r) => r.id);
+    setEditingRow(group.primary);
+    setEditMode('shared');
+    setEditTargetIds(matchingIds);
     setIsEditOpen(true);
   };
 
-  const openDelete = (row) => {
+  const openSingleEdit = (e, row) => {
+    e.stopPropagation();
+    setEditingRow(row);
+    setEditMode('single');
+    setEditTargetIds([row.id]);
+    setIsEditOpen(true);
+  };
+
+  const openDelete = (e, row) => {
+    e.stopPropagation();
     setDeletingRow(row);
     setIsDeleteOpen(true);
   };
 
-  const openDetails = (group) => {
-    setDetailsGroup(group);
+  const openSharedDelete = (e, group) => {
+    e.stopPropagation();
+    setDeletingRow(group.primary);
+    setIsDeleteOpen(true);
+  };
+
+  const openSingleDetails = (e, row, index) => {
+    e.stopPropagation();
+    setDetailsTitle(`${row.item_name} (#${index + 1})`);
+    setDetailsRows([row]);
     setIsDetailsOpen(true);
   };
 
@@ -131,21 +207,19 @@ export default function QuickReceiveHistory({ refreshKey }) {
 
   const grouped = groupHistory(history);
 
-  const filteredGrouped = grouped.filter(({ primary, children }) => {
-    if (typeFilter !== 'ALL') {
-      const isTypeMatch = (row) => {
-        if (typeFilter === 'Asset') return row.type === 'Asset';
-        if (typeFilter === 'Consumable') return row.type !== 'Asset';
-        return true;
-      };
+  const filteredGrouped = grouped.filter((group) => {
+    const { allRows, primary } = group;
 
-      if (!isTypeMatch(primary) && !children.some(isTypeMatch)) return false;
+    if (typeFilter !== 'ALL') {
+      const matchesType = allRows.some((row) =>
+        typeFilter === 'Asset' ? row.type === 'Asset' : row.type !== 'Asset'
+      );
+      if (!matchesType) return false;
     }
 
     if (dateRange?.from || dateRange?.to) {
       const rowDateStr = primary.received_at || primary.created_at;
       if (!rowDateStr) return false;
-
       const itemDate = new Date(rowDateStr);
 
       if (dateRange.from) {
@@ -163,7 +237,7 @@ export default function QuickReceiveHistory({ refreshKey }) {
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      const matchesQuery = (row) => {
+      return allRows.some((row) => {
         const formattedDate = row.received_at
           ? new Date(row.received_at).toLocaleDateString()
           : '';
@@ -171,12 +245,13 @@ export default function QuickReceiveHistory({ refreshKey }) {
           row.item_name?.toLowerCase().includes(query) ||
           row.item_code?.toLowerCase().includes(query) ||
           row.reference_no?.toLowerCase().includes(query) ||
+          row.property_number?.toLowerCase().includes(query) ||
           row.serial_number?.toLowerCase().includes(query) ||
+          row.model?.toLowerCase().includes(query) ||
+          row.manufacturer_name?.toLowerCase().includes(query) ||
           formattedDate.toLowerCase().includes(query)
         );
-      };
-
-      return matchesQuery(primary) || children.some(matchesQuery);
+      });
     }
 
     return true;
@@ -184,9 +259,6 @@ export default function QuickReceiveHistory({ refreshKey }) {
 
   const hasActiveFilters =
     searchQuery || typeFilter !== 'ALL' || Boolean(dateRange?.from || dateRange?.to);
-  const allDetailRows = detailsGroup
-    ? [detailsGroup.primary, ...detailsGroup.children]
-    : [];
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
@@ -217,7 +289,7 @@ export default function QuickReceiveHistory({ refreshKey }) {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
             type="search"
-            placeholder="Search name, code, ref, date..."
+            placeholder="Search name, code, SN, property no..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-8 h-9 text-xs"
@@ -292,97 +364,208 @@ export default function QuickReceiveHistory({ refreshKey }) {
       )}
 
       {!loadingHistory && filteredGrouped.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredGrouped.map(({ primary, children }) => {
-            const isBundled = children.length > 0;
-            const imageUrl = primary.item_image_url || primary.image_url || primary.item?.image_url;
-            const isAsset = primary.type === 'Asset';
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full border-collapse text-left text-xs">
+            <thead>
+              <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <th className="w-8 py-2.5 pl-3 pr-1"></th>
+                <th className="py-2.5 px-3">Item</th>
+                <th className="py-2.5 px-3">Type</th>
+                <th className="py-2.5 px-3 text-right">Qty</th>
+                <th className="py-2.5 px-3 text-right">Total Cost</th>
+                <th className="py-2.5 px-3">Date Received</th>
+                <th className="py-2.5 px-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filteredGrouped.map((group) => {
+                const { primary, allRows, totalQuantity, totalCost } = group;
+                const isExpanded = expandedKeys.has(group.key);
+                const hasSubRows = allRows.length > 1;
+                const isAsset = primary.type === 'Asset';
+                const imageUrl =
+                  primary.item_image_url || primary.image_url || primary.item?.image_url;
 
-            return (
-              <Card
-                key={`${primary.type}-${primary.id}`}
-                className="group flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-2xs transition-all hover:shadow-sm"
-              >
-                <div className="relative aspect-4/3 w-full bg-muted/40 overflow-hidden border-b border-border flex items-center justify-center">
-                  {imageUrl ? (
-                    <img
-                      src={imageUrl}
-                      alt={primary.item_name}
-                      className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center gap-1.5 text-muted-foreground/50">
-                      <Package className="size-8 stroke-[1.5]" />
-                      <span className="text-[10px] font-medium uppercase tracking-wider">No Preview</span>
-                    </div>
-                  )}
-
-                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider border ${
-                        isAsset
-                          ? 'bg-info-soft text-info-text border-info-border'
-                          : 'bg-success-soft text-success-text border-success-border'
+                return (
+                  <React.Fragment key={group.key}>
+                    <tr
+                      onClick={() => toggleExpand(group.key)}
+                      className={`cursor-pointer transition-colors ${
+                        isExpanded ? 'bg-muted/40' : 'hover:bg-muted/25'
                       }`}
                     >
-                      {primary.type}
-                    </span>
-                    {isBundled && (
-                      <Badge variant="outline" className="bg-card/90 backdrop-blur-xs text-[10px] px-1.5 py-0 border-border">
-                        Bundled ({children.length})
-                      </Badge>
+                      <td className="py-2.5 pl-3 pr-1 text-muted-foreground">
+                        {isExpanded ? (
+                          <ChevronDown className="size-4" />
+                        ) : (
+                          <ChevronRight className="size-4" />
+                        )}
+                      </td>
+
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-muted/40">
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={primary.item_name}
+                                className="size-full object-cover"
+                              />
+                            ) : (
+                              <Package className="size-4 text-muted-foreground/60" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-foreground truncate">
+                                {primary.item_name}
+                              </span>
+                              {hasSubRows && (
+                                <Badge
+                                  variant="secondary"
+                                  className="h-4 px-1.5 text-[10px] font-medium gap-1"
+                                >
+                                  <Layers className="size-2.5" />
+                                  {allRows.length} units
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="block text-[11px] text-muted-foreground">
+                              {primary.item_code}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="py-2.5 px-3">
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider border ${
+                            isAsset
+                              ? 'bg-info-soft text-info-text border-info-border'
+                              : 'bg-success-soft text-success-text border-success-border'
+                          }`}
+                        >
+                          {primary.type}
+                        </span>
+                      </td>
+
+                      <td className="py-2.5 px-3 text-right font-medium text-foreground">
+                        {totalQuantity} {primary.unit_of_measure || ''}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-right font-semibold text-foreground">
+                        {money(totalCost)}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-muted-foreground">
+                        {primary.received_at
+                          ? new Date(primary.received_at).toLocaleDateString()
+                          : 'N/A'}
+                      </td>
+
+                      {/* Main row actions: Edit + Delete only */}
+                      <td
+                        className="py-2.5 px-3 text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-[11px] gap-1"
+                            onClick={(e) => openSharedEdit(e, group)}
+                            title={
+                              hasSubRows
+                                ? `Edit shared fields across ${allRows.length} items`
+                                : 'Edit shared item details'
+                            }
+                          >
+                            <Pencil className="size-3" />
+                            Edit
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {isExpanded && (
+                      <tr className="bg-muted/20">
+                        <td colSpan={9} className="p-0">
+                          <div className="border-t border-border/70 px-4 py-3 pl-11">
+                            <div className="overflow-x-auto rounded-md border border-border bg-card">
+                              <table className="w-full border-collapse text-left text-xs">
+                                <thead>
+                                  <tr className="border-b border-border bg-muted/30 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                    <th className="py-1.5 px-2.5">#</th>
+                                    <th className="py-1.5 px-2.5">Property / Ref No.</th>
+                                    <th className="py-1.5 px-2.5">Serial No.</th>
+                                    <th className="py-1.5 px-2.5 text-right">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/60">
+                                  {allRows.map((subRow, idx) => (
+                                    <tr
+                                      key={getRowKey(subRow)}
+                                      className="hover:bg-muted/30 transition-colors"
+                                    >
+                                      <td className="py-2 px-2.5 font-mono text-[11px] text-muted-foreground">
+                                        #{idx + 1}
+                                      </td>
+                                      <td className="py-2 px-2.5 font-mono text-[11px] text-foreground">
+                                        {subRow.property_number || subRow.reference_no || 'N/A'}
+                                      </td>
+                                      <td className="py-2 px-2.5 font-mono text-[11px] text-muted-foreground">
+                                        {subRow.serial_number || 'N/A'}
+                                      </td>
+                                      {/* Sub-row actions: Details + Edit + Delete */}
+                                      <td className="py-2 px-2.5 text-right">
+                                        <div className="inline-flex items-center justify-end gap-1">
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 w-6 p-0"
+                                            onClick={(e) => openSingleDetails(e, subRow, idx)}
+                                            title="View Details"
+                                          >
+                                            <Eye className="size-3.5" />
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 w-6 p-0"
+                                            onClick={(e) => openSingleEdit(e, subRow)}
+                                            title="Edit Item"
+                                          >
+                                            <Pencil className="size-3.5" />
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                            onClick={(e) => openDelete(e, subRow)}
+                                            title="Delete Record"
+                                          >
+                                            <Trash2 className="size-3.5" />
+                                          </Button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </div>
-                </div>
-
-                <CardHeader className="p-3.5 pb-2">
-                  <CardTitle className="text-sm font-semibold line-clamp-1 text-foreground">
-                    {primary.item_name}
-                  </CardTitle>
-                  <p className="text-[11px] font-medium text-muted-foreground truncate">
-                    {primary.item_code} &middot; Ref: {primary.reference_no || 'N/A'}
-                  </p>
-                </CardHeader>
-
-                <CardContent className="px-3.5 py-1.5 flex-1 space-y-2">
-                  <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
-                    <dt className="text-muted-foreground">Received Date</dt>
-                    <dd className="text-right font-medium text-foreground">
-                      {primary.received_at ? new Date(primary.received_at).toLocaleDateString() : 'N/A'}
-                    </dd>
-
-                    <dt className="text-muted-foreground">Quantity</dt>
-                    <dd className="text-right font-medium text-foreground">
-                      {primary.quantity} {primary.unit_of_measure || ''}
-                    </dd>
-
-                    <dt className="text-muted-foreground font-medium pt-1 border-t border-border/50">Total Cost</dt>
-                    <dd className="text-right font-semibold text-xs text-foreground pt-1 border-t border-border/50">
-                      {money(primary.total_cost)}
-                    </dd>
-                  </dl>
-
-                  {isBundled && (
-                    <p className="text-[11px] text-muted-foreground truncate border-t border-border/60 pt-2">
-                      <span className="font-semibold text-foreground">Includes:</span> {children.map(c => c.item_name).join(', ')}
-                    </p>
-                  )}
-                </CardContent>
-
-                <CardFooter className="p-3.5 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full gap-1.5 text-xs h-8"
-                    onClick={() => openDetails({ primary, children })}
-                  >
-                    <Eye className="size-3.5" />
-                    View Details
-                  </Button>
-                </CardFooter>
-              </Card>
-            );
-          })}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -391,18 +574,21 @@ export default function QuickReceiveHistory({ refreshKey }) {
         <AlertDialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-base font-semibold text-foreground">
-              {detailsGroup?.primary?.item_name}
-              {detailsGroup?.children.length > 0 && ` + ${detailsGroup.children.length} bundled item(s)`}
+              {detailsTitle || 'Item Details'}
             </AlertDialogTitle>
           </AlertDialogHeader>
 
           <div className="space-y-3 overflow-y-auto pr-1 flex-1 py-2">
-            {allDetailRows.map((row) => {
-              const rowImageUrl = row.item_image_url || row.image_url || row.item?.image_url;
+            {detailsRows.map((row) => {
+              const rowImageUrl =
+                row.item_image_url || row.image_url || row.item?.image_url;
               const isAsset = row.type === 'Asset';
 
               return (
-                <div key={`${row.type}-${row.id}`} className="border border-border rounded-lg bg-muted/30 p-3.5 space-y-3">
+                <div
+                  key={getRowKey(row)}
+                  className="border border-border rounded-lg bg-muted/30 p-3.5 space-y-3"
+                >
                   <div className="flex items-center gap-3">
                     <div className="size-14 rounded-md border border-border bg-card flex items-center justify-center overflow-hidden shrink-0">
                       {rowImageUrl ? (
@@ -429,19 +615,23 @@ export default function QuickReceiveHistory({ refreshKey }) {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Item Code: <span className="text-xs text-muted-foreground font-medium">{row.item_code}</span>
+                        Item Code: <span className="font-medium">{row.item_code}</span>
                       </p>
                     </div>
                   </div>
 
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs border-t border-border/60 pt-2.5">
-                    <dt className="text-muted-foreground">Reference No.</dt>
-                    <dd className="text-right font-medium text-foreground">{row.reference_no || 'N/A'}</dd>
+                    <dt className="text-muted-foreground">Property / Ref No.</dt>
+                    <dd className="text-right font-medium text-foreground">
+                      {row.property_number || row.reference_no || 'N/A'}
+                    </dd>
 
                     {row.serial_number && (
                       <>
                         <dt className="text-muted-foreground">Serial Number</dt>
-                        <dd className="text-right font-medium text-foreground">{row.serial_number}</dd>
+                        <dd className="text-right font-medium text-foreground">
+                          {row.serial_number}
+                        </dd>
                       </>
                     )}
 
@@ -455,55 +645,65 @@ export default function QuickReceiveHistory({ refreshKey }) {
                     {row.manufacturer_name && (
                       <>
                         <dt className="text-muted-foreground">Manufacturer</dt>
-                        <dd className="text-right text-foreground">{row.manufacturer_name}</dd>
+                        <dd className="text-right text-foreground">
+                          {row.manufacturer_name}
+                        </dd>
                       </>
                     )}
 
                     {row.country_of_origin && (
                       <>
                         <dt className="text-muted-foreground">Country of Origin</dt>
-                        <dd className="text-right text-foreground">{row.country_of_origin}</dd>
-                      </>
-                    )}
-
-                    {row.estimated_useful_life && (
-                      <>
-                        <dt className="text-muted-foreground">Estimated Useful Life</dt>
-                        <dd className="text-right text-foreground">{row.estimated_useful_life}</dd>
+                        <dd className="text-right text-foreground">
+                          {row.country_of_origin}
+                        </dd>
                       </>
                     )}
 
                     <dt className="text-muted-foreground">Quantity</dt>
-                    <dd className="text-right text-foreground">{row.quantity} {row.unit_of_measure || ''}</dd>
+                    <dd className="text-right text-foreground">
+                      {row.quantity} {row.unit_of_measure || ''}
+                    </dd>
 
                     <dt className="text-muted-foreground">Unit Cost</dt>
-                    <dd className="text-right text-foreground">{money(row.unit_cost)}</dd>
+                    <dd className="text-right text-foreground">
+                      {money(row.unit_cost)}
+                    </dd>
 
                     <dt className="text-muted-foreground font-medium">Total Cost</dt>
-                    <dd className="text-right font-semibold text-foreground">{money(row.total_cost)}</dd>
+                    <dd className="text-right font-semibold text-foreground">
+                      {money(row.total_cost)}
+                    </dd>
 
                     <dt className="text-muted-foreground">Date Received</dt>
                     <dd className="text-right text-foreground">
-                      {row.received_at ? new Date(row.received_at).toLocaleDateString() : 'N/A'}
+                      {row.received_at
+                        ? new Date(row.received_at).toLocaleDateString()
+                        : 'N/A'}
                     </dd>
                   </dl>
 
-                  {/* Edit & Delete Actions */}
                   <div className="flex gap-2 pt-2 border-t border-border/50">
                     <Button
                       size="sm"
                       variant="outline"
                       className="flex-1 text-xs h-8 gap-1.5"
-                      onClick={() => { setIsDetailsOpen(false); openEdit(row); }}
+                      onClick={(e) => {
+                        setIsDetailsOpen(false);
+                        openSingleEdit(e, row);
+                      }}
                     >
                       <Pencil className="size-3.5" />
-                      Edit Record
+                      Edit Individual Record
                     </Button>
                     <Button
                       size="sm"
                       variant="destructive"
                       className="flex-1 text-xs h-8 gap-1.5"
-                      onClick={() => { setIsDetailsOpen(false); openDelete(row); }}
+                      onClick={(e) => {
+                        setIsDetailsOpen(false);
+                        openDelete(e, row);
+                      }}
                     >
                       <Trash2 className="size-3.5" />
                       Delete Record
@@ -525,6 +725,8 @@ export default function QuickReceiveHistory({ refreshKey }) {
         isOpen={isEditOpen}
         onClose={() => setIsEditOpen(false)}
         row={editingRow}
+        mode={editMode}
+        targetIds={editTargetIds}
         onSaved={fetchHistory}
       />
 

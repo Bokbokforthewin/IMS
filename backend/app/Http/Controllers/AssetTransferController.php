@@ -2,163 +2,166 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AssetTransfer;
 use App\Models\AccountabilityReceipt;
+use App\Models\AssetTransfer;
 use App\Models\SerializedAsset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class AssetTransferController extends Controller
 {
-    // Must match the permission name in the seeder exactly.
     private const ICTU_PERMISSION = 'action:manage asset status';
 
     public function index(Request $request)
     {
         try {
-            $user = $request->user();
-
             $transfers = AssetTransfer::with([
                 'serializedAsset.item.category',
                 'transferredFrom',
                 'transferredTo',
             ])
-            ->applyDataScope($user) // 🔒 Enforces Division/Unit scoping on transfer logs
-            ->orderBy('created_at', 'desc')
-            ->get();
+                ->latest()
+                ->get();
 
-            return response()->json($transfers, 200);
-        } catch (\Exception $e) {
+            return response()->json([
+                'data' => $transfers,
+            ]);
+        } catch (\Throwable $e) {
             Log::error('Failed to fetch asset transfers: ' . $e->getMessage());
-            return response()->json(['error' => 'Failed to retrieve transfer logs: ' . $e->getMessage()], 500);
+
+            return response()->json([
+                'message' => 'Failed to load asset transfers.',
+            ], 500);
         }
     }
 
     public function store(Request $request)
     {
-        // Returns and transfers change who is accountable for an item, so ICTU records them
-        // (the MR requests, ICTU processes). Remove this block if MRs should file them directly.
-        if (!$request->user()->can(self::ICTU_PERMISSION)) {
-            return response()->json(['error' => 'Only ICTU can process transfers and returns.'], 403);
-        }
-
-        $validatedData = $request->validate([
-            'serialized_asset_id' => 'required|exists:serialized_assets,id',
-            'transfer_type'       => 'required|in:RETURN,TRANSFER',
-            'user_id'             => 'required|exists:users,id', // transferring FROM
-            'transfered_to'       => 'required|exists:users,id', // transferring TO
-            'new_mr_id'           => 'required_if:transfer_type,TRANSFER|nullable|exists:users,id',
-            'description'         => 'required|string|max:255',
-            'reason'              => 'required|string|max:255',
-            'transfer_date'       => 'required|date',
-            'remarks'             => 'nullable|string|max:1000',
+        $validated = $request->validate([
+            'serialized_asset_id' => ['required', 'exists:serialized_assets,id'],
+            'transfer_type'       => ['required', 'in:RETURN,TRANSFER'],
+            'user_id'             => ['required', 'exists:users,id'],
+            'transfered_to'       => ['required', 'exists:users,id'],
+            'current_mr_id'       => ['nullable', 'exists:users,id'],
+            'new_mr_id'           => ['nullable', 'required_if:transfer_type,TRANSFER', 'exists:users,id'],
+            'received_by_mr_id'   => ['nullable', 'exists:users,id'],
+            'received_mr_by_id'   => ['nullable', 'exists:users,id'],
+            'description'         => ['required', 'string', 'max:255'],
+            'reason'              => ['required', 'string', 'max:255'],
+            'transfer_date'       => ['required', 'date'],
+            'remarks'             => ['nullable', 'string'],
         ]);
 
-        $date = $validatedData['transfer_date'];
-        $year = date('Y', strtotime($date));
-        $month = date('m', strtotime($date));
-        $prefix = $validatedData['transfer_type'] === 'RETURN' ? 'RET' : 'PTR';
-
         try {
-            return DB::transaction(function () use ($validatedData, $year, $month, $prefix, $request) {
-                $asset = SerializedAsset::where('id', $validatedData['serialized_asset_id'])
+            return DB::transaction(function () use ($validated) {
+                $asset = SerializedAsset::with('item')
                     ->lockForUpdate()
-                    ->firstOrFail();
+                    ->findOrFail($validated['serialized_asset_id']);
 
-                // Only items that are out with someone can be transferred or returned.
-                // (Without this, a Condemned item could be "transferred" back to Assigned.)
-                if (!in_array($asset->status, ['Assigned', 'Distributed'], true)) {
-                    return response()->json([
-                        'error' => "Only Assigned or Distributed items can be transferred or returned (this item is {$asset->status}).",
-                    ], 422);
-                }
-
-                $lastRecord = AssetTransfer::where('transfer_type', $validatedData['transfer_type'])
-                    ->whereYear('transfer_date', $year)
-                    ->whereMonth('transfer_date', $month)
-                    ->orderBy('id', 'desc')
-                    ->lockForUpdate()
+                $latestReceipt = AccountabilityReceipt::whereHas('lines', function ($query) use ($asset) {
+                    $query->where('serialized_asset_id', $asset->id);
+                })
+                    ->latest('id')
                     ->first();
 
-                $nextSeq = 1;
-                if ($lastRecord && $lastRecord->document_number) {
-                    $parts = explode('-', $lastRecord->document_number);
-                    $nextSeq = intval(end($parts)) + 1;
-                }
+                $latestReceiptMrId = $latestReceipt?->received_by_mr_id
+                    ?? $latestReceipt?->received_mr_by_id;
 
-                $documentNumber = sprintf("%s-%s-%s-%04d", $prefix, $year, $month, $nextSeq);
+                // Explicitly use the MR chosen in the form (new_mr_id on TRANSFER; existing/current MR on RETURN)
+                // Never fall back to transfered_to (end user) or the authenticated user.
+                $chosenMrId = $validated['transfer_type'] === 'TRANSFER'
+                    ? ($validated['new_mr_id']
+                        ?? $validated['received_by_mr_id']
+                        ?? $validated['received_mr_by_id']
+                        ?? null)
+                    : ($validated['current_mr_id']
+                        ?? $validated['received_by_mr_id']
+                        ?? $validated['received_mr_by_id']
+                        ?? $latestReceiptMrId
+                        ?? null);
+
+                $prefix = $validated['transfer_type'] === 'RETURN' ? 'PTR' : 'PTR';
+                $documentNumber = sprintf(
+                    '%s-%s-%s',
+                    $prefix,
+                    now()->format('Ymd'),
+                    strtoupper(Str::random(6))
+                );
 
                 $transfer = AssetTransfer::create([
                     'document_number'     => $documentNumber,
-                    'transfer_type'       => $validatedData['transfer_type'],
                     'serialized_asset_id' => $asset->id,
-                    'user_id'             => $validatedData['user_id'],
-                    'transfered_to'       => $validatedData['transfered_to'],
-                    'description'         => $validatedData['description'],
-                    'reason'              => $validatedData['reason'],
-                    'transfer_date'       => $validatedData['transfer_date'],
-                    'remarks'             => $validatedData['remarks'] ?? null,
+                    'transfer_type'       => $validated['transfer_type'],
+                    'user_id'             => $validated['user_id'],
+                    'transfered_to'       => $validated['transfered_to'],
+                    'issued_by_id'        => $chosenMrId,
+                    'received_by_mr_id'   => $chosenMrId,
+                    'received_mr_by_id'   => $chosenMrId,
+                    'description'         => $validated['description'],
+                    'reason'              => $validated['reason'],
+                    'transfer_date'       => $validated['transfer_date'],
+                    'remarks'             => $validated['remarks'] ?? null,
                 ]);
 
-                if ($validatedData['transfer_type'] === 'RETURN') {
-                    // Back in the ICTU office: no holder. ICTU can then mark it
-                    // Under Repair or Condemned from the status action.
+                $createdReceipt = null;
+
+                if ($validated['transfer_type'] === 'RETURN') {
                     $asset->update([
-                        'status'            => 'Available',
+                        'status'            => 'available',
                         'current_holder_id' => null,
-                        'revert_reason'     => null, // clear any pending revert request
                     ]);
                 } else {
-                    // Transfer the physical holder and create a new accountability receipt
-                    // for the person responsible as MR. Keep the asset's current status.
                     $asset->update([
-                        'current_holder_id' => $validatedData['transfered_to'],
+                        'status'            => 'Assigned',
+                        'current_holder_id' => $validated['transfered_to'],
                     ]);
 
-                    $mr = \App\Models\User::findOrFail($validatedData['new_mr_id']);
-                    $unitName = strtoupper(preg_replace('/[^A-Za-z0-9-_]/', '', trim($mr->unit ?? 'OFFICE')));
-                    $unitName = $unitName ?: 'OFFICE';
-                    $receiptYear = date('Y', strtotime($validatedData['transfer_date']));
-                    $receiptNumbers = AccountabilityReceipt::where('document_number', 'like', "{$unitName}-{$receiptYear}-%")
-                        ->lockForUpdate()->pluck('document_number');
-                    $receiptSeq = 1;
-                    foreach ($receiptNumbers as $number) {
-                        $parts = explode('-', $number);
-                        $receiptSeq = max($receiptSeq, intval(end($parts)) + 1);
-                    }
-                    $cost = (float) preg_replace('/[^0-9.]/', '', (string) ($asset->unit_cost ?? $asset->item?->unit_cost ?? 0));
-                    $receipt = AccountabilityReceipt::create([
-                        'receipt_type' => $cost >= 50000 ? 'PAR' : 'ICS',
-                        'document_number' => sprintf('%s-%s-%04d', $unitName, $receiptYear, $receiptSeq),
-                        'user_id' => $validatedData['transfered_to'],
-                        'issued_by_id' => $request->user()->id,
-                        'received_mr_by_id' => $mr->id,
-                        'date_issued' => $validatedData['transfer_date'],
-                        'remarks' => $validatedData['remarks'] ?? null,
+                    $unitCost = (float) ($asset->unit_cost ?? $asset->item?->unit_cost ?? 0);
+                    $receiptType = $unitCost >= 50000 ? 'PAR' : 'ICS';
+                    $receiptDocNumber = sprintf(
+                        '%s-%s-%s',
+                        $receiptType,
+                        now()->format('Ymd'),
+                        strtoupper(Str::random(6))
+                    );
+
+                    $createdReceipt = AccountabilityReceipt::create([
+                        'document_number'   => $receiptDocNumber,
+                        'receipt_type'      => $receiptType,
+                        'user_id'           => $validated['transfered_to'], // End user receiving the asset
+                        'issued_by_id'      => $chosenMrId,                 // Same as chosen MR
+                        'received_by_mr_id' => $chosenMrId,                 // Chosen MR
+                        'received_mr_by_id' => $chosenMrId,                 // Chosen MR alias if used
+                        'date_issued'       => $validated['transfer_date'],
+                        'remarks'           => $validated['remarks'] ?? $validated['description'],
                     ]);
-                    $receipt->lines()->create([
+
+                    $createdReceipt->lines()->create([
                         'serialized_asset_id' => $asset->id,
-                        'item_id' => $asset->item_id,
-                        'quantity' => 1,
+                        'item_id'             => $asset->item_id,
+                        'user_id'             => $validated['transfered_to'],
+                        'quantity'            => 1,
+                        'unit_cost'           => $unitCost,
+                        'accessories_notes'   => $validated['remarks'] ?? null,
                     ]);
                 }
 
-                $transfer->load([
-                    'serializedAsset.item.category',
-                    'transferredFrom',
-                    'transferredTo'
-                ]);
-
                 return response()->json([
-                    'message'         => "Asset successfully processed under {$documentNumber}",
-                    'document_number' => $documentNumber,
-                    'transfer'        => $transfer,
+                    'message' => 'Asset transfer processed successfully.',
+                    'data'    => [
+                        'transfer' => $transfer->load(['serializedAsset.item.category', 'transferredFrom', 'transferredTo']),
+                        'receipt'  => $createdReceipt?->load(['lines.serializedAsset.item', 'user']),
+                    ],
                 ], 201);
             });
-        } catch (\Exception $e) {
-            Log::error('Failed to process asset transfer/return: ' . $e->getMessage());
-            return response()->json(['error' => 'Failed to process transaction: ' . $e->getMessage()], 500);
+        } catch (\Throwable $e) {
+            Log::error('Failed to process asset transfer: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'Failed to process asset transfer.',
+            ], 500);
         }
     }
 }

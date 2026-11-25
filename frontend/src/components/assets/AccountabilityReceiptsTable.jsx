@@ -7,7 +7,6 @@ import {
   PackageOpen,
   FileText,
   User,
-  UserCheck,
   Paperclip,
   ChevronLeft,
   ChevronRight,
@@ -15,27 +14,38 @@ import {
   ChevronsRight,
   Loader2,
   Filter,
+  Printer,
+  Pencil,
+  MoreVertical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useDistribution, AssetStatusCell, ReceiptDistributeButtons, DistributionDialogs } from './DistributionControls';
-
-function money(n) {
-  return `₱${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-}
-
-function getSecondaryReceiver(line, defaultPrimaryUser) {
-  const holder =
-    line.serialized_asset?.current_holder ||
-    line.serialized_asset?.currentHolder;
-
-  if (holder?.name) return holder.name;
-  if (line.user?.name) return line.user.name;
-  return defaultPrimaryUser?.name || 'Primary Receiver';
-}
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  useDistribution,
+  AssetStatusCell,
+  ReceiptDistributeButtons,
+  DistributionDialogs,
+} from './DistributionControls';
+import AccountabilityDetailsModal from './AccountabilityDetailsModal';
+import EditDetailsModal, {
+  getUserDesignation,
+  getUserUnit,
+  formatUserLabel,
+} from './EditDetailsModal';
 
 function groupLines(lines) {
   const byPropertyNumber = {};
@@ -66,10 +76,12 @@ function groupReceiptsIntoBundles(receipts) {
   const bundleMap = new Map();
 
   receipts.forEach((receipt) => {
-    const mrUser = 
-      receipt.receivedMrBy || 
-      receipt.received_mr_by || 
-      (receipt.received_mr_by_id ? { id: receipt.received_mr_by_id, name: `MR ID #${receipt.received_mr_by_id}` } : null) || 
+    const mrUser =
+      receipt.receivedMrBy ||
+      receipt.received_mr_by ||
+      (receipt.received_mr_by_id
+        ? { id: receipt.received_mr_by_id, name: 'Unassigned MR User' }
+        : null) ||
       receipt.user;
 
     const primaryUserId = mrUser?.id || receipt.received_mr_by_id || receipt.user_id;
@@ -109,9 +121,13 @@ function isLineMatched(line, query) {
 
   const asset = line.serialized_asset;
   const catalogItem = line.item || asset?.item;
-  const holder = asset?.current_holder || asset?.currentHolder || line.user;
+  const holder =
+    line.endUser ||
+    line.end_user ||
+    asset?.current_holder ||
+    asset?.currentHolder ||
+    line.user;
 
-  // Aggregate all possible fields for this line into a single text blob
   const textBlob = [
     catalogItem?.name,
     catalogItem?.brand,
@@ -126,26 +142,29 @@ function isLineMatched(line, query) {
     asset?.unit_cost,
     line?.unit_cost,
     holder?.name,
-    holder?.unit?.name || holder?.unit,
-    holder?.designation?.name || holder?.designation,
+    getUserUnit(holder),
+    getUserDesignation(holder),
     holder?.division?.name || holder?.division,
   ]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
 
-  // Every word in the user's query must be present in the text blob
   return tokens.every((token) => textBlob.includes(token));
 }
 
-export default function AccountabilityReceiptsTable({ refreshKey }) {
+export default function AccountabilityReceiptsTable({ refreshKey, onUpdated }) {
   const [receipts, setReceipts] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [editingReceiptContext, setEditingReceiptContext] = useState(null);
+  const [openMenuReceiptId, setOpenMenuReceiptId] = useState(null);
+  const [activeDetails, setActiveDetails] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showOnlyMatchingItems, setShowOnlyMatchingItems] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
-
   const [loadingMap, setLoadingMap] = useState({});
+  const [selectedStickerAssetIds, setSelectedStickerAssetIds] = useState(() => new Set());
 
   const startLoading = (key) => setLoadingMap((prev) => ({ ...prev, [key]: true }));
   const stopLoading = (key) => setLoadingMap((prev) => ({ ...prev, [key]: false }));
@@ -161,15 +180,73 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
     }
   }, []);
 
+  const fetchUsers = useCallback(async () => {
+    try {
+      const response = await api.get('/v1/users').catch(() => null);
+      const raw = response?.data;
+      const list = Array.isArray(raw) ? raw : raw?.data || [];
+      setUsers(list);
+    } catch (err) {
+      console.error('Failed to load users for MR editor:', err);
+      setUsers([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchReceipts();
-  }, [fetchReceipts, refreshKey]);
+    fetchUsers();
+  }, [fetchReceipts, fetchUsers, refreshKey]);
 
-  const dist = useDistribution(fetchReceipts);
+  const handleAfterSave = useCallback(async () => {
+    await fetchReceipts();
+    if (typeof onUpdated === 'function') {
+      await onUpdated();
+    }
+  }, [fetchReceipts, onUpdated]);
+
+  const dist = useDistribution(handleAfterSave);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery]);
+
+  const toggleStickerSelection = (e, assetId) => {
+    e?.stopPropagation?.();
+    if (!assetId) return;
+    const key = String(assetId);
+    setSelectedStickerAssetIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const handlePrintSelectedStickers = async () => {
+    const assetIds = Array.from(selectedStickerAssetIds)
+      .map((id) => Number(id))
+      .filter(Boolean);
+    if (assetIds.length === 0) return;
+
+    const key = 'selected_stickers';
+    startLoading(key);
+
+    try {
+      const response = await api.post(
+        '/v1/accountability/bulk-tags-pdf',
+        { asset_ids: assetIds },
+        { responseType: 'blob' }
+      );
+
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error('Failed to print selected stickers:', err);
+    } finally {
+      stopLoading(key);
+    }
+  };
 
   const handleDownload = async (receiptId, documentNumber) => {
     const key = `excel_${receiptId}`;
@@ -244,7 +321,6 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
   };
 
   const bundles = useMemo(() => groupReceiptsIntoBundles(receipts), [receipts]);
-
   const cleanQuery = searchQuery.toLowerCase().trim();
 
   const filteredBundles = useMemo(() => {
@@ -253,8 +329,8 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
     return bundles.filter((bundle) => {
       const primaryUser = bundle.user;
       const primaryUserName = (primaryUser?.name || '').toLowerCase();
-      const primaryUserUnit = (primaryUser?.unit?.name || primaryUser?.unit || '').toLowerCase();
-      const primaryUserDesignation = (primaryUser?.designation?.name || primaryUser?.designation || '').toLowerCase();
+      const primaryUserUnit = getUserUnit(primaryUser).toLowerCase();
+      const primaryUserDesignation = getUserDesignation(primaryUser).toLowerCase();
 
       const remarksMatches = (bundle.remarks || '').toLowerCase().includes(cleanQuery);
       const dateMatches = (bundle.date_issued || '').toLowerCase().includes(cleanQuery);
@@ -291,6 +367,8 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
     }
   }, [totalPages, currentPage]);
 
+  const isPrintingSelected = Boolean(loadingMap.selected_stickers);
+
   return (
     <Card className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
       {/* Header */}
@@ -304,6 +382,38 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
 
         {/* Toolbar Controls */}
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {selectedStickerAssetIds.size > 0 && (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                disabled={isPrintingSelected}
+                onClick={handlePrintSelectedStickers}
+                className="h-9 text-xs gap-1.5"
+              >
+                {isPrintingSelected ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Printer className="w-3.5 h-3.5" />
+                )}
+                <span>
+                  {isPrintingSelected
+                    ? 'Generating...'
+                    : `Print Selected (${selectedStickerAssetIds.size})`}
+                </span>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedStickerAssetIds(new Set())}
+                className="h-9 text-xs text-muted-foreground"
+              >
+                Clear
+              </Button>
+            </>
+          )}
+
           {cleanQuery && (
             <Button
               size="sm"
@@ -355,7 +465,7 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <User className="h-4 w-4 text-primary shrink-0" />
                         <span className="font-semibold text-sm text-foreground truncate">
-                          {bundle.user?.name || 'Unassigned Primary Receiver'}
+                          {formatUserLabel(bundle.user, 'Unassigned Primary Receiver')}
                         </span>
                         <span className="text-xs text-muted-foreground font-normal shrink-0">
                           ({bundle.date_issued})
@@ -382,7 +492,9 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                         ) : (
                           <PackageOpen className="w-3.5 h-3.5 text-info-text" />
                         )}
-                        <span>{isBulkTagLoading ? 'Generating Stickers...' : 'Print Sticker Bundle'}</span>
+                        <span>
+                          {isBulkTagLoading ? 'Generating Stickers...' : 'Print Sticker Bundle'}
+                        </span>
                       </Button>
                     </div>
                   </div>
@@ -393,7 +505,6 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                       const receiptLines = rcpt.lines || [];
                       let groupedLines = groupLines(receiptLines);
 
-                      // Optional row filter
                       if (cleanQuery && showOnlyMatchingItems) {
                         groupedLines = groupedLines.filter(
                           ({ primary, children }) =>
@@ -405,127 +516,238 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                       if (groupedLines.length === 0) return null;
 
                       const isExcelLoading = loadingMap[`excel_${rcpt.id}`];
+                      const isMenuOpen = openMenuReceiptId === rcpt.id;
 
                       return (
                         <div
                           key={rcpt.id}
-                          className="rounded-lg border border-border bg-card shadow-2xs overflow-hidden"
+                          className="rounded-lg border border-border bg-muted/90 shadow-2xs overflow-hidden"
                         >
-                          <div className="bg-card px-3 py-2.5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <div className="bg-muted/70 px-3 py-2.5 border-b border-border flex items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
                               <FileSpreadsheet className="w-4 h-4 text-success-text shrink-0" />
-                              <span className="font-semibold text-xs sm:text-sm text-foreground">
+                              <span className="font-semibold text-xs sm:text-sm text-foreground truncate">
                                 {rcpt.document_number}
                               </span>
-                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] border border-border">
+                              <Badge
+                                variant="secondary"
+                                className="px-1.5 py-0 text-[10px] border border-border"
+                              >
                                 {rcpt.receipt_type}
                               </Badge>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-2">
-                              <ReceiptDistributeButtons rcpt={rcpt} dist={dist} />
-                              <Button
-                                size="sm"
-                                disabled={isExcelLoading}
-                                className="h-7 text-xs gap-1.5 bg-success text-success-foreground hover:bg-success/90 shadow-2xs shrink-0 justify-center"
-                                onClick={() => handleDownload(rcpt.id, rcpt.document_number)}
+                            <Popover
+                              open={isMenuOpen}
+                              onOpenChange={(nextOpen) =>
+                                setOpenMenuReceiptId(nextOpen ? rcpt.id : null)
+                              }
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0 border-border bg-card shadow-2xs"
+                                  aria-label={`Receipt actions for ${rcpt.document_number}`}
+                                >
+                                  {isExcelLoading ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <MoreVertical className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                align="end"
+                                className="w-48 p-1.5 border-border bg-card shadow-md space-y-1"
                               >
-                                {isExcelLoading ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <Download className="w-3.5 h-3.5" />
-                                )}
-                                <span>{isExcelLoading ? 'Generating...' : 'Download Sheet'}</span>
-                              </Button>
-                            </div>
+                                <button
+                                  type="button"
+                                  className="w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-foreground hover:bg-accent transition-colors text-left"
+                                  onClick={() => {
+                                    setOpenMenuReceiptId(null);
+                                    setEditingReceiptContext({
+                                      receipt: rcpt,
+                                      bundleUser: bundle.user,
+                                    });
+                                  }}
+                                >
+                                  <Pencil className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  <span>Edit MR</span>
+                                </button>
+
+                                <div
+                                  className="w-full [&>button]:w-full [&>button]:justify-start [&>button]:border-0 [&>button]:bg-transparent [&>button]:shadow-none [&>button]:px-2.5 [&>button]:py-1.5 [&>button]:h-auto [&>button]:text-xs [&>button]:font-normal [&>button]:hover:bg-accent"
+                                  onClick={() => setOpenMenuReceiptId(null)}
+                                >
+                                  <ReceiptDistributeButtons rcpt={rcpt} dist={dist} />
+                                </div>
+
+                                <button
+                                  type="button"
+                                  disabled={isExcelLoading}
+                                  className="w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-success-text hover:bg-accent transition-colors text-left disabled:opacity-50"
+                                  onClick={async () => {
+                                    setOpenMenuReceiptId(null);
+                                    await handleDownload(rcpt.id, rcpt.document_number);
+                                  }}
+                                >
+                                  {isExcelLoading ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                                  ) : (
+                                    <Download className="h-3.5 w-3.5 shrink-0" />
+                                  )}
+                                  <span>
+                                    {isExcelLoading ? 'Generating...' : 'Download Sheet'}
+                                  </span>
+                                </button>
+                              </PopoverContent>
+                            </Popover>
                           </div>
 
                           {/* Mobile Layout (Card Based Details) */}
                           <div className="block md:hidden divide-y divide-border/60">
                             {groupedLines.map(({ primary, children }) => {
-                              const primarySecondaryHolder = getSecondaryReceiver(primary, bundle.user);
                               const isPrimaryMatched = isLineMatched(primary, cleanQuery);
-                              const primaryItemName = primary.item?.name || primary.serialized_asset?.item?.name || 'N/A';
+                              const primaryItemName =
+                                primary.item?.name || primary.serialized_asset?.item?.name || 'N/A';
+                              const primaryAssetId = primary.serialized_asset?.id;
+                              const primaryChecked =
+                                primaryAssetId &&
+                                selectedStickerAssetIds.has(String(primaryAssetId));
 
                               return (
                                 <div
                                   key={primary.id}
-                                  className={`p-3 space-y-2.5 ${
-                                    isPrimaryMatched ? 'bg-primary/10' : 'bg-card'
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() =>
+                                    setActiveDetails({ line: primary, receipt: rcpt, mr: bundle.user })
+                                  }
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault();
+                                      setActiveDetails({
+                                        line: primary,
+                                        receipt: rcpt,
+                                        mr: bundle.user,
+                                      });
+                                    }
+                                  }}
+                                  className={`cursor-pointer p-3 space-y-2.5 transition-colors hover:bg-accent/50 ${
+                                    isPrimaryMatched ? 'bg-primary/10' : 'bg-secondary/40'
                                   }`}
                                 >
                                   <div className="flex items-start justify-between gap-2">
-                                    <div className="space-y-1 min-w-0">
-                                      <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className="font-semibold text-xs text-foreground">
-                                          {primaryItemName}
-                                        </span>
-                                        {isPrimaryMatched && (
-                                          <Badge variant="outline" className="text-[9px] px-1 py-0 bg-primary/20 border-primary/30">
-                                            Match
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      <div className="font-mono text-[11px] text-muted-foreground">
-                                        {primary.serialized_asset?.property_number || 'N/A'}
-                                        {primary.serialized_asset?.serial_number && (
-                                          <span className="block text-[10px] text-muted-foreground/80">
-                                            SN: {primary.serialized_asset.serial_number}
+                                    <div className="flex items-start gap-2 min-w-0">
+                                      {primaryAssetId && (
+                                        <input
+                                          type="checkbox"
+                                          checked={Boolean(primaryChecked)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          onChange={(e) =>
+                                            toggleStickerSelection(e, primaryAssetId)
+                                          }
+                                          aria-label={`Select sticker for ${primaryItemName}`}
+                                          className="mt-0.5 size-4 rounded border-input accent-primary shrink-0"
+                                        />
+                                      )}
+                                      <div className="space-y-1 min-w-0">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="font-semibold text-xs text-foreground">
+                                            {primaryItemName}
                                           </span>
-                                        )}
+                                          {isPrimaryMatched && (
+                                            <Badge
+                                              variant="outline"
+                                              className="text-[9px] px-1 py-0 bg-primary/20 border-primary/30"
+                                            >
+                                              Match
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        <div className="font-mono text-[11px] text-muted-foreground">
+                                          {primary.serialized_asset?.property_number || 'N/A'}
+                                        </div>
                                       </div>
-                                    </div>
-                                    <div className="shrink-0 font-mono text-xs font-medium text-foreground">
-                                      {money(primary.serialized_asset?.unit_cost || primary.unit_cost)}
                                     </div>
                                   </div>
 
                                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1 border-t border-border/40">
-                                    <span className="inline-flex items-center gap-1 text-primary font-medium truncate">
-                                      <UserCheck className="h-3 w-3 shrink-0" />
-                                      {primarySecondaryHolder}
-                                    </span>
-                                    <div className="flex items-center gap-2">
+                                    <div onClick={(event) => event.stopPropagation()}>
                                       <AssetStatusCell line={primary} rcpt={rcpt} dist={dist} />
-                                      {primary.serialized_asset?.id && (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          disabled={loadingMap[`tag_${primary.serialized_asset.id}`]}
-                                          className="h-6 text-[10px] px-2 border-border gap-1"
-                                          onClick={() => handleDownloadTagPdf(primary.serialized_asset.id)}
-                                        >
-                                          <span>Sticker</span>
-                                        </Button>
-                                      )}
                                     </div>
                                   </div>
 
-                                  {/* Attached Child Items on Mobile */}
                                   {children.length > 0 && (
                                     <div className="pl-3 mt-2 space-y-2 border-l-2 border-primary/20">
                                       {children.map((child) => {
-                                        const childSecondaryHolder = getSecondaryReceiver(child, bundle.user);
                                         const isChildMatched = isLineMatched(child, cleanQuery);
-                                        const childItemName = child.item?.name || child.serialized_asset?.item?.name || 'N/A';
+                                        const childItemName =
+                                          child.item?.name ||
+                                          child.serialized_asset?.item?.name ||
+                                          'N/A';
+                                        const childAssetId = child.serialized_asset?.id;
+                                        const childChecked =
+                                          childAssetId &&
+                                          selectedStickerAssetIds.has(String(childAssetId));
 
                                         return (
                                           <div
                                             key={child.id}
-                                            className={`p-2.5 rounded-md space-y-2 ${
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              setActiveDetails({
+                                                line: child,
+                                                receipt: rcpt,
+                                                mr: bundle.user,
+                                              });
+                                            }}
+                                            onKeyDown={(event) => {
+                                              if (event.key === 'Enter' || event.key === ' ') {
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                                setActiveDetails({
+                                                  line: child,
+                                                  receipt: rcpt,
+                                                  mr: bundle.user,
+                                                });
+                                              }
+                                            }}
+                                            className={`cursor-pointer p-2.5 rounded-md space-y-2 transition-colors hover:bg-accent/50 ${
                                               isChildMatched ? 'bg-primary/10' : 'bg-muted/30'
                                             }`}
                                           >
-                                            <div className="flex items-start justify-between gap-2">
+                                            <div className="flex items-start gap-2 min-w-0">
+                                              {childAssetId && (
+                                                <input
+                                                  type="checkbox"
+                                                  checked={Boolean(childChecked)}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  onChange={(e) =>
+                                                    toggleStickerSelection(e, childAssetId)
+                                                  }
+                                                  aria-label={`Select sticker for ${childItemName}`}
+                                                  className="mt-0.5 size-4 rounded border-input accent-primary shrink-0"
+                                                />
+                                              )}
                                               <div className="space-y-1 min-w-0">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                   <Paperclip className="h-3 w-3 text-primary/70 shrink-0" />
                                                   <span className="font-semibold text-xs text-foreground">
                                                     {childItemName}{' '}
-                                                    <span className="text-[10px] font-normal text-muted-foreground">(Attached)</span>
+                                                    <span className="text-[10px] font-normal text-muted-foreground">
+                                                      (Attached)
+                                                    </span>
                                                   </span>
                                                   {isChildMatched && (
-                                                    <Badge variant="outline" className="text-[9px] px-1 py-0 bg-primary/20 border-primary/30">
+                                                    <Badge
+                                                      variant="outline"
+                                                      className="text-[9px] px-1 py-0 bg-primary/20 border-primary/30"
+                                                    >
                                                       Match
                                                     </Badge>
                                                   )}
@@ -534,28 +756,11 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                                   {child.serialized_asset?.property_number || 'N/A'}
                                                 </div>
                                               </div>
-                                              <div className="shrink-0 font-mono text-xs font-medium text-foreground">
-                                                {money(child.serialized_asset?.unit_cost || child.unit_cost)}
-                                              </div>
                                             </div>
 
                                             <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1 border-t border-border/40">
-                                              <span className="text-muted-foreground truncate">
-                                                {childSecondaryHolder}
-                                              </span>
-                                              <div className="flex items-center gap-2">
+                                              <div onClick={(event) => event.stopPropagation()}>
                                                 <AssetStatusCell line={child} rcpt={rcpt} dist={dist} />
-                                                {child.serialized_asset?.id && (
-                                                  <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    disabled={loadingMap[`tag_${child.serialized_asset.id}`]}
-                                                    className="h-6 text-[10px] px-2 border-border gap-1"
-                                                    onClick={() => handleDownloadTagPdf(child.serialized_asset.id)}
-                                                  >
-                                                    <span>Sticker</span>
-                                                  </Button>
-                                                )}
                                               </div>
                                             </div>
                                           </div>
@@ -573,99 +778,153 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                             <table className="w-full text-xs text-left">
                               <thead className="bg-muted/40 text-muted-foreground border-b border-border">
                                 <tr>
-                                  <th className="py-2 px-3 font-medium">Item Name</th>
-                                  <th className="py-2 px-3 font-medium">Property No. / SN</th>
-                                  <th className="py-2 px-3 font-medium">End User</th>
-                                  <th className="py-2 px-3 font-medium text-right">Unit Cost</th>
+                                  <th className="w-9 py-2 pl-3 pr-1 font-medium">Sticker</th>
+                                  <th className="py-2 px-3 font-medium">Item</th>
+                                  <th className="py-2 px-3 font-medium">Property No.</th>
                                   <th className="py-2 px-3 font-medium">Status</th>
-                                  <th className="py-2 px-3 font-medium text-center w-[100px]">Tag</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-border/60">
                                 {groupedLines.map(({ primary, children }) => {
-                                  const primarySecondaryHolder = getSecondaryReceiver(
-                                    primary,
-                                    bundle.user
-                                  );
-
                                   const isPrimaryMatched = isLineMatched(primary, cleanQuery);
-                                  const primaryItemName = primary.item?.name || primary.serialized_asset?.item?.name || 'N/A';
+                                  const primaryItemName =
+                                    primary.item?.name ||
+                                    primary.serialized_asset?.item?.name ||
+                                    'N/A';
+                                  const primaryAssetId = primary.serialized_asset?.id;
+                                  const primaryChecked =
+                                    primaryAssetId &&
+                                    selectedStickerAssetIds.has(String(primaryAssetId));
 
                                   return (
                                     <React.Fragment key={primary.id}>
                                       <tr
-                                        className={`transition-colors ${
+                                        tabIndex={0}
+                                        onClick={() =>
+                                          setActiveDetails({
+                                            line: primary,
+                                            receipt: rcpt,
+                                            mr: bundle.user,
+                                          })
+                                        }
+                                        onKeyDown={(event) => {
+                                          if (event.key === 'Enter' || event.key === ' ') {
+                                            event.preventDefault();
+                                            setActiveDetails({
+                                              line: primary,
+                                              receipt: rcpt,
+                                              mr: bundle.user,
+                                            });
+                                          }
+                                        }}
+                                        className={`cursor-pointer transition-colors ${
                                           isPrimaryMatched
                                             ? 'bg-primary/10 hover:bg-primary/15 font-medium'
                                             : 'hover:bg-muted/20'
                                         }`}
                                       >
+                                        <td
+                                          className="py-2 pl-3 pr-1"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          {primaryAssetId ? (
+                                            <input
+                                              type="checkbox"
+                                              checked={Boolean(primaryChecked)}
+                                              onChange={(e) =>
+                                                toggleStickerSelection(e, primaryAssetId)
+                                              }
+                                              aria-label={`Select sticker for ${primaryItemName}`}
+                                              className="size-4 rounded border-input accent-primary cursor-pointer"
+                                            />
+                                          ) : null}
+                                        </td>
                                         <td className="py-2 px-3 text-foreground">
                                           {primaryItemName}
                                           {isPrimaryMatched && (
-                                            <Badge variant="outline" className="ml-2 text-[9px] px-1 py-0 bg-primary/20 border-primary/30">
+                                            <Badge
+                                              variant="outline"
+                                              className="ml-2 text-[9px] px-1 py-0 bg-primary/20 border-primary/30"
+                                            >
                                               Match
                                             </Badge>
                                           )}
                                         </td>
                                         <td className="py-2 px-3 font-mono text-muted-foreground">
                                           {primary.serialized_asset?.property_number || 'N/A'}
-                                          {primary.serialized_asset?.serial_number && (
-                                            <span className="block text-[10px] text-muted-foreground/80">
-                                              SN: {primary.serialized_asset.serial_number}
-                                            </span>
-                                          )}
                                         </td>
-                                        <td className="py-2 px-3">
-                                          <span className="inline-flex items-center gap-1 text-primary font-medium">
-                                            <UserCheck className="h-3 w-3 shrink-0" />
-                                            {primarySecondaryHolder}
-                                          </span>
-                                        </td>
-                                        <td className="py-2 px-3 text-right font-mono text-foreground font-medium">
-                                          {money(primary.serialized_asset?.unit_cost || primary.unit_cost)}
-                                        </td>
-                                        <td className="py-2 px-3">
+                                        <td
+                                          className="py-2 px-3"
+                                          onClick={(event) => event.stopPropagation()}
+                                        >
                                           <AssetStatusCell line={primary} rcpt={rcpt} dist={dist} />
-                                        </td>
-                                        <td className="py-2 px-3 text-center">
-                                          {primary.serialized_asset?.id && (
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              disabled={loadingMap[`tag_${primary.serialized_asset.id}`]}
-                                              className="h-6 text-[10px] px-2 border-border gap-1"
-                                              onClick={() => handleDownloadTagPdf(primary.serialized_asset.id)}
-                                            >
-                                              <span>Print Sticker</span>
-                                            </Button>
-                                          )}
                                         </td>
                                       </tr>
 
                                       {children.map((child) => {
-                                        const childSecondaryHolder = getSecondaryReceiver(
-                                          child,
-                                          bundle.user
-                                        );
                                         const isChildMatched = isLineMatched(child, cleanQuery);
-                                        const childItemName = child.item?.name || child.serialized_asset?.item?.name || 'N/A';
+                                        const childItemName =
+                                          child.item?.name ||
+                                          child.serialized_asset?.item?.name ||
+                                          'N/A';
+                                        const childAssetId = child.serialized_asset?.id;
+                                        const childChecked =
+                                          childAssetId &&
+                                          selectedStickerAssetIds.has(String(childAssetId));
 
                                         return (
                                           <tr
                                             key={child.id}
-                                            className={`transition-colors ${
+                                            tabIndex={0}
+                                            onClick={() =>
+                                              setActiveDetails({
+                                                line: child,
+                                                receipt: rcpt,
+                                                mr: bundle.user,
+                                              })
+                                            }
+                                            onKeyDown={(event) => {
+                                              if (event.key === 'Enter' || event.key === ' ') {
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                                setActiveDetails({
+                                                  line: child,
+                                                  receipt: rcpt,
+                                                  mr: bundle.user,
+                                                });
+                                              }
+                                            }}
+                                            className={`cursor-pointer transition-colors ${
                                               isChildMatched
                                                 ? 'bg-primary/10 hover:bg-primary/15 font-medium'
                                                 : 'bg-muted/10 hover:bg-muted/20'
                                             }`}
                                           >
+                                            <td
+                                              className="py-1.5 pl-3 pr-1"
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              {childAssetId ? (
+                                                <input
+                                                  type="checkbox"
+                                                  checked={Boolean(childChecked)}
+                                                  onChange={(e) =>
+                                                    toggleStickerSelection(e, childAssetId)
+                                                  }
+                                                  aria-label={`Select sticker for ${childItemName}`}
+                                                  className="size-4 rounded border-input accent-primary cursor-pointer"
+                                                />
+                                              ) : null}
+                                            </td>
                                             <td className="py-1.5 px-3 pl-6 text-muted-foreground">
                                               <span className="inline-flex items-center gap-1">
                                                 <Paperclip className="h-3 w-3 text-primary/70 shrink-0" />
                                                 {childItemName} (Attached)
                                                 {isChildMatched && (
-                                                  <Badge variant="outline" className="ml-2 text-[9px] px-1 py-0 bg-primary/20 border-primary/30">
+                                                  <Badge
+                                                    variant="outline"
+                                                    className="ml-2 text-[9px] px-1 py-0 bg-primary/20 border-primary/30"
+                                                  >
                                                     Match
                                                   </Badge>
                                                 )}
@@ -674,29 +933,11 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
                                             <td className="py-1.5 px-3 font-mono text-muted-foreground text-[11px]">
                                               {child.serialized_asset?.property_number || 'N/A'}
                                             </td>
-                                            <td className="py-1.5 px-3 text-[11px]">
-                                              <span className="text-muted-foreground">
-                                                {childSecondaryHolder}
-                                              </span>
-                                            </td>
-                                            <td className="py-1.5 px-3 text-right font-mono text-[11px] text-foreground font-medium">
-                                              {money(child.serialized_asset?.unit_cost || child.unit_cost)}
-                                            </td>
-                                            <td className="py-1.5 px-3">
+                                            <td
+                                              className="py-1.5 px-3"
+                                              onClick={(event) => event.stopPropagation()}
+                                            >
                                               <AssetStatusCell line={child} rcpt={rcpt} dist={dist} />
-                                            </td>
-                                            <td className="py-1.5 px-3 text-center">
-                                              {child.serialized_asset?.id && (
-                                                <Button
-                                                  size="sm"
-                                                  variant="outline"
-                                                  disabled={loadingMap[`tag_${child.serialized_asset.id}`]}
-                                                  className="h-6 text-[10px] px-2 border-border gap-1"
-                                                  onClick={() => handleDownloadTagPdf(child.serialized_asset.id)}
-                                                >
-                                                  <span>Print Sticker</span>
-                                                </Button>
-                                              )}
                                             </td>
                                           </tr>
                                         );
@@ -789,6 +1030,22 @@ export default function AccountabilityReceiptsTable({ refreshKey }) {
         )}
       </div>
 
+      {editingReceiptContext && (
+        <EditDetailsModal
+          receipt={editingReceiptContext.receipt}
+          bundleUser={editingReceiptContext.bundleUser}
+          users={users}
+          onClose={() => setEditingReceiptContext(null)}
+          onSaved={handleAfterSave}
+        />
+      )}
+
+      <AccountabilityDetailsModal
+        open={!!activeDetails}
+        onClose={() => setActiveDetails(null)}
+        details={activeDetails}
+        onPrintTag={handleDownloadTagPdf}
+      />
       <DistributionDialogs dist={dist} />
     </Card>
   );

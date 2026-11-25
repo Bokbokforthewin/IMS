@@ -1,11 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -21,11 +14,14 @@ import {
   Package,
   Check,
   Plus,
+  X,
   Eye,
   Search,
   RotateCcw,
   Layers,
   ArrowRight,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 
 function money(value) {
@@ -140,15 +136,42 @@ function groupAssets(assets) {
     }));
 }
 
+function getItemGroupKey(asset) {
+  const itemId = asset.item_id ?? asset.item?.id;
+  const itemCode = asset.item_code ?? asset.item?.item_code;
+  const itemName = asset.item_name ?? asset.item?.name ?? 'Asset Item';
+  return `item-${itemId || itemCode || itemName}`;
+}
+
 export default function AssetCatalogBrowse({
   catalog = {},
   cart = [],
   addAssetToCart,
+  removeAssetFromCart,
+  onRemoveFromCart,
+  onCartChange,
+  setCart,
   onProceed,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [localCart, setLocalCart] = useState([]);
+  const [expandedKeys, setExpandedKeys] = useState(() => new Set());
   const [detailsGroup, setDetailsGroup] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  // Use parent cart when provided; mirror removals cleanly if parent doesn't pass a setter/handler
+  const effectiveCart = useMemo(() => {
+    if (!Array.isArray(cart)) return localCart;
+    if (
+      typeof removeAssetFromCart === 'function' ||
+      typeof onRemoveFromCart === 'function' ||
+      typeof onCartChange === 'function' ||
+      typeof setCart === 'function'
+    ) {
+      return cart;
+    }
+    return cart.filter((item) => !localCart.some((rem) => rem.key === item.key));
+  }, [cart, localCart, removeAssetFromCart, onRemoveFromCart, onCartChange, setCart]);
 
   const rawAssets =
     catalog?.serialized || catalog?.assets || (Array.isArray(catalog) ? catalog : []);
@@ -156,23 +179,100 @@ export default function AssetCatalogBrowse({
 
   const groupedAssets = useMemo(() => groupAssets(assets), [assets]);
 
-  const filteredGroupedAssets = useMemo(() => {
-    if (!searchQuery.trim()) return groupedAssets;
+  // Group standalone asset entries that share the same item into a single expandable row
+  const itemBuckets = useMemo(() => {
+    const map = new Map();
+
+    groupedAssets.forEach((entry) => {
+      const key = getItemGroupKey(entry.primary);
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+      map.get(key).push(entry);
+    });
+
+    return Array.from(map.entries()).map(([key, entries]) => {
+      const primary = entries[0].primary;
+      const allUnits = entries.flatMap((e) => [e.primary, ...e.children]);
+      const totalCost = entries.reduce(
+        (sum, e) => sum + Number(e.primary.unit_cost || 0),
+        0
+      );
+
+      return {
+        key,
+        primary,
+        entries,
+        allUnits,
+        totalCost,
+      };
+    });
+  }, [groupedAssets]);
+
+  const filteredBuckets = useMemo(() => {
+    if (!searchQuery.trim()) return itemBuckets;
     const query = searchQuery.trim();
 
-    return groupedAssets.filter(({ primary, children }) => {
-      const primaryMatches = isAssetMatch(primary, query);
-      const childMatches = children.some((child) => isAssetMatch(child, query));
-      return primaryMatches || childMatches;
-    });
-  }, [groupedAssets, searchQuery]);
+    return itemBuckets.filter(({ allUnits }) =>
+      allUnits.some((unit) => isAssetMatch(unit, query))
+    );
+  }, [itemBuckets, searchQuery]);
 
-  const openDetails = (group) => {
-    setDetailsGroup(group);
+  const toggleExpand = (key) => {
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const handleToggleAssetCart = (e, unit, children = []) => {
+    e?.stopPropagation?.();
+    const key = `a-${unit.id}`;
+    const childKeys = new Set((children || []).map((c) => `a-${c.id}`));
+    const exists = effectiveCart.some((c) => c.key === key);
+
+    if (!exists) {
+      setLocalCart((prev) => prev.filter((item) => item.key !== key && !childKeys.has(item.key)));
+      addAssetToCart?.(unit, children);
+      return;
+    }
+
+    if (typeof removeAssetFromCart === 'function') {
+      removeAssetFromCart(unit, children);
+    } else if (typeof onRemoveFromCart === 'function') {
+      onRemoveFromCart(key, unit, children);
+    } else if (typeof setCart === 'function') {
+      setCart((prev) =>
+        (Array.isArray(prev) ? prev : []).filter(
+          (item) => item.key !== key && !childKeys.has(item.key) && item.parentId !== unit.id
+        )
+      );
+    } else if (typeof onCartChange === 'function') {
+      const nextCart = (Array.isArray(cart) ? cart : []).filter(
+        (item) => item.key !== key && !childKeys.has(item.key) && item.parentId !== unit.id
+      );
+      onCartChange(nextCart);
+    } else {
+      // Fallback when parent only passes `cart` and `addAssetToCart`
+      setLocalCart((prev) => [
+        ...prev.filter((item) => item.key !== key),
+        { key, parentId: unit.id },
+      ]);
+      addAssetToCart?.(unit, children);
+    }
+  };
+
+  const openDetails = (e, unit, children = []) => {
+    e?.stopPropagation?.();
+    setDetailsGroup({ primary: unit, children });
     setIsDetailsOpen(true);
   };
 
-  const allDetailRows = detailsGroup ? [detailsGroup.primary, ...detailsGroup.children] : [];
+  const allDetailRows = detailsGroup
+    ? [detailsGroup.primary, ...(detailsGroup.children || [])]
+    : [];
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-5">
@@ -198,15 +298,19 @@ export default function AssetCatalogBrowse({
           </div>
 
           <Button
+            type="button"
             size="sm"
-            disabled={cart.length === 0}
+            disabled={effectiveCart.length === 0}
             onClick={onProceed}
             className="h-9 text-xs gap-1.5 px-3 shrink-0"
           >
             <span>Proceed</span>
-            {cart.length > 0 && (
-              <Badge variant="secondary" className="bg-primary-foreground/20 text-primary-foreground text-[10px] h-4 px-1">
-                {cart.length}
+            {effectiveCart.length > 0 && (
+              <Badge
+                variant="secondary"
+                className="bg-primary-foreground/20 text-primary-foreground text-[10px] h-4 px-1"
+              >
+                {effectiveCart.length}
               </Badge>
             )}
             <ArrowRight className="size-3.5" />
@@ -215,14 +319,15 @@ export default function AssetCatalogBrowse({
       </div>
 
       {/* Empty States */}
-      {groupedAssets.length === 0 ? (
+      {itemBuckets.length === 0 ? (
         <div className="py-12 text-center text-xs text-muted-foreground">
           No available assets to display in the catalog.
         </div>
-      ) : filteredGroupedAssets.length === 0 ? (
+      ) : filteredBuckets.length === 0 ? (
         <div className="flex flex-col h-36 items-center justify-center text-center text-xs text-muted-foreground gap-3 border border-dashed border-border rounded-lg bg-muted/20">
           <span>No assets found matching "{searchQuery}".</span>
           <Button
+            type="button"
             variant="outline"
             size="sm"
             onClick={() => setSearchQuery('')}
@@ -233,131 +338,270 @@ export default function AssetCatalogBrowse({
           </Button>
         </div>
       ) : (
-        /* Asset Grid */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredGroupedAssets.map(({ primary, children }) => {
-            const cartKey = `a-${primary.id}`;
-            const inCart = cart.some((c) => c.key === cartKey);
-            const cost = Number(primary.unit_cost || 0);
-            const isBundled = children.length > 0;
-            const itemName = primary.item?.name || primary.item_name || 'Asset Item';
-            const itemCode = primary.item?.item_code || primary.item_code || 'N/A';
-            const brandName = primary.item?.brand ? `${primary.item.brand} ` : '';
+        /* Expandable Asset Table */
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full border-collapse text-left text-xs">
+            <thead>
+              <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <th className="w-8 py-2.5 pl-3 pr-1"></th>
+                <th className="py-2.5 px-3">Asset</th>
+                <th className="py-2.5 px-3">Type</th>
+                <th className="py-2.5 px-3 text-right">Total Cost</th>
+                <th className="py-2.5 px-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filteredBuckets.map((bucket) => {
+                const { key, primary, entries, totalCost } = bucket;
+                const isExpanded = expandedKeys.has(key);
+                const hasMultipleUnits = entries.length > 1;
+                const primaryEntry = entries[0];
+                const cartKey = `a-${primary.id}`;
+                const inCart = effectiveCart.some((c) => c.key === cartKey);
+                const cost = Number(primary.unit_cost || 0);
+                const itemName = primary.item?.name || primary.item_name || 'Asset Item';
+                const itemCode = primary.item?.item_code || primary.item_code || 'N/A';
+                const brandName = primary.item?.brand ? `${primary.item.brand} ` : '';
+                const imageUrl =
+                  primary.item?.image_url || primary.image_url || primary.item_image_url;
+                const categoryName =
+                  primary.category_name ||
+                  primary.category?.name ||
+                  primary.item?.category_name ||
+                  primary.item?.category?.name ||
+                  null;
 
-            // Resolve image URL
-            const imageUrl = primary.item?.image_url || primary.image_url || primary.item_image_url;
+                return (
+                  <React.Fragment key={key}>
+                    <tr
+                      onClick={() => hasMultipleUnits && toggleExpand(key)}
+                      className={`transition-colors ${
+                        hasMultipleUnits ? 'cursor-pointer' : ''
+                      } ${isExpanded ? 'bg-muted/40' : 'hover:bg-muted/25'}`}
+                    >
+                      <td className="py-2.5 pl-3 pr-1 text-muted-foreground">
+                        {hasMultipleUnits ? (
+                          isExpanded ? (
+                            <ChevronDown className="size-4" />
+                          ) : (
+                            <ChevronRight className="size-4" />
+                          )
+                        ) : null}
+                      </td>
 
-            const categoryName =
-              primary.category_name ||
-              primary.category?.name ||
-              primary.item?.category_name ||
-              primary.item?.category?.name ||
-              null;
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-muted/40">
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={itemName}
+                                className="size-full object-cover"
+                              />
+                            ) : (
+                              <Package className="size-4 text-muted-foreground/60" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-foreground truncate">
+                                {brandName}
+                                {itemName}
+                              </span>
+                              {hasMultipleUnits && (
+                                <Badge
+                                  variant="secondary"
+                                  className="h-4 px-1.5 text-[10px] font-medium gap-1"
+                                >
+                                  <Layers className="size-2.5" />
+                                  {entries.length} units
+                                </Badge>
+                              )}
+                            </div>
+                            <span className="block text-[11px] text-muted-foreground truncate">
+                              {categoryName || primary.reference_no || itemCode}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
 
-            return (
-              <Card
-                key={primary.id}
-                className="group flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card shadow-2xs transition-all hover:shadow-sm"
-              >
-                {/* Hero Image Header Section */}
-                <div className="relative aspect-4/3 w-full bg-muted/40 overflow-hidden border-b border-border flex items-center justify-center">
-                  {imageUrl ? (
-                    <img
-                      src={imageUrl}
-                      alt={itemName}
-                      className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center gap-1.5 text-muted-foreground/50">
-                      <Package className="size-8 stroke-[1.5]" />
-                      <span className="text-[10px] font-medium uppercase tracking-wider">No Preview</span>
-                    </div>
-                  )}
+                      <td className="py-2.5 px-3">
+                        <span className="text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider border bg-info-soft text-info-text border-info-border">
+                          {cost >= 50000 ? 'PAR' : 'ICS'}
+                        </span>
+                      </td>
 
-                  {/* Overlaid Badges */}
-                  <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider border bg-info-soft text-info-text border-info-border">
-                      Asset
-                    </span>
-                    {isBundled && (
-                      <Badge variant="outline" className="bg-card/90 backdrop-blur-xs text-[10px] px-1.5 py-0 border-border">
-                        Bundled ({children.length})
-                      </Badge>
+                      <td className="py-2.5 px-3 text-right font-semibold text-foreground">
+                        {money(hasMultipleUnits ? totalCost : cost)}
+                      </td>
+
+                      <td
+                        className="py-2.5 px-3 text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          {!hasMultipleUnits && (
+                            <>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-[11px] gap-1"
+                                onClick={(e) =>
+                                  openDetails(e, primaryEntry.primary, primaryEntry.children)
+                                }
+                              >
+                                <Eye className="size-3" />
+                                Details
+                              </Button>
+
+                              {inCart ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  className="h-7 px-2 text-[11px] gap-1 border border-border"
+                                  onClick={(e) =>
+                                    handleToggleAssetCart(
+                                      e,
+                                      primaryEntry.primary,
+                                      primaryEntry.children
+                                    )
+                                  }
+                                  title="Tap to cancel and remove from cart"
+                                >
+                                  <Check className="size-3 text-emerald-600" />
+                                  <span>Added</span>
+                                  <X className="size-3 text-muted-foreground" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="h-7 px-2 text-[11px] gap-1"
+                                  onClick={(e) =>
+                                    handleToggleAssetCart(
+                                      e,
+                                      primaryEntry.primary,
+                                      primaryEntry.children
+                                    )
+                                  }
+                                >
+                                  <Plus className="size-3" />
+                                  Add
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Expanded Dropdown Rows for Same Item */}
+                    {isExpanded && hasMultipleUnits && (
+                      <tr className="bg-muted/20">
+                        <td colSpan={7} className="p-0">
+                          <div className="border-t border-border/70 px-4 py-3 pl-11">
+                            <div className="overflow-x-auto rounded-md border border-border bg-card">
+                              <table className="w-full border-collapse text-left text-xs">
+                                <thead>
+                                  <tr className="border-b border-border bg-muted/30 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                    <th className="py-1.5 px-2.5">#</th>
+                                    <th className="py-1.5 px-2.5">Property No.</th>
+                                    <th className="py-1.5 px-2.5">Serial No.</th>
+                                    <th className="py-1.5 px-2.5 text-right">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/60">
+                                  {entries.map((entry, idx) => {
+                                    const unit = entry.primary;
+                                    const unitCartKey = `a-${unit.id}`;
+                                    const unitInCart = effectiveCart.some(
+                                      (c) => c.key === unitCartKey
+                                    );
+
+                                    return (
+                                      <tr
+                                        key={unit.id || idx}
+                                        className="hover:bg-muted/30 transition-colors"
+                                      >
+                                        <td className="py-2 px-2.5 font-mono text-[11px] text-muted-foreground">
+                                          #{idx + 1}
+                                        </td>
+                                        <td className="py-2 px-2.5 font-mono text-[11px] text-foreground">
+                                          {unit.property_number || 'N/A'}
+                                        </td>
+                                        <td className="py-2 px-2.5 font-mono text-[11px] text-muted-foreground">
+                                          {unit.serial_number || 'N/A'}
+                                        </td>
+                                        <td className="py-2 px-2.5 text-right">
+                                          <div className="inline-flex items-center justify-end gap-1.5">
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              className="h-6 px-2 text-[11px] gap-1"
+                                              onClick={(e) =>
+                                                openDetails(e, unit, entry.children)
+                                              }
+                                            >
+                                              <Eye className="size-3" />
+                                              Details
+                                            </Button>
+
+                                            {unitInCart ? (
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="secondary"
+                                                className="h-6 px-2 text-[11px] gap-1 border border-border"
+                                                onClick={(e) =>
+                                                  handleToggleAssetCart(
+                                                    e,
+                                                    unit,
+                                                    entry.children
+                                                  )
+                                                }
+                                                title="Tap to cancel and remove from cart"
+                                              >
+                                                <Check className="size-3 text-emerald-600" />
+                                                <span>Added</span>
+                                                <X className="size-3 text-muted-foreground" />
+                                              </Button>
+                                            ) : (
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                className="h-6 px-2 text-[11px] gap-1"
+                                                onClick={(e) =>
+                                                  handleToggleAssetCart(
+                                                    e,
+                                                    unit,
+                                                    entry.children
+                                                  )
+                                                }
+                                              >
+                                                <Plus className="size-3" />
+                                                Add
+                                              </Button>
+                                            )}
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </div>
-
-                  <div className="absolute top-2.5 right-2.5">
-                    <Badge variant="secondary" className="bg-card/90 backdrop-blur-xs text-[10px] font-bold border border-border">
-                      {cost >= 50000 ? 'PAR' : 'ICS'}
-                    </Badge>
-                  </div>
-                </div>
-
-                <CardHeader className="p-3.5 pb-2">
-                  <CardTitle className="text-sm font-semibold line-clamp-1 text-foreground">
-                    {brandName}{itemName}
-                  </CardTitle>
-                  <p className="text-[11px] font-medium text-muted-foreground truncate">
-                    {categoryName || primary.property_number || primary.reference_no || itemCode}
-                  </p>
-                </CardHeader>
-
-                <CardContent className="px-3.5 py-1.5 flex-1 space-y-2">
-                  <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
-                    <dt className="text-muted-foreground">Property No.</dt>
-                    <dd className="text-right font-medium text-foreground truncate">
-                      {primary.property_number || 'N/A'}
-                    </dd>
-
-                    <dt className="text-muted-foreground font-medium pt-1 border-t border-border/50">Unit Cost</dt>
-                    <dd className="text-right font-semibold text-xs text-foreground pt-1 border-t border-border/50">
-                      {money(cost)}
-                    </dd>
-                  </dl>
-
-                  {isBundled && (
-                    <p className="text-[11px] text-muted-foreground truncate border-t border-border/60 pt-2">
-                      <span className="font-semibold text-foreground">Includes:</span>{' '}
-                      {children
-                        .map((c) => c.item?.name || c.item_name || 'Peripheral')
-                        .join(', ')}
-                    </p>
-                  )}
-                </CardContent>
-
-                <CardFooter className="p-3.5 pt-2 flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-xs h-8 gap-1.5"
-                    onClick={() => openDetails({ primary, children })}
-                  >
-                    <Eye className="size-3.5" />
-                    Details
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    className="flex-1 text-xs h-8 gap-1.5"
-                    disabled={inCart}
-                    onClick={() => addAssetToCart(primary, children)}
-                  >
-                    {inCart ? (
-                      <>
-                        <Check className="size-3.5" />
-                        Added
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="size-3.5" />
-                        Add Asset
-                      </>
-                    )}
-                  </Button>
-                </CardFooter>
-              </Card>
-            );
-          })}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -371,8 +615,11 @@ export default function AssetCatalogBrowse({
                   detailsGroup?.primary?.item_name ||
                   'Asset Details'}
               </span>
-              {detailsGroup?.children.length > 0 && (
-                <Badge variant="outline" className="bg-card text-[11px] font-normal border-border shrink-0">
+              {detailsGroup?.children?.length > 0 && (
+                <Badge
+                  variant="outline"
+                  className="bg-card text-[11px] font-normal border-border shrink-0"
+                >
                   <Layers className="mr-1 h-3 w-3 text-primary" />
                   + {detailsGroup.children.length} bundled peripheral(s)
                 </Badge>
@@ -385,7 +632,8 @@ export default function AssetCatalogBrowse({
               const rowName = row.item?.name || row.item_name || 'Asset Item';
               const rowCode = row.item?.item_code || row.item_code || 'N/A';
               const isMain = idx === 0;
-              const rowImageUrl = row.item?.image_url || row.image_url || row.item_image_url;
+              const rowImageUrl =
+                row.item?.image_url || row.image_url || row.item_image_url;
 
               const rowCategory =
                 row.category_name ||
@@ -414,7 +662,9 @@ export default function AssetCatalogBrowse({
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="font-semibold text-xs text-foreground truncate">{rowName}</span>
+                        <span className="font-semibold text-xs text-foreground truncate">
+                          {rowName}
+                        </span>
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider border ${
                             isMain
@@ -426,14 +676,19 @@ export default function AssetCatalogBrowse({
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Item Code: <span className="font-medium text-muted-foreground">{rowCode}</span>
+                        Item Code:{' '}
+                        <span className="font-medium text-muted-foreground">
+                          {rowCode}
+                        </span>
                       </p>
                     </div>
                   </div>
 
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs border-t border-border/60 pt-2.5">
                     <dt className="text-muted-foreground">Category</dt>
-                    <dd className="text-right font-medium text-foreground">{rowCategory}</dd>
+                    <dd className="text-right font-medium text-foreground">
+                      {rowCategory}
+                    </dd>
 
                     <dt className="text-muted-foreground">Property No.</dt>
                     <dd className="text-right font-medium text-foreground">
@@ -443,14 +698,18 @@ export default function AssetCatalogBrowse({
                     {row.reference_no && (
                       <>
                         <dt className="text-muted-foreground">Reference No.</dt>
-                        <dd className="text-right font-medium text-foreground">{row.reference_no}</dd>
+                        <dd className="text-right font-medium text-foreground">
+                          {row.reference_no}
+                        </dd>
                       </>
                     )}
 
                     {row.serial_number && (
                       <>
                         <dt className="text-muted-foreground">Serial Number</dt>
-                        <dd className="text-right font-medium text-foreground">{row.serial_number}</dd>
+                        <dd className="text-right font-medium text-foreground">
+                          {row.serial_number}
+                        </dd>
                       </>
                     )}
 
@@ -464,19 +723,25 @@ export default function AssetCatalogBrowse({
                     {row.manufacturer_name && (
                       <>
                         <dt className="text-muted-foreground">Manufacturer</dt>
-                        <dd className="text-right text-foreground">{row.manufacturer_name}</dd>
+                        <dd className="text-right text-foreground">
+                          {row.manufacturer_name}
+                        </dd>
                       </>
                     )}
 
                     {row.country_of_origin && (
                       <>
                         <dt className="text-muted-foreground">Country of Origin</dt>
-                        <dd className="text-right text-foreground">{row.country_of_origin}</dd>
+                        <dd className="text-right text-foreground">
+                          {row.country_of_origin}
+                        </dd>
                       </>
                     )}
 
                     <dt className="text-muted-foreground font-medium">Unit Cost</dt>
-                    <dd className="text-right font-semibold text-foreground">{money(row.unit_cost)}</dd>
+                    <dd className="text-right font-semibold text-foreground">
+                      {money(row.unit_cost)}
+                    </dd>
                   </dl>
                 </div>
               );

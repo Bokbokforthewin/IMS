@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AccountabilityReceipt;
 use App\Models\SerializedAsset;
+use App\Models\AccountabilityReceiptLine;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -407,5 +408,141 @@ class AccountabilityController extends Controller
             ->get();
 
         return response()->json($attached, 200);
+    }
+
+    /**
+     * Update an existing accountability receipt's MR user, issuer, end users,
+     * and remove/return deleted items to the available asset pool.
+     */
+    public function updateReceipt(Request $request, AccountabilityReceipt $receipt): JsonResponse
+    {
+        $validated = $request->validate([
+            'received_mr_by_id' => 'nullable|exists:users,id',
+            'user_id' => 'nullable|exists:users,id',
+            'issued_by_id' => 'nullable|exists:users,id',
+            'remarks' => 'nullable|string|max:1000',
+            'removed_line_ids' => 'nullable|array',
+            'removed_line_ids.*' => 'integer',
+            'removed_asset_ids' => 'nullable|array',
+            'removed_asset_ids.*' => 'integer',
+            'lines' => 'nullable|array',
+            'lines.*.id' => 'nullable|integer',
+            'lines.*.serialized_asset_id' => 'nullable|integer|exists:serialized_assets,id',
+            'lines.*.end_user_id' => 'nullable|exists:users,id',
+        ]);
+
+        try {
+            return DB::transaction(function () use ($request, $validated, $receipt) {
+                $user = $request->user();
+
+                $scopedReceipt = AccountabilityReceipt::with([
+                    'lines.serializedAsset',
+                    'user',
+                    'issuedBy',
+                    'receivedMrBy',
+                ])
+                    ->applyDataScope($user)
+                    ->lockForUpdate()
+                    ->findOrFail($receipt->id);
+
+                // 1. Update receipt-level fields (MR user, end user if sent, issuer, remarks)
+                $receiptUpdates = [];
+                if (array_key_exists('received_mr_by_id', $validated) && !empty($validated['received_mr_by_id'])) {
+                    $receiptUpdates['received_mr_by_id'] = $validated['received_mr_by_id'];
+                }
+                if (array_key_exists('user_id', $validated) && !empty($validated['user_id'])) {
+                    $receiptUpdates['user_id'] = $validated['user_id'];
+                }
+                if (array_key_exists('issued_by_id', $validated) && !empty($validated['issued_by_id'])) {
+                    $receiptUpdates['issued_by_id'] = $validated['issued_by_id'];
+                }
+                if (array_key_exists('remarks', $validated)) {
+                    $receiptUpdates['remarks'] = $validated['remarks'];
+                }
+
+                if (!empty($receiptUpdates)) {
+                    $scopedReceipt->update($receiptUpdates);
+                }
+
+                // 2. Determine which lines/assets are being removed
+                $removedLineIds = collect($validated['removed_line_ids'] ?? [])->map(fn($id) => (int) $id);
+                $removedAssetIds = collect($validated['removed_asset_ids'] ?? [])->map(fn($id) => (int) $id);
+
+                $linesToDelete = $scopedReceipt->lines->filter(function ($line) use ($removedLineIds, $removedAssetIds) {
+                    return $removedLineIds->contains((int) $line->id)
+                        || ($line->serialized_asset_id && $removedAssetIds->contains((int) $line->serialized_asset_id));
+                });
+
+                $releasedAssets = collect();
+
+                foreach ($linesToDelete as $line) {
+                    if ($line->serializedAsset) {
+                        $releasedAssets->push($line->serializedAsset);
+                    }
+                    $line->delete();
+                }
+
+                // Release removed serialized assets back to Available
+                foreach ($releasedAssets as $asset) {
+                    $lockedAsset = SerializedAsset::whereKey($asset->id)->lockForUpdate()->first();
+                    if (!$lockedAsset) continue;
+
+                    // Detach any child peripherals still attached to this asset's property number
+                    if (!empty($lockedAsset->property_number)) {
+                        SerializedAsset::where('attached_to', $lockedAsset->property_number)
+                            ->update(['attached_to' => null]);
+                    }
+
+                    $lockedAsset->update([
+                        'status' => 'Available',
+                        'current_holder_id' => null,
+                        'attached_to' => null,
+                    ]);
+                }
+
+                // 3. Update end users on remaining lines
+                $submittedLines = collect($validated['lines'] ?? []);
+                foreach ($submittedLines as $lineInput) {
+                    if (empty($lineInput['end_user_id'])) continue;
+
+                    $lineModel = null;
+                    if (!empty($lineInput['id'])) {
+                        $lineModel = AccountabilityReceiptLine::where('accountability_receipt_id', $scopedReceipt->id)
+                            ->whereKey($lineInput['id'])
+                            ->first();
+                    } elseif (!empty($lineInput['serialized_asset_id'])) {
+                        $lineModel = AccountabilityReceiptLine::where('accountability_receipt_id', $scopedReceipt->id)
+                            ->where('serialized_asset_id', $lineInput['serialized_asset_id'])
+                            ->first();
+                    }
+
+                    if ($lineModel && $lineModel->serialized_asset_id) {
+                        SerializedAsset::whereKey($lineModel->serialized_asset_id)
+                            ->lockForUpdate()
+                            ->update([
+                                'current_holder_id' => $lineInput['end_user_id'],
+                            ]);
+                    }
+                }
+
+                $updatedReceipt = $scopedReceipt->fresh([
+                    'lines.serializedAsset.item',
+                    'lines.serializedAsset.currentHolder',
+                    'user',
+                    'issuedBy',
+                    'receivedMrBy',
+                ]);
+
+                return response()->json([
+                    'message' => 'Accountability receipt updated successfully.',
+                    'receipt' => $updatedReceipt,
+                ], 200);
+            });
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Receipt not found or outside your scope.'], 404);
+        } catch (\Exception $e) {
+            Log::error('Failed to update receipt #' . $receipt->id . ': ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to update receipt: ' . $e->getMessage()], 500);
+        }
     }
 }

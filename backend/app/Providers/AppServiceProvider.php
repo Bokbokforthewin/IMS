@@ -3,9 +3,10 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\URL; // Import URL Facade
+use Illuminate\Support\Facades\URL;
 use Illuminate\Http\Request;
 
 class AppServiceProvider extends ServiceProvider
@@ -17,10 +18,16 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Force HTTPS for generated asset() links if in production or running SSL
         if ($this->app->environment('production') || request()->isSecure()) {
             URL::forceScheme('https');
         }
+
+        Gate::before(function ($user, $ability) {
+            if ($user && method_exists($user, 'hasRole') && $user->hasRole('super_admin')) {
+                return true;
+            }
+            return null;
+        });
 
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
