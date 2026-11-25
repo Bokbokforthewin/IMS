@@ -7,13 +7,11 @@ import {
   PackageCheck,
   PackageOpen,
   ClipboardCheck,
-  ArrowLeftRight,
   ChevronRight,
   PanelLeftClose,
   PanelLeftOpen,
   Baby,
   ReceiptText,
-  ShieldCogCorner,
   Sun,
   Moon,
 } from "lucide-react";
@@ -50,6 +48,7 @@ const rawMenuItems = [
     label: "Dashboard",
     icon: LayoutDashboard,
     permission: "view:dashboard_page",
+    tabPrefixes: ["dashboard"],
     subItems: [
       { id: "dashboard-overview", label: "Overview", permission: "view:dashboard_page" },
     ],
@@ -59,6 +58,7 @@ const rawMenuItems = [
     label: "Reports",
     icon: ReceiptText,
     permission: "view:reports_page",
+    tabPrefixes: ["reports"],
     subItems: [
       { id: "reports-overview", label: "Reports", permission: "view:reports_page" },
     ],
@@ -68,6 +68,7 @@ const rawMenuItems = [
     label: "Quick Receive",
     icon: PackageCheck,
     permission: "view:quick_receive_page",
+    tabPrefixes: ["quick-receive"],
     subItems: [
       { id: "quick-receive-categories", label: "Categories", permission: "component:quick_category_widget" },
       { id: "quick-receive-form", label: "Quick Receive Form", permission: "component:quick_receive_form_widget" },
@@ -79,6 +80,7 @@ const rawMenuItems = [
     label: "Catalog",
     icon: Boxes,
     permission: "view:catalog_page",
+    tabPrefixes: ["catalog"],
     subItems: [
       { id: "catalog-categories", label: "Categories", permission: "component:catalog_category_widget" },
       { id: "catalog-items", label: "Items", permission: "component:catalog_item_widget" },
@@ -89,6 +91,7 @@ const rawMenuItems = [
     label: "Receive Stock",
     icon: PackageCheck,
     permission: "view:receiving_page",
+    tabPrefixes: ["receive"],
     subItems: [
       { id: "receive-single", label: "Single Item", permission: "component:receive_single_item_widget" },
       { id: "receive-bundle", label: "Bundle / Set", permission: "component:receive_bulk_item_widget" },
@@ -100,6 +103,7 @@ const rawMenuItems = [
     label: "Issue Consumables",
     icon: PackageOpen,
     permission: "view:consumables_page",
+    tabPrefixes: ["consumables"],
     subItems: [
       { id: "consumables-issue", label: "Issue Item", permission: "component:issue_consumable_item_widget" },
       { id: "consumables-history", label: "Issue History", permission: "component:issue_history_widget" },
@@ -110,17 +114,10 @@ const rawMenuItems = [
     label: "Assign Asset",
     icon: ClipboardCheck,
     permission: "view:assets_page",
+    tabPrefixes: ["accountability", "transfer-return"],
     subItems: [
       { id: "accountability-assign", label: "Assign Form", permission: "component:assign_asset_form_widget" },
       { id: "accountability-list", label: "Assigned List", permission: "component:assigned_list_widget" },
-    ],
-  },
-  {
-    id: "transfer-return",
-    label: "Transfers & Returns",
-    icon: ArrowLeftRight,
-    permission: "view:assets_page",
-    subItems: [
       { id: "transfer-return-form", label: "Transfer / Return", permission: "component:transfer_return_form_widget" },
       { id: "transfer-return-history", label: "Movement Logs", permission: "component:movement_logs_widget" },
     ],
@@ -130,16 +127,9 @@ const rawMenuItems = [
     label: "Admin Panel",
     icon: Baby,
     permission: "action:manage users",
+    tabPrefixes: ["admin", "audit"],
     subItems: [
       { id: "admin-users", label: "User Management", permission: "action:manage users" },
-    ],
-  },
-  {
-    id: "audit",
-    label: "Audit Trail",
-    icon: ShieldCogCorner,
-    permission: "view:audit_trail_page",
-    subItems: [
       { id: "audit-logs", label: "Audit Logs", permission: "view:audit_trail_page" },
     ],
   },
@@ -169,10 +159,10 @@ function SidebarCollapseButton() {
   );
 }
 
-export default function Sidebar({ 
-  activeTab, 
-  setActiveTab, 
-  appConfig: propConfig 
+export default function Sidebar({
+  activeTab,
+  setActiveTab,
+  appConfig: propConfig,
 }) {
   const { hasPermission, settings } = useAuth();
   const { toggleSidebar } = useSidebar();
@@ -181,8 +171,10 @@ export default function Sidebar({
 
   // Night Mode State synced with document class and localStorage
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    return document.documentElement.classList.contains("dark") ||
-      localStorage.getItem("theme") === "dark";
+    return (
+      document.documentElement.classList.contains("dark") ||
+      localStorage.getItem("theme") === "dark"
+    );
   });
 
   useEffect(() => {
@@ -196,6 +188,11 @@ export default function Sidebar({
   }, [isDarkMode]);
 
   const simplified = settings?.simplified_encoding_workflow;
+
+  const isItemActive = (item) => {
+    const prefixes = item.tabPrefixes || [item.id];
+    return prefixes.some((prefix) => activeTab.startsWith(prefix));
+  };
 
   const filteredMenuItems = rawMenuItems
     .filter((item) => {
@@ -241,15 +238,19 @@ export default function Sidebar({
     fetchAppConfig();
   }, [propConfig]);
 
-  const toggleMenu = (id) => {
+  const toggleMenu = (item) => {
     setOpenMenus((current) => ({
       ...current,
-      [id]: current[id] !== undefined ? !current[id] : !activeTab.startsWith(id),
+      [item.id]: current[item.id] !== undefined ? !current[item.id] : !isItemActive(item),
     }));
   };
 
   return (
-    <ShadcnSidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground text-left">
+    <ShadcnSidebar
+      collapsible="icon"
+      variant="sidebar"
+      className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground text-left"
+    >
       {/* Header */}
       <SidebarHeader className="flex h-14 items-center justify-between border-b border-sidebar-border px-3 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
         <div className="flex w-full items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
@@ -290,14 +291,14 @@ export default function Sidebar({
             <SidebarMenu className="text-left">
               {filteredMenuItems.map((item) => {
                 const Icon = item.icon;
-                const isParentActive = activeTab.startsWith(item.id);
+                const isParentActive = isItemActive(item);
                 const isOpen = openMenus[item.id] ?? isParentActive;
 
                 return (
                   <Collapsible
                     key={item.id}
                     open={isOpen}
-                    onOpenChange={() => toggleMenu(item.id)}
+                    onOpenChange={() => toggleMenu(item)}
                     className="group/collapsible w-full text-left"
                   >
                     <SidebarMenuItem className="text-left">
